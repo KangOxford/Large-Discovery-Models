@@ -1,0 +1,77 @@
+{
+  "trust_region_centers": {
+    "CDR_H3": {
+      "description": "Primary paratope diversity center",
+      "type": "weak_center",
+      "rationale": "CDR-H3 is the most variable loop and a dominant antigen-contact region"
+    },
+    "CDR_L3": {
+      "description": "Secondary paratope diversity center",
+      "type": "weak_center",
+      "rationale": "CDR-L3 frequently contributes to antigen binding"
+    },
+    "CDR_H2": {
+      "description": "Tertiary paratope center",
+      "type": "weak_center",
+      "rationale": "CDR-H2 can modulate binding orientation and affinity"
+    },
+    "CDR_L1": {
+      "description": "Tertiary paratope center",
+      "type": "weak_center",
+      "rationale": "CDR-L1 can participate in antigen contacts"
+    },
+    "CDR_H1": {
+      "description": "Peripheral paratope center",
+      "type": "weak_center",
+      "rationale": "CDR-H1 can fine-tune antigen recognition"
+    },
+    "CDR_L2": {
+      "description": "Peripheral paratope center",
+      "type": "weak_center",
+      "rationale": "CDR-L2 can fine-tune antigen recognition"
+    }
+  },
+  "mutation_policy": {
+    "CDR_regions": {
+      "strategy": "Moderate diversification",
+      "allowed_substitutions": "All 20 standard amino acids considered; preference for physicochemically similar substitutions",
+      "avoid": [
+        "Unpaired cysteines",
+        "Proline at internal loop positions unless structurally justified"
+      ]
+    },
+    "framework_regions": {
+      "strategy": "Conservative",
+      "allowed_substitutions": "BLOSUM62-conservative or synonymous substitutions only",
+      "avoid": [
+        "Any change to conserved framework residues",
+        "Introduction of buried charges"
+      ]
+    },
+    "global": {
+      "substitution_model": "BLOSUM62-informed, weak physicochemical similarity prior",
+      "energy_prediction": "none"
+    }
+  },
+  "soft_constraints": [
+    "Avoid introducing unpaired cysteines",
+    "Avoid N-X-S/T N-linked glycosylation motifs",
+    "Avoid deamidation-prone motifs (e.g., NG, NS, DG) in exposed loops",
+    "Maintain overall net charge within approximately ±2 of the starting sequence",
+    "Limit contiguous hydrophobic stretches to reduce aggregation risk",
+    "Preserve known disulfide bonds and structural anchors",
+    "Avoid poly-glycine or poly-proline runs"
+  ],
+  "antigen_preferences": {
+    "antigen_specific_hotspots": [],
+    "forbidden_positions": [],
+    "glycan_aware_positions": [],
+    "bound_100_residues": [],
+    "preferred_interaction_modes": [
+      "polar contacts",
+      "aromatic stacking",
+      "salt bridges"
+    ],
+    "guidance": "No antigen hotspots, glycans, forbidden positions, or bound residue information were provided. Antigen preferences are therefore weak and sequence-level only; do not assume specific epitope residues."
+  }
+}

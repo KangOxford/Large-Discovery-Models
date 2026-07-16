@@ -1,0 +1,93 @@
+{
+  "api": {
+    "api_key_env": "OPENROUTER_API_KEY",
+    "base_url_env": "OPENROUTER_BASE_URL",
+    "api_key": "sk-WW4wU0123456789ioPoMUw",
+    "base_url": "https://example_base_url.com/v1",
+    "key_files": [
+      ".env"
+    ]
+  },
+  "models": {
+    "primary": "DeepSeek-V4-Flash",
+    "fallback": [
+      "Kimi-K2.6",
+      "MiniMax-M2.7"
+    ]
+  },
+  "runtime": {
+    "transport": "text",
+    "max_output_tokens": 16000,
+    "max_pdf_chars": 180000,
+    "max_pages_per_pdf": 80,
+    "reuse_uploads": false,
+    "force": false,
+    "no_api": false
+  },
+  "paths": {
+    "outdir": "markush_outputs",
+    "pdfs": [],
+    "csvs": []
+  },
+  "markush_referee": {
+    "enabled": true,
+    "context_chars_per_row": 5000,
+    "max_output_tokens": 3000,
+    "reuse_cache": true
+  },
+  "formula_workflow": {
+    "pdfs": [
+      "structure-based-design-and-evaluation-of-reversible-kras-g13d-inhibitors.pdf",
+      "ml3c00478_si_001.pdf"
+    ],
+    "outdir": "formula_workflow_outputs",
+    "llm": {
+      "model": "DeepSeek-V4-Flash",
+      "pages_per_chunk": 8,
+      "max_chunk_chars": 24000,
+      "max_output_tokens": 4000
+    },
+    "request": {
+      "delay": 1.0,
+      "api_timeout": 45,
+      "api_retries": 6,
+      "api_base_delay": 2.0,
+      "include_pubchem_formula": false
+    },
+    "cache": {
+      "force": false,
+      "reuse_pdf_pages": true,
+      "reuse_page_chunks": true,
+      "reuse_compound_scope": true,
+      "reuse_formula_extract": true,
+      "reuse_external_api": true
+    },
+    "compound_scope": {
+      "target_compound_ids": [],
+      "excluded_compound_ids": [],
+      "context_max_chars": 60000,
+      "demote_reference_only_final_compounds": true
+    },
+    "referee": {
+      "enabled": true,
+      "statuses": [
+        "ambiguous",
+        "resolved_bindingdb_sequence"
+      ],
+      "context_chars_per_row": 4000,
+      "max_output_tokens": 2000,
+      "reuse_cache": true
+    },
+    "output": {
+      "pdf_pages_json": "pdf_pages.json",
+      "pdf_page_chunks_json": "pdf_page_chunks.json",
+      "compound_scope_json": "compound_scope.json",
+      "formula_records_json": "formula_records.json",
+      "activity_records_json": "activity_records.json",
+      "detailed_csv": "formula_to_smiles.csv",
+      "final_csv": "final_compounds.csv",
+      "metadata_json": "workflow_metadata.json",
+      "ambiguity_referee_json": "ambiguity_referee.json"
+    }
+  }
+}

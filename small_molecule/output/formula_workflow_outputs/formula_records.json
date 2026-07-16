@@ -1,0 +1,1254 @@
+{
+  "tables": [
+    {
+      "table_ref": "Table S1",
+      "page_refs": [
+        ""
+      ],
+      "description": "LCMS data for analogs 7-26. Columns: Cmpd., Amide (not used), Molecular formula, Calculated m/z [M+H]+, Observed m/z."
+    },
+    {
+      "table_ref": "Page 45–50 (image-only sections, no parseable text for formulas)",
+      "page_refs": [
+        "ml3c00478_si_001.pdf:45",
+        "ml3c00478_si_001.pdf:46",
+        "ml3c00478_si_001.pdf:47",
+        "ml3c00478_si_001.pdf:48",
+        "ml3c00478_si_001.pdf:49",
+        "ml3c00478_si_001.pdf:50"
+      ],
+      "description": "Pages contain NMR/LCMS data for compounds 27–32, but all data are embedded in images. No extractable text formula records."
+    },
+    {
+      "table_ref": "ml3c00478_si_001.pdf:27-34",
+      "page_refs": [
+        "ml3c00478_si_001.pdf:27",
+        "ml3c00478_si_001.pdf:28",
+        "ml3c00478_si_001.pdf:29",
+        "ml3c00478_si_001.pdf:30",
+        "ml3c00478_si_001.pdf:31",
+        "ml3c00478_si_001.pdf:32",
+        "ml3c00478_si_001.pdf:33",
+        "ml3c00478_si_001.pdf:34"
+      ],
+      "description": "Synthesis descriptions for compounds 35, 36, 37 with LCMS/HRMS data"
+    }
+  ],
+  "records": [
+    {
+      "compound_id": "7",
+      "neutral_formula": "C31H37ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C31H38ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 7: molecular formula C31H38ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "8",
+      "neutral_formula": "C30H33ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C30H34ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 8: molecular formula C30H34ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "9",
+      "neutral_formula": "C32H37ClF3N8O4",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C32H38ClF3N8O4"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 9a: molecular formula C32H38ClF3N8O4, Calculated m/z [M+H]+. Footnote 'a' (mixture of diastereomers) mapped to base ID 9."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "10",
+      "neutral_formula": "C29H33ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C29H34ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 10: molecular formula C29H34ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "11",
+      "neutral_formula": "C35H41ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C35H42ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 11a: molecular formula C35H42ClF3N8O3, Calculated m/z [M+H]+. Footnote 'a' (mixture of diastereomers) mapped to base ID 11."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "12",
+      "neutral_formula": "C31H35ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C31H36ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 12: molecular formula C31H36ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "13",
+      "neutral_formula": "C33H39ClF3N8O4",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C33H40ClF3N8O4"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 13a: molecular formula C33H40ClF3N8O4, Calculated m/z [M+H]+. Footnote 'a' (mixture of diastereomers) mapped to base ID 13."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "14",
+      "neutral_formula": "C34H41ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C34H42ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 14: molecular formula C34H42ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "15",
+      "neutral_formula": "C32H37ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C32H38ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 15: molecular formula C32H38ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "16",
+      "neutral_formula": "C32H37ClF3N8O4",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C32H38ClF3N8O4"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 16a: molecular formula C32H38ClF3N8O4, Calculated m/z [M+H]+. Footnote 'a' (mixture of diastereomers) mapped to base ID 16."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "17",
+      "neutral_formula": "C34H41ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C34H42ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 17: molecular formula C34H42ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "18",
+      "neutral_formula": "C34H41ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C34H42ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 18: molecular formula C34H42ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "19",
+      "neutral_formula": "C32H37ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C32H38ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 19: molecular formula C32H38ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "20",
+      "neutral_formula": "C32H35ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C32H36ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 20a: molecular formula C32H36ClF3N8O3, Calculated m/z [M+H]+. Footnote 'a' (mixture of diastereomers) mapped to base ID 20."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "21",
+      "neutral_formula": "C33H39ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C33H40ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 21: molecular formula C33H40ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "22",
+      "neutral_formula": "C34H39ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C34H40ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 22a: molecular formula C34H40ClF3N8O3, Calculated m/z [M+H]+. Footnote 'a' (mixture of diastereomers) mapped to base ID 22."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "23",
+      "neutral_formula": "C33H39ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C33H40ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 23a: molecular formula C33H40ClF3N8O3, Calculated m/z [M+H]+. Footnote 'a' (mixture of diastereomers) mapped to base ID 23."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "24",
+      "neutral_formula": "C34H39ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C34H40ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 24: molecular formula C34H40ClF3N8O3, Calculated m/z [M+H]+."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "25",
+      "neutral_formula": "C33H37ClF3N8O4",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C33H38ClF3N8O4"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 25a: molecular formula C33H38ClF3N8O4, Calculated m/z [M+H]+. Footnote 'a' (mixture of diastereomers) mapped to base ID 25."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "26",
+      "neutral_formula": "C33H35ClF3N8O3",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C33H36ClF3N8O3"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table"
+      ],
+      "page_refs": [
+        ""
+      ],
+      "evidence": [
+        "Table S1 row 26a: molecular formula C33H36ClF3N8O3, Calculated m/z [M+H]+. Footnote 'a' (mixture of diastereomers) mapped to base ID 26."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "",
+      "primary_activity_target": "",
+      "primary_activity_endpoint": "",
+      "primary_activity_value_text": "",
+      "primary_activity_value_nM": "",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [],
+      "activity_evidence": [],
+      "activities_json": "[]"
+    },
+    {
+      "compound_id": "27",
+      "neutral_formula": "C37H39ClF3N9O3",
+      "formula_score": 11.3,
+      "raw_formulas": [
+        "C39H33Cl2FN6O",
+        "C37H40ClF3N9O3"
+      ],
+      "formula_kinds": [
+        "neutral",
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:2",
+        ""
+      ],
+      "evidence": [
+        "Synthesis of compound 27 listed in SI table of contents",
+        "Text on page 10: 'LCMS (ESI): calcd. for C37H40ClF3N9O3+ [M+H]+ 750.3, found 750.5' from synthesis of 27."
+      ],
+      "confidence": 1.0,
+      "warnings": [
+        "Conflicting neutral formula: C39H33Cl2FN6O vs C37H39ClF3N9O3"
+      ],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "0.18 μM",
+      "primary_activity_value_nM": "180",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [
+        "3"
+      ],
+      "activity_evidence": [
+        "Table 2, row 27."
+      ],
+      "activities_json": "[{\"compound_id\":\"27\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"0.18 μM\",\"qualifier\":\"\",\"value_numeric\":\"0.18\",\"unit\":\"uM\",\"value_nM\":\"180\",\"selectivity_fold\":\"\",\"source_type\":\"table\",\"page_refs\":[\"3\"],\"evidence\":\"Table 2, row 27.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "28",
+      "neutral_formula": "C40H41ClF3N9O3",
+      "formula_score": 10.8,
+      "raw_formulas": [
+        "C40H42ClF3N9O3+"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:12"
+      ],
+      "evidence": [
+        "LCMS (ESI, m/z): calcd. for C40H42ClF3N9O3+ [M+H]+ found 788.5, in step 2 synthesis of compound 28."
+      ],
+      "confidence": 0.95,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "~0.013 μM",
+      "primary_activity_value_nM": "13",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [
+        "3"
+      ],
+      "activity_evidence": [
+        "Table 2, row 28. Approximate value from text; table likely gives value around 13 nM."
+      ],
+      "activities_json": "[{\"compound_id\":\"28\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"~0.013 μM\",\"qualifier\":\"~\",\"value_numeric\":\"0.013\",\"unit\":\"uM\",\"value_nM\":\"13\",\"selectivity_fold\":\"\",\"source_type\":\"table\",\"page_refs\":[\"3\"],\"evidence\":\"Table 2, row 28. Approximate value from text; table likely gives value around 13 nM.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "29",
+      "neutral_formula": "C40H40ClF4N9O3",
+      "formula_score": 10.8,
+      "raw_formulas": [
+        "C40H41ClF4N9O3+"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:16"
+      ],
+      "evidence": [
+        "LCMS (ESI): calcd. for C40H41ClF4N9O3+ [M+H]+ found 806.4, in step 8 synthesis of compound 29."
+      ],
+      "confidence": 0.95,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "1.5 nM",
+      "primary_activity_value_nM": "1.5",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [
+        "3"
+      ],
+      "activity_evidence": [
+        "Table 2, row 29; also Table 4 row 29."
+      ],
+      "activities_json": "[{\"compound_id\":\"29\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"1.5 nM\",\"qualifier\":\"\",\"value_numeric\":\"1.5\",\"unit\":\"nM\",\"value_nM\":\"1.5\",\"selectivity_fold\":\"\",\"source_type\":\"table\",\"page_refs\":[\"3\"],\"evidence\":\"Table 2, row 29; also Table 4 row 29.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "30",
+      "neutral_formula": "C31H27ClF4N8O2",
+      "formula_score": 10.8,
+      "raw_formulas": [
+        "C31H28ClF4N8O2+"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:18"
+      ],
+      "evidence": [
+        "LCMS (ESI): calcd. for C31H28ClF4N8O2+ [M+H]+ found 655.2, in step 6 synthesis of compound 30."
+      ],
+      "confidence": 0.95,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "2.7 μM",
+      "primary_activity_value_nM": "2700",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [
+        "3"
+      ],
+      "activity_evidence": [
+        "Table 2, row 30."
+      ],
+      "activities_json": "[{\"compound_id\":\"30\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"2.7 μM\",\"qualifier\":\"\",\"value_numeric\":\"2700\",\"unit\":\"nM\",\"value_nM\":\"2700\",\"selectivity_fold\":\"\",\"source_type\":\"table\",\"page_refs\":[\"3\"],\"evidence\":\"Table 2, row 30.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "31",
+      "neutral_formula": "C41H43ClF3N9O3",
+      "formula_score": 11.3,
+      "raw_formulas": [
+        "C41H44ClF3N9O3+"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:20"
+      ],
+      "evidence": [
+        "Line: LCMS (ESI, m/z): calcd. for C41H44ClF3N9O3+ [M+H]+ 802.3, found 802.3."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "0.024 μM",
+      "primary_activity_value_nM": "24",
+      "primary_activity_selectivity_fold": "",
+      "activity_source_pages": [
+        "3"
+      ],
+      "activity_evidence": [
+        "Table 2, row 31."
+      ],
+      "activities_json": "[{\"compound_id\":\"31\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"0.024 μM\",\"qualifier\":\"\",\"value_numeric\":\"0.024\",\"unit\":\"uM\",\"value_nM\":\"24\",\"selectivity_fold\":\"\",\"source_type\":\"table\",\"page_refs\":[\"3\"],\"evidence\":\"Table 2, row 31.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "32",
+      "neutral_formula": "C40H42ClF4N9O2",
+      "formula_score": 11.3,
+      "raw_formulas": [
+        "C40H43ClF4N9O2+"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:22"
+      ],
+      "evidence": [
+        "Line: LCMS (ESI): calcd. for C40H43ClF4N9O2+ [M+H]+ 792.3, found 792.4;"
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "1.9 nM",
+      "primary_activity_value_nM": "1.9",
+      "primary_activity_selectivity_fold": "7.2",
+      "activity_source_pages": [
+        "3"
+      ],
+      "activity_evidence": [
+        "Table 3, row 32."
+      ],
+      "activities_json": "[{\"compound_id\":\"32\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"1.9 nM\",\"qualifier\":\"\",\"value_numeric\":\"1.9\",\"unit\":\"nM\",\"value_nM\":\"1.9\",\"selectivity_fold\":\"7.2\",\"source_type\":\"table\",\"page_refs\":[\"3\"],\"evidence\":\"Table 3, row 32.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "33",
+      "neutral_formula": "C39H42ClF4N9O2",
+      "formula_score": 11.3,
+      "raw_formulas": [
+        "C39H43ClF4N9O2+"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:24"
+      ],
+      "evidence": [
+        "Line: LC/MS (ESI): calcd. for C39H43ClF4N9O2+ [M+H]+ 780.3, found 780.3."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "0.53 nM",
+      "primary_activity_value_nM": "0.53",
+      "primary_activity_selectivity_fold": "5.7",
+      "activity_source_pages": [
+        "4"
+      ],
+      "activity_evidence": [
+        "Table 3, row 33."
+      ],
+      "activities_json": "[{\"compound_id\":\"33\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"0.53 nM\",\"qualifier\":\"\",\"value_numeric\":\"0.53\",\"unit\":\"nM\",\"value_nM\":\"0.53\",\"selectivity_fold\":\"5.7\",\"source_type\":\"table\",\"page_refs\":[\"4\"],\"evidence\":\"Table 3, row 33.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "34",
+      "neutral_formula": "C42H46ClF4N9O3",
+      "formula_score": 11.3,
+      "raw_formulas": [
+        "C42H47ClF4N9O3+"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:26"
+      ],
+      "evidence": [
+        "Line: LCMS (ESI): calcd. for C42H47ClF4N9O3+ [M+H]+ 836.3, found 836.3."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "22 nM",
+      "primary_activity_value_nM": "22",
+      "primary_activity_selectivity_fold": "1.5",
+      "activity_source_pages": [
+        "4"
+      ],
+      "activity_evidence": [
+        "Table 3, row 34."
+      ],
+      "activities_json": "[{\"compound_id\":\"34\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"22 nM\",\"qualifier\":\"\",\"value_numeric\":\"22\",\"unit\":\"nM\",\"value_nM\":\"22\",\"selectivity_fold\":\"1.5\",\"source_type\":\"table\",\"page_refs\":[\"4\"],\"evidence\":\"Table 3, row 34.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "35",
+      "neutral_formula": "C40H44ClF4N9O2",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C40H45ClF4N9O2+",
+        "C40H45ClF4N9O2"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table",
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:29",
+        "chunk_006; ml3c00478_si_001.pdf:27",
+        "ml3c00478_si_001.pdf:28",
+        "ml3c00478_si_001.pdf:30",
+        "ml3c00478_si_001.pdf:31",
+        "ml3c00478_si_001.pdf:32",
+        "ml3c00478_si_001.pdf:33",
+        "ml3c00478_si_001.pdf:34"
+      ],
+      "evidence": [
+        "LCMS (ESI, m/z): calcd. for C40H45ClF4N9O2+ [M+H]+ 794.3, found 794.4",
+        "--- Missing compound 35; chunk_006; ml3c00478_si_001.pdf:27, ml3c00478_si_001.pdf:28, ml3c00478_si_001.pdf:29, ml3c00478_si_001.pdf:30, ml3c00478_si_001.pdf:31, ml3c00478_si_001.pdf:32, ml3c00478_si_001.pdf:33, ml3c00478_si_001.pdf:34 --- afford 35 (15 mg, 53% yield) as a white solid and as FA salt."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "0.64 nM",
+      "primary_activity_value_nM": "0.64",
+      "primary_activity_selectivity_fold": "9.6",
+      "activity_source_pages": [
+        "4"
+      ],
+      "activity_evidence": [
+        "Table 3, row 35."
+      ],
+      "activities_json": "[{\"compound_id\":\"35\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"0.64 nM\",\"qualifier\":\"\",\"value_numeric\":\"0.64\",\"unit\":\"nM\",\"value_nM\":\"0.64\",\"selectivity_fold\":\"9.6\",\"source_type\":\"table\",\"page_refs\":[\"4\"],\"evidence\":\"Table 3, row 35.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "36",
+      "neutral_formula": "C41H46ClF4N9O2",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C41H47ClF4N9O2+",
+        "C41H47ClF4N9O2"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table",
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:27-34",
+        "chunk_006; ml3c00478_si_001.pdf:27",
+        "ml3c00478_si_001.pdf:28",
+        "ml3c00478_si_001.pdf:29",
+        "ml3c00478_si_001.pdf:30",
+        "ml3c00478_si_001.pdf:31",
+        "ml3c00478_si_001.pdf:32",
+        "ml3c00478_si_001.pdf:33",
+        "ml3c00478_si_001.pdf:34"
+      ],
+      "evidence": [
+        "LCMS (ESI) calcd. for C41H47ClF4N9O2+ [M+H]+ 808.4, found 808.4; HRMS calc. for C41H47ClF4N9O2+ [M+H]+, 808.3472; found, 808.3472",
+        "--- Missing compound 36; chunk_006; ml3c00478_si_001.pdf:27, ml3c00478_si_001.pdf:28, ml3c00478_si_001.pdf:29, ml3c00478_si_001.pdf:30, ml3c00478_si_001.pdf:31, ml3c00478_si_001.pdf:32, ml3c00478_si_001.pdf:33, ml3c00478_si_001.pdf:34 --- afford compound 36 (33 mg, 25% yield) as a white solid. LCMS "
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "0.67 nM",
+      "primary_activity_value_nM": "0.67",
+      "primary_activity_selectivity_fold": "10.4",
+      "activity_source_pages": [
+        "4"
+      ],
+      "activity_evidence": [
+        "Table 3, row 36."
+      ],
+      "activities_json": "[{\"compound_id\":\"36\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"0.67 nM\",\"qualifier\":\"\",\"value_numeric\":\"0.67\",\"unit\":\"nM\",\"value_nM\":\"0.67\",\"selectivity_fold\":\"10.4\",\"source_type\":\"table\",\"page_refs\":[\"4\"],\"evidence\":\"Table 3, row 36.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "37",
+      "neutral_formula": "C44H50ClF4N9O2",
+      "formula_score": 11.1,
+      "raw_formulas": [
+        "C44H51ClF4N9O2+",
+        "C35H44ClF4N7O5P"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "table",
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:34",
+        "chunk_006; ml3c00478_si_001.pdf:27",
+        "ml3c00478_si_001.pdf:28",
+        "ml3c00478_si_001.pdf:29",
+        "ml3c00478_si_001.pdf:30",
+        "ml3c00478_si_001.pdf:31",
+        "ml3c00478_si_001.pdf:32",
+        "ml3c00478_si_001.pdf:33"
+      ],
+      "evidence": [
+        "LCMS (ESI): calcd. for C44H51ClF4N9O2+ [M+H]+ 848.4, found 848.4; HRMS calc. for C44H51ClF4N9O2+ [M+H]+, 848.3785; found, 848.3773",
+        "--- Missing compound 37; chunk_006; ml3c00478_si_001.pdf:27, ml3c00478_si_001.pdf:28, ml3c00478_si_001.pdf:29, ml3c00478_si_001.pdf:30, ml3c00478_si_001.pdf:31, ml3c00478_si_001.pdf:32, ml3c00478_si_001.pdf:33, ml3c00478_si_001.pdf:34 --- Synthesis of compound 37 Step 1: A solution of 6-((R)-6-chlor"
+      ],
+      "confidence": 1.0,
+      "warnings": [
+        "Conflicting neutral formula: C44H50ClF4N9O2 vs C35H43ClF4N7O5P"
+      ],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "0.34 nM (15x)",
+      "primary_activity_value_nM": "0.34",
+      "primary_activity_selectivity_fold": "15",
+      "activity_source_pages": [
+        "4"
+      ],
+      "activity_evidence": [
+        "Table 3, row 37. Text: Selectivity given as 15× over WT."
+      ],
+      "activities_json": "[{\"compound_id\":\"37\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"0.34 nM (15x)\",\"qualifier\":\"\",\"value_numeric\":\"0.34\",\"unit\":\"nM\",\"value_nM\":\"0.34\",\"selectivity_fold\":\"15\",\"source_type\":\"table\",\"page_refs\":[\"4\"],\"evidence\":\"Table 3, row 37. Text: Selectivity given as 15× over WT.\",\"confidence\":1.0,\"score\":23.0}]"
+    },
+    {
+      "compound_id": "38",
+      "neutral_formula": "C41H43ClF4N8O2",
+      "formula_score": 11.100000000000001,
+      "raw_formulas": [
+        "C41H44ClF4N8O2+"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:35"
+      ],
+      "evidence": [
+        "LCMS (ESI): calcd. for C41H44ClF4N8O2+ [M+H]+ 791.3, found 791.3; HRMS calc. for C41H44ClF4N8O2+ [M+H]+, 791.3206; found, 791.3190"
+      ],
+      "confidence": 0.98,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "0.69 nM",
+      "primary_activity_value_nM": "0.69",
+      "primary_activity_selectivity_fold": "11",
+      "activity_source_pages": [
+        "5"
+      ],
+      "activity_evidence": [
+        "Table 4, row 38."
+      ],
+      "activities_json": "[{\"compound_id\":\"38\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"0.69 nM\",\"qualifier\":\"\",\"value_numeric\":\"0.69\",\"unit\":\"nM\",\"value_nM\":\"0.69\",\"selectivity_fold\":\"11\",\"source_type\":\"table\",\"page_refs\":[\"5\"],\"evidence\":\"Table 4, row 38.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "39",
+      "neutral_formula": "C43H47ClF4N8O2",
+      "formula_score": 11.100000000000001,
+      "raw_formulas": [
+        "C43H48ClF4N8O2+"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:39"
+      ],
+      "evidence": [
+        "LCMS (ESI, m/z): calcd. for C43H48ClF4N8O2+ [M+H]+ 819.4, found 819.4"
+      ],
+      "confidence": 0.98,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "0.85 nM",
+      "primary_activity_value_nM": "0.85",
+      "primary_activity_selectivity_fold": "16",
+      "activity_source_pages": [
+        "4"
+      ],
+      "activity_evidence": [
+        "Table 3, row 39."
+      ],
+      "activities_json": "[{\"compound_id\":\"39\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"0.85 nM\",\"qualifier\":\"\",\"value_numeric\":\"0.85\",\"unit\":\"nM\",\"value_nM\":\"0.85\",\"selectivity_fold\":\"16\",\"source_type\":\"table\",\"page_refs\":[\"4\"],\"evidence\":\"Table 3, row 39.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "40",
+      "neutral_formula": "C43H45ClF4N8O2",
+      "formula_score": 11.3,
+      "raw_formulas": [
+        "C43H46ClF4N8O2"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:44"
+      ],
+      "evidence": [
+        "Line: 'LCMS (ESI): calcd. for C43H46ClF4N8O2+ [M+H]+ 817.3, found 817.3' for compound 40."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "0.33 nM",
+      "primary_activity_value_nM": "0.33",
+      "primary_activity_selectivity_fold": "27",
+      "activity_source_pages": [
+        "4"
+      ],
+      "activity_evidence": [
+        "Table 3, row 40."
+      ],
+      "activities_json": "[{\"compound_id\":\"40\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"0.33 nM\",\"qualifier\":\"\",\"value_numeric\":\"0.33\",\"unit\":\"nM\",\"value_nM\":\"0.33\",\"selectivity_fold\":\"27\",\"source_type\":\"table\",\"page_refs\":[\"4\"],\"evidence\":\"Table 3, row 40.\",\"confidence\":1.0,\"score\":22.0}]"
+    },
+    {
+      "compound_id": "41",
+      "neutral_formula": "C43H45ClF4N8O2",
+      "formula_score": 11.3,
+      "raw_formulas": [
+        "C43H46ClF4N8O2"
+      ],
+      "formula_kinds": [
+        "mh_plus"
+      ],
+      "source_types": [
+        "characterization"
+      ],
+      "page_refs": [
+        "ml3c00478_si_001.pdf:44"
+      ],
+      "evidence": [
+        "Line: 'LCMS (ESI): calcd. for C43H46ClF4N8O2+ [M+H] + 817.3, found 817.3' for compound 41."
+      ],
+      "confidence": 1.0,
+      "warnings": [],
+      "primary_activity_assay": "KRAS G13D GDP HTRF",
+      "primary_activity_target": "KRAS G13D",
+      "primary_activity_endpoint": "IC50",
+      "primary_activity_value_text": "0.04 nM",
+      "primary_activity_value_nM": "0.04",
+      "primary_activity_selectivity_fold": "29",
+      "activity_source_pages": [
+        "4"
+      ],
+      "activity_evidence": [
+        "Table 3, row 41."
+      ],
+      "activities_json": "[{\"compound_id\":\"41\",\"assay_name\":\"KRAS G13D GDP HTRF\",\"target\":\"KRAS G13D\",\"endpoint\":\"IC50\",\"value_text\":\"0.04 nM\",\"qualifier\":\"\",\"value_numeric\":\"0.04\",\"unit\":\"nM\",\"value_nM\":\"0.04\",\"selectivity_fold\":\"29\",\"source_type\":\"table\",\"page_refs\":[\"4\"],\"evidence\":\"Table 3, row 41.\",\"confidence\":1.0,\"score\":22.0}]"
+    }
+  ],
+  "notes": [
+    "Chunk contained synthetic intermediates and characterization lines for compound 35, 36, 37, and 38, but no final-target formula records were found in the provided text.",
+    "Compound '7-26' generic statement is not extracted; only individual rows in Table S1 are used.",
+    "Compound 27 is found in characterization text (synthesis section) with [M+H]+ formula.",
+    "Compound 30' (atropisomer) was not included as it does not match the ID list (no ID number assigned).",
+    "Compound 35: extracted from the synthesis line ending with 'afford 35 (15 mg, 53% yield) as a white solid and as FA salt.' The LCMS line gives [M+H]+ formula.",
+    "Compound 36: extracted from fragment 'afford compound 36 (33 mg, 25% yield) as a white solid.' followed by LCMS and HRMS with [M+H]+ formula.",
+    "Compound 37: extracted from fragment 'afford 37 (30 mg, 28% yield) as a white solid.' followed by LCMS and HRMS with [M+H]+ formula.",
+    "Compound 40 and 41 are mentioned in the heading 'Synthesis of compounds 40 and 41' but no characterization lines with formulas were found within the provided PDF pages for these compounds.",
+    "Compound 5 appears in the text with a structure but no molecular formula.",
+    "Compounds 30' (page 19) and S12, S18–S28, 49, 56–60 are excluded as intermediates.",
+    "Deterministic focused LCMS formula fallback.",
+    "Formulas for the other target IDs (7-37, 40, 41) were not found in the provided text chunks.",
+    "Intermediate/excluded IDs (6a, 6b, 42-64, S12) are excluded.",
+    "No LCMS/HRMS characterization lines (e.g., 'calcd. for C...') were found for any of the final target compounds (7–41).",
+    "No data was found for compounds 28-41 in the provided chunks.",
+    "No table structures containing final target formulas were found.",
+    "No table-like regions containing column-aligned molecular formula data were found in the provided PDF text.",
+    "No table-like regions containing final target compound IDs were detected. All three records were extracted from LCMS characterization lines in synthesis procedures.",
+    "No tables or characterization lines with molecular formulas found on the provided page. The page only contains pharmacokinetic study descriptions and mentions compound IDs 29 and 38, but no formulas are given.",
+    "Only compounds 31-34 (±1 page) appeared in the text. Compounds 7-30 and 35-41 absent from all scanned pages.",
+    "Only compounds 40 and 41 appear in parseable text on these pages. All other target IDs (7–39) are either on image-only pages or in other supporting info not included in the provided chunks. The image-only NMR/LCMS pages for 27–32 (pages 45–50) contain no extractable formula strings.",
+    "Supporting information is mentioned but not included in the provided text.",
+    "Table S1 rows explicitly include footnote 'a' for compound IDs 9a, 11a, 13a, 16a, 20a, 22a, 23a, 25a, 26a. These are mapped to base IDs 9, 11, 13, 16, 20, 22, 23, 25, 26 respectively as per rules.",
+    "The PDF contains images of chemical structures (e.g., Figures 1–3, Tables 1–3), but the OCR text does not include formula strings.",
+    "The PDF pages contain only compound headers (e.g., 'Compound 33 (1H-NMR, LCMS)' and solvent names) but no visible molecular formula data in text form. The extracted text shows no LCMS/HRMS lines, table regions, or characterization lines containing formulas. Therefore, no formula records can be extracted for the final target compound IDs from these pages.",
+    "The PDF text provided does not include the actual characterization data tables or LCMS lines with formulas for the target compounds. The supporting information table of contents shows compound numbers 27-41 but no molecular formulas are included in the provided text excerpts.",
+    "The main paper pages mention compound IDs 27, 29, 38, 41 but no molecular formula data is present in the provided text.",
+    "The text describes compound IDs (e.g., 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41) but provides only biochemical IC50 and selectivity data, not molecular formulas.",
+    "To extract actual formulas, the full text of the supporting information (including the characterization sections) would be needed."
+  ]
+}

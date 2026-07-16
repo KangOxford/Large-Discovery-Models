@@ -1,0 +1,52 @@
+acq: ei
+antigen: 1ADQ_A
+ard: true
+batch_size: 1
+bbox:
+  path: /mnt/data0/shared/AntBO/Absolut
+  process: 2
+  startTask: 0
+  tool: Absolut
+device: cuda
+kernel_type: transformed_overlap
+max_iters: 200
+min_cuda: 10
+n_init: 20
+noise_variance: 1e-6
+# Section 1 / Mode B: random temporary candidates ranked by an LLM-derived JSON policy.
+llm_ranked_init: true
+llm_init_policy_path: ./bo/example_llm_init_policy.json
+llm_init_n_candidates: 200
+llm_init_diversity_weight: 0.25
+llm_init_score_weights:
+  developability: 1.0
+  mutation_policy: 1.0
+  antigen_preference: 1.0
+  
+# Section 2
+llm_trust_region: true
+llm_trust_region_policy_path: ./bo/example_llm_trust_region_policy.json
+llm_trust_region_lambda: 0.1
+llm_trust_region_include_current_best: true
+
+normalise: true
+path: /mnt/data0/shared/AntBO/Absolut
+process: 1
+resume: ???
+save_path: /mnt/data0/shared/AntBO/HEBO/AntBO/results
+search_strategy: local
+seq_len: 11
+startTask: 0
+tabular_search_csv: null
+
+# Section 3: antigen feature injection into LLM prompt context.
+llm_antigen_context: true
+llm_antigen_context_timeout_s: 30
+llm_antigen_context_include_raw: false
+llm_prompt_save_every: 0
+llm_prompt_top_k: 10
+
+llm_policy_command: null
+llm_policy_timeout_s: 120
+llm_generate_initial_policy: false
+llm_refresh_policy: false

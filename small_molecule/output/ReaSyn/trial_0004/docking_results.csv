@@ -1,0 +1,10 @@
+compound_id,canonical_smiles,score,pose_ref,status,cached,message
+37_trial4_analog_1,Cc1cnc(C=CC(=O)N2CCN(c3c(Cl)cc4c(Cl)nc(Cl)nc4c3F)C(C)C2)cc1C1CCN(C)CC1,-9.824,output/reasyn_hpc_docking_work/poses/37_trial0_analog_2_af76cc4c79de6269b833.pdbqt,ok,True,
+37_trial4_analog_9,Cc1cnc(C=CC(=O)N2CCN(c3nc(Cl)c4cc(Cl)c(Br)c(F)c4n3)C(C)C2)cc1C1CCN(C)CC1,-9.176,output/reasyn_hpc_docking_work/poses/37_trial0_analog_3_b2917defb42f5c395eac.pdbqt,ok,True,
+37_trial4_analog_17,Cc1cnc(C=CC(=O)N2CCN(c3nc(Cl)nc4c(F)c(Br)c(Cl)cc34)C(C)C2)cc1C1CCN(C)CC1,-9.627,output/reasyn_hpc_docking_work/poses/37_trial0_analog_1_bebd5603ba7704f32f3b.pdbqt,ok,True,
+38_trial4_analog_1,C=C1CN2CCCC2(COc2nc(N3CCN(C(C)=O)CC3C)c3cc(Cl)c(Br)c(F)c3n2)C1,-8.827,output/reasyn_hpc_docking_work/poses/32_trial0_analog_2_0544f036d8af1cf96fc8.pdbqt,ok,True,
+38_trial4_analog_65,C=C1CN2CCCC2(COc2cc3c(N4CCN(C(C)=O)CC4C)nc(Cl)nc3c(F)c2-c2c(C)cc(N)nc2O)C1,-8.472,output/reasyn_hpc_docking_work/poses/32_trial0_analog_3_4c78a9d4daa0d594f7ad.pdbqt,ok,True,
+38_trial4_analog_18,C=C1CN2CCCC2(COc2nc(N3CCN(C(C)=O)CC3C)c3cc(Cl)c(-c4c(C)cc(N)nc4O)c(F)c3n2)C1,-9.669,output/reasyn_hpc_docking_work/poses/32_trial0_analog_1_a073df8338a3a13a7f32.pdbqt,ok,True,
+39_trial4_analog_1,C=C1CN2CCCC2(COc2nc(N3CCN(C(C)=O)CC3C)c3cc(Cl)c(Br)c(F)c3n2)C1,-8.827,output/reasyn_hpc_docking_work/poses/32_trial0_analog_2_0544f036d8af1cf96fc8.pdbqt,ok,True,
+39_trial4_analog_65,C=C1CN2CCCC2(COc2cc3c(N4CCN(C(C)=O)CC4C)nc(Cl)nc3c(F)c2-c2c(C)cc(N)nc2O)C1,-8.472,output/reasyn_hpc_docking_work/poses/32_trial0_analog_3_4c78a9d4daa0d594f7ad.pdbqt,ok,True,
+39_trial4_analog_18,C=C1CN2CCCC2(COc2nc(N3CCN(C(C)=O)CC3C)c3cc(Cl)c(-c4c(C)cc(N)nc4O)c(F)c3n2)C1,-9.669,output/reasyn_hpc_docking_work/poses/32_trial0_analog_1_a073df8338a3a13a7f32.pdbqt,ok,True,

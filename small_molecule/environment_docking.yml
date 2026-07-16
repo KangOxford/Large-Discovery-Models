@@ -1,0 +1,12 @@
+name: markush-dock
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - rdkit
+  - meeko
+  - vina
+  - gemmi
+  - scipy
+  - pydantic>=2
+  - pip

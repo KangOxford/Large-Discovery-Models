@@ -1,0 +1,25 @@
+COMMAND:
+/Users/StarLiu714/Desktop/test/.venv_dock/bin/mk_prepare_receptor.py --read_pdb docking_work/receptors/8UN5_A_XQ6_clean.pdb -o docking_work/receptors/8UN5_A_XQ6_meeko -p --box_center 7.098 -12.100 -8.160 --box_size 20.421 22.659 22.227 -v -a
+
+STDOUT:
+
+
+STDERR:
+/Users/StarLiu714/Desktop/test/.venv_dock/lib/python3.9/site-packages/prody/utilities/misctools.py:424: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Traceback (most recent call last):
+  File "/Users/StarLiu714/Desktop/test/.venv_dock/bin/mk_prepare_receptor.py", line 6, in <module>
+    sys.exit(main())
+  File "/Users/StarLiu714/Desktop/test/.venv_dock/lib/python3.9/site-packages/meeko/cli/mk_prepare_receptor.py", line 628, in main
+    polymer = Polymer.from_pdb_string(
+  File "/Users/StarLiu714/Desktop/test/.venv_dock/lib/python3.9/site-packages/meeko/polymer.py", line 1139, in from_pdb_string
+    polymer = cls(
+  File "/Users/StarLiu714/Desktop/test/.venv_dock/lib/python3.9/site-packages/meeko/polymer.py", line 910, in __init__
+    self.monomers, self.log = self._get_monomers(
+  File "/Users/StarLiu714/Desktop/test/.venv_dock/lib/python3.9/site-packages/meeko/polymer.py", line 1682, in _get_monomers
+    rdkit_mol = cls._build_rdkit_mol(
+  File "/Users/StarLiu714/Desktop/test/.venv_dock/lib/python3.9/site-packages/meeko/polymer.py", line 1400, in _build_rdkit_mol
+    update_H_positions(rdkit_mol, idxs)
+  File "/Users/StarLiu714/Desktop/test/.venv_dock/lib/python3.9/site-packages/meeko/polymer.py", line 454, in update_H_positions
+    raise RuntimeError(
+RuntimeError: Updated 1 H positions but deleted 5

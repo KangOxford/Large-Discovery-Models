@@ -1,0 +1,30 @@
+{
+  "antigen_context": {
+    "antigen_id": "1ADQ_A",
+    "pdb_id": "1ADQ",
+    "chain_id": "A",
+    "source": "Absolut",
+    "features": {
+      "forbidden_positions": [],
+      "glycans": [],
+      "hotspots": [],
+      "hotspot_core_residues": [],
+      "bound_100_residues": []
+    }
+  },
+  "bo_history": {
+    "num_observations": 0,
+    "current_best_sequence": null,
+    "current_best_value": null,
+    "top_observed_sequences": []
+  },
+  "task": {
+    "instruction": "Propose weak, interpretable trust-region centers and mutation preferences. Return JSON only. Do not predict exact binding energy. Do not invent antigen facts not present in antigen_context.",
+    "expected_json_keys": [
+      "trust_region_centers",
+      "mutation_policy",
+      "soft_constraints",
+      "antigen_preferences"
+    ]
+  }
+}

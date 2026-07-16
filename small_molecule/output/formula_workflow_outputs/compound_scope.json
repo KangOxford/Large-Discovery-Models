@@ -1,0 +1,506 @@
+{
+  "paper": {
+    "title": "Structure-Based Design and Evaluation of Reversible KRAS G13D Inhibitors",
+    "abstract_summary": "This paper describes the design and evaluation of potent and KRAS G13D-selective reversible inhibitors targeting the GDP state Switch II pocket.",
+    "primary_target_or_assay": "KRAS G13D GDP HTRF IC50, selectivity over WT KRAS"
+  },
+  "final_compounds": [
+    {
+      "compound_id": "7",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "8",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "9",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "10",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "11",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "12",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "13",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "14",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "15",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "16",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "17",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "18",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "19",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "20",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "21",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "22",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "23",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "24",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "25",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "26",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "27",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "28",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "29",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "30",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "31",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "32",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "33",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "34",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "35",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "36",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "37",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "38",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "39",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "40",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "41",
+      "role": "final_target",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    }
+  ],
+  "intermediates": [
+    {
+      "compound_id": "42-58",
+      "role": "Synthetic intermediates in Scheme 1 for compound 29",
+      "source_refs": [
+        "Scheme 1"
+      ],
+      "evidence": "Scheme 1 synthetic route; not assayed",
+      "confidence": 1
+    },
+    {
+      "compound_id": "59-64",
+      "role": "Synthetic intermediates in Scheme 2 for compound 38",
+      "source_refs": [
+        "Scheme 2"
+      ],
+      "evidence": "Scheme 2 synthetic route; not assayed",
+      "confidence": 1
+    },
+    {
+      "compound_id": "6a,6b",
+      "role": "Intermediates in synthesis of amide library (Table 1)",
+      "source_refs": [
+        "SI: General procedures"
+      ],
+      "evidence": "Reported as intermediates; do not appear in assay tables",
+      "confidence": 1
+    }
+  ],
+  "excluded_compounds": [
+    {
+      "compound_id": "1",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "2",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "3",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "4",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "6a",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "6b",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "42",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "43",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "44",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "45",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "46",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "47",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "48",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "49",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "50",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "51",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "52",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "53",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "54",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "55",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "56",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "57",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "58",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "59",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "60",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "61",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "62",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "63",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "64",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    },
+    {
+      "compound_id": "S12",
+      "reason": "excluded_or_intermediate",
+      "source_refs": [],
+      "evidence": "LLM/manual scope result.",
+      "confidence": 1.0
+    }
+  ],
+  "target_id_patterns": [
+    "IDs in Tables 1-4 and Figures 2-5",
+    "Compounds described in abstract as selective inhibitors"
+  ],
+  "notes": [
+    "Compact ranges used where evidence supports (e.g., 27-29, 33-41).",
+    "Compound 5 included as it is a direct comparator with crystallographic data.",
+    "All compounds in Table 3 (33-41) included as finished series even if weak selectivity.",
+    "Added final analog range 7-26 from LCMS/MS or analog-library text.",
+    "Added final analog range 27−41 from LCMS/MS or analog-library text."
+  ]
+}

@@ -1,0 +1,731 @@
+{
+  "decisions": {
+    "5_0a5b815ab59093c0": {
+      "compound_id": "5",
+      "decision": "select_candidate",
+      "selected_chembl_id": "CHEMBL96201",
+      "selected_bindingdb_id": "BDBM50072110",
+      "confidence": 0.8,
+      "distinguishing_features": [
+        "sequence_offset_support of 23 strongly supports BDBM50619529 as the expected BindingDB ID, but that ID does not appear in the candidate list; however, among candidates with a BindingDB ID, the one that best matches the structural features inferred from the formula evidence (C15H13N2O+ [M]+ 237.1) is CHEMBL96201 (BDBM50072110), with SMILES C(Oc1cncc(c1)-c1ccccc1)[C@@H]1CCN1, which has the correct core and matches the observed [M]+ mass based on the neutral formula C15H16N2O.",
+        "The current selection (CHEMBL10563) has SMILES C1C[C@H](CN1)Oc1cncc(c1)-c1ccccc1, which also fits the formula but lacks a BindingDB ID consistent with the sequence expectation; CHEMBL96201 has the same core with a different substituent (alcohol vs. no alcohol) and is supported by a BindingDB ID that is the closest match among candidates to the sequence-expected BindingDB ID when considering offset.",
+        "Other candidates with BindingDB IDs have SMILES that do not match the fragment evidence (e.g., no pyridine-aryl ether linkage)."
+      ],
+      "rationale": "The formula evidence shows LCMS found [M]+ 237.1 for C15H13N2O+, which corresponds to a neutral formula of C15H16N2O. The candidate CHEMBL96201 with SMILES C(Oc1cncc(c1)-c1ccccc1)[C@@H]1CCN1 matches this core structure (pyridine-aryl ether with a pyrrolidine ring) and has a BindingDB ID (BDBM50072110). Although the sequence-expected BindingDB ID (BDBM50619529) is not present, among the candidates with BindingDB IDs, this one is the best structural match given the high sequence_offset_support. Therefore, the decision is to select CHEMBL96201."
+    },
+    "9_acaba4f3692aac28": {
+      "compound_id": "9",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5420106",
+      "selected_bindingdb_id": "BDBM50619533",
+      "confidence": 0.92,
+      "distinguishing_features": [
+        "The sequence_expected_bindingdb_id is BDBM50619533 with sequence_offset_support 23, strongly indicating the correct candidate.",
+        "Candidate 1 (CHEMBL5420106 / BDBM50619533) has a bindingdb_minus_compound_id of 50619524, which matches the expected delta offset.",
+        "Both candidates share the same molecular formula C32H38ClF3N8O4, so formula does not distinguish them.",
+        "The formula evidence from Table S1 is consistent with both structures, but the sequence support is decisive."
+      ],
+      "rationale": "The sequence_offset_support of 23 strongly indicates that the BindingDB ID BDBM50619533 (Candidate 1) is the correct structure for compound 9. No evidence points toward Candidate 2."
+    },
+    "14_e7f4377ee8b7b289": {
+      "compound_id": "14",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5400481",
+      "selected_bindingdb_id": "BDBM50619538",
+      "confidence": 0.92,
+      "distinguishing_features": [
+        "sequence_offset_support of 23 matches expected BindingDB ID BDBM50619538",
+        "BindingDB ID sequence offset (50619524) for candidate 2 aligns with inferred sequence",
+        "No other candidate has the same offset value",
+        "Formula provenance from table S1 with high confidence supports the compound but does not differentiate isomers",
+        "Candidate 2 is the current selection consistent with resolved_bindingdb_sequence status"
+      ],
+      "rationale": "The compound has a resolved_bindingdb_sequence status with high sequence_offset_support (23) and the expected BindingDB ID matches candidate 2 (BDBM50619538). The other candidates have different BindingDB IDs and offsets, and there is no evidence to overturn the current selection."
+    },
+    "15_99492bd7e415f9d9": {
+      "compound_id": "15",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5403626",
+      "selected_bindingdb_id": "BDBM50619539",
+      "confidence": 1.0,
+      "distinguishing_features": [
+        "sequence_offset_support is 23, indicating the expected BindingDB ID BDBM50619539 is well-supported",
+        "Candidate 2 has bindingdb_minus_compound_id = 50619524, matching the inferred offset sequence",
+        "No warnings or evidence favor the other candidate over the current selection"
+      ],
+      "rationale": "The current selected candidate CHEMBL5403626/BDBM50619539 aligns with the sequence_offset_support value (23) and the expected BindingDB ID (BDBM50619539) from BindingDB sequence inference. The other candidate has a different BindingDB ID and offset, and there is no countervailing evidence to prefer it. Therefore, the current choice remains the best supported."
+    },
+    "16_0404309040ae16c3": {
+      "compound_id": "16",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5423141",
+      "selected_bindingdb_id": "BDBM50619540",
+      "confidence": 0.92,
+      "distinguishing_features": [
+        "sequence_offset_support=23 for candidate 2 matches expected BindingDB ID BDBM50619540",
+        "candidate 2 is the current selection and has supporting sequence expectation",
+        "no contrary evidence from formula provenance or warnings"
+      ],
+      "rationale": "The sequence_offset_support field indicates high support for BDBM50619540 as the expected BindingDB ID. The current selection (CHEMBL5423141/BDBM50619540) corresponds to this expected ID. Candidate 1 (BDBM50619533) does not match the expected sequence. The formula, provenance, and warnings do not contradict this choice. Therefore the current selection is the best supported."
+    },
+    "17_f43f04ba67bbc665": {
+      "compound_id": "17",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5400366",
+      "selected_bindingdb_id": "BDBM50619541",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "sequence_offset_support is high (23) and matches current selected BindingDB ID BDBM50619541",
+        "all candidates have identical formula and nearly identical SMILES; the only difference is the stereochemistry of the tail, which cannot be resolved by formula or common evidence",
+        "no warnings or contradictory evidence against the current selection",
+        "the current candidate CHEMBL5400366/BDBM50619541 is the sequence-supported choice"
+      ],
+      "rationale": "The compound ID 17 has a high sequence_offset_support (23) that exactly matches the expected BindingDB ID BDBM50619541, which corresponds to the currently selected candidate CHEMBL5400366. All three candidates share the same molecular formula and their core structures are identical; the only variations are in the stereochemistry of the terminal piperidine ring. Since the formula, characterization evidence, and table provenance do not differentiate the candidates, the sequence offset support is the decisive factor favoring the current selection. No warnings indicate that the current choice should be rejected. Therefore, the current selection is retained."
+    },
+    "18_2ceddcd9f40dd5bf": {
+      "compound_id": "18",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5421903",
+      "selected_bindingdb_id": "BDBM50619542",
+      "confidence": 1.0,
+      "distinguishing_features": [
+        "sequence_offset_support: 23",
+        "expected_bindingdb_id matches current selection",
+        "sequence_expected_bindingdb_id: BDBM50619542",
+        "raw formula kind mh_plus with confidence 1.0 from table",
+        "formula evidence table S1"
+      ],
+      "rationale": "The high sequence_offset_support (23) and the direct match between sequence_expected_bindingdb_id and current_selected_bindingdb_id strongly support Candidate 3. Formula provenance and table evidence are consistent. No reason to switch."
+    },
+    "19_95b8f85b2e306a72": {
+      "compound_id": "19",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5399365",
+      "selected_bindingdb_id": "BDBM50619543",
+      "confidence": 0.7,
+      "distinguishing_features": [
+        "The current selected candidate matches the sequence_expected_bindingdb_id BDBM50619543 with a sequence_offset_support of 23, which is high.",
+        "Both candidates share the same formula C32H38ClF3N8O3, but the current selection is explicitly listed as the expected BindingDB ID.",
+        "No warnings or contradictory evidence are present in the formula provenance or candidate metadata that would favor the alternate candidate."
+      ],
+      "rationale": "Candidate 1 (CHEMBL5399365/BDBM50619543) is the current selection and its BindingDB ID matches the expected sequence-derived BindingDB ID (BDBM50619543) with high sequence_offset_support (23). No evidence in the provided metadata or warnings diminishes this support. The alternate candidate (CHEMBL5403626/BDBM50619539) does not match the expected sequence ID, so the current candidate remains the best supported choice."
+    },
+    "21_9a8a6302e99f13fb": {
+      "compound_id": "21",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5407525",
+      "selected_bindingdb_id": "BDBM50619545",
+      "confidence": 0.85,
+      "distinguishing_features": [
+        "BindingDB ID matches expected BindingDB ID BDBM50619545 with high sequence_offset_support (23)",
+        "Candidate 1 and Candidate 2 share identical molecular formula and nearly identical SMILES, differing only in the terminal ring: Candidate 1 has 'CC1CCNCC1' while Candidate 2 has 'CCC1CCNC1'",
+        "The table evidence for compound 21 supports a specific structure, and the current selection is consistent with that evidence",
+        "No warnings or contradictory characterizations"
+      ],
+      "rationale": "The current selected candidate CHEMBL5407525/BDBM50619545 aligns perfectly with the expected BindingDB ID (BDBM50619545) and has high sequence offset support (23).  The two candidates differ in a minor structural detail, but the current selection is the one expected and supported by the evidence. Therefore, the current candidate is the best supported choice."
+    },
+    "22_e445d87a97f026e3": {
+      "compound_id": "22",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5440407",
+      "selected_bindingdb_id": "BDBM50619546",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "sequence_offset_support: 23",
+        "sequence_expected_bindingdb_id matches current_selected_bindingdb_id",
+        "bindingdb_minus_compound_id delta=50619524 matches expected offset",
+        "both candidates share same formula and close structure; no conflicting evidence"
+      ],
+      "rationale": "The current selection (CHEMBL5440407/BDBM50619546) has sequence_offset_support of 23, and its bindingdb_minus_compound_id (50619524) matches the sequence_expected_bindingdb_id.  Candidate 1 (BDBM50619548) has a different offset (50619526) and no additional supporting evidence.  The formula provenance and warnings are consistent with the current selection.  Therefore the best supported candidate is the currently selected one."
+    },
+    "23_4c87144673e85477": {
+      "compound_id": "23",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5439684",
+      "selected_bindingdb_id": "BDBM50619547",
+      "confidence": 1.0,
+      "distinguishing_features": [
+        "sequence_expected_bindingdb_id matches candidate 2's bindingdb_id",
+        "sequence_offset_support is 23, directly supporting candidate 2",
+        "no contradictory evidence from formula or warnings"
+      ],
+      "rationale": "The sequence_offset_support of 23 directly indicates candidate 2 (BDBM50619547) is the expected match, and it is the current selection. All other candidates are unsupported in the sequence context."
+    },
+    "24_e58a9466245d8862": {
+      "compound_id": "24",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5401087",
+      "selected_bindingdb_id": "BDBM50619548",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "Current selected candidate CHEMBL5401087/BDBM50619548 matches the sequence_expected_bindingdb_id (BDBM50619548) with high sequence_offset_support (23).",
+        "Both candidates share the same molecular formula and very similar SMILES, but none of the other distinguishing evidence (provenance, warnings, characterization) favors a different candidate.",
+        "No contradictory evidence present in the record; the pre‐selected candidate is still best supported."
+      ],
+      "rationale": "The sequence_offset_support strongly points to BDBM50619548 as the intended BindingDB entry, which is exactly the candidate currently selected. The formula evidence does not discriminate between the two candidates, and no warnings or other metadata suggest a change. Therefore the current selection is maintained."
+    },
+    "9_4cea486bd5e9a712": {
+      "compound_id": "9",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5420106",
+      "selected_bindingdb_id": "BDBM50619533",
+      "confidence": 0.8,
+      "distinguishing_features": [
+        "sequence_offset_support = 20 for BDBM50619533",
+        "sequence_expected_bindingdb_id matches the current selected BindingDB ID",
+        "formula provenance from Table S1 with high confidence (1.0) supports the same core structure",
+        "candidate 2 (BDBM50619540) has delta 50619531 vs expected 50619524, less alignment to the inferred sequence"
+      ],
+      "rationale": "The compound was ambiguous but the sequence_offset_support value of 20 strongly indicates that the expected BindingDB ID (BDBM50619533) is correct. The current selected candidate CHEMBL5420106/BDBM50619533 exactly matches that expectation. The other candidate (CHEMBL5423141/BDBM50619540) has a different bindingdb_minus_compound_id offset and is less supported by the sequence inference. The formula evidence from Table S1 is consistent with both but does not override the sequence support."
+    },
+    "14_9bf6bdb110194e95": {
+      "compound_id": "14",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5400481",
+      "selected_bindingdb_id": "BDBM50619538",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "high_sequence_offset_support_20",
+        "sequence_expected_BindingDB_ID_matches_current_selected",
+        "all_candidates_have_same_scaffold_and_differ_only_in_chiral_center_of_piperidine_ring",
+        "table_provenance_consistent_with_any_of_them",
+        "no_warning_against_current_selection"
+      ],
+      "rationale": "The sequence_offset_support value is 20, and the expected BindingDB ID (BDBM50619538) matches the currently selected candidate 2. All candidates share the same molecular formula and very similar SMILES, differing only in the stereochemistry of one ring. The table extraction provides no stereochemical information to disambiguate, so the strong sequence‐based support for BDBM50619538 is the deciding factor. Therefore the current selection is kept."
+    },
+    "15_8159164c12295411": {
+      "compound_id": "15",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5403626",
+      "selected_bindingdb_id": "BDBM50619539",
+      "confidence": 1.0,
+      "distinguishing_features": [
+        "sequence_offset_support=20, sequence_expected_bindingdb_id matches candidate 2",
+        "current_selected matches expected bindingdb id in sequence inference",
+        "warnings explicitly mention resolution via inferred BindingDB ID sequence with offset 50619524, corresponding to candidate 2"
+      ],
+      "rationale": "The compound is resolved via BindingDB sequence inference. The sequence_expected_bindingdb_id is BDBM50619539 (candidate 2) and the sequence_offset_support value (20) indicates high support. The only warning states that ambiguity was resolved using exactly this inferred BindingDB ID sequence (offset=50619524), which points to candidate 2. Therefore, the current selection (CHEMBL5403626/BDBM50619539) is the best supported choice."
+    },
+    "16_aff8660ce07b4849": {
+      "compound_id": "16",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5423141",
+      "selected_bindingdb_id": "BDBM50619540",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "Current candidate BDBM50619540 matches the sequence_expected_bindingdb_id from the resolved BindingDB sequence with offset support 20.",
+        "The formula provenance indicates the compound is from Table S1 entry 16a, and the inferred BindingDB sequence points to BDBM50619540.",
+        "Candidate 2 has delta=50619524 matching the sequence_offset_support (20 away from the base), while Candidate 1 delta=50619517 does not align with the expected offset.",
+        "No contradictory evidence in characterization or warnings."
+      ],
+      "rationale": "The currently selected candidate CHEMBL5423141/BDBM50619540 is the best supported choice because the sequence_offset_support of 20 directly corresponds to the BindingDB number delta 50619524, matching the expected BindingDB ID from the sequence inference. The formula provenance, raw formula, and table evidence are identical for both candidates. Candidate 1's delta 50619517 does not match the expected offset. Therefore the current selection is retained."
+    },
+    "17_9f46f89242c35f08": {
+      "compound_id": "17",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5400366",
+      "selected_bindingdb_id": "BDBM50619541",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "sequence_offset_support (20) matches current BindingDB ID BDBM50619541 and expected BDBM50619541",
+        "formula evidence from Table S1 supports the given formula for compound 17 with high confidence (score 11.1, confidence 1.0)",
+        "smiles of current candidate matches the expected stereochemistry based on table evidence"
+      ],
+      "rationale": "The expected BindingDB ID (BDBM50619541) exactly matches the current selection, and the sequence_offset_support (20) is high, indicating strong likelihood that this is the correct assignment. The formula provenance (high score/confidence from table) further supports the identity. "
+    },
+    "18_2038b42ea99c250b": {
+      "compound_id": "18",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5421903",
+      "selected_bindingdb_id": "BDBM50619542",
+      "confidence": 1.0,
+      "distinguishing_features": [
+        "Candidate 3 (CHEMBL5421903/BDBM50619542) matches the sequence_expected_bindingdb_id derived from BindingDB sequence inference with high offset support (20).",
+        "The formula evidence (Table S1) is consistent across all candidates and does not favor one over another.",
+        "No candidate has contradictory structural evidence; the decision is based on the strong sequence_offset_support."
+      ],
+      "rationale": "The current selection (CHEMBL5421903/BDBM50619542) is the best supported because the sequence_offset_support of 20 directly links Compound 18 to BDBM50619542. The other candidates differ in minor structural features (e.g., ring stereochemistry) but lack the same level of sequence-based support. Keeping the current selection is justified."
+    },
+    "19_a490bb318a0f3188": {
+      "compound_id": "19",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5399365",
+      "selected_bindingdb_id": "BDBM50619543",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "sequence_offset_support=20 strongly supports current selection (expected BindingDB ID BDBM50619543 matches the current selected BindingDB ID)",
+        "formula evidence from Table S1 is solid (score 11.1, confidence 1.0) but applies equally to both candidates",
+        "Both candidates differ only by a ring stereocenter (piperidine vs piperidine 3R stereochemistry); the sequence-based inference favors Candidate 1",
+        "No warnings or conflicting metadata"
+      ],
+      "rationale": "The compound has high sequence_offset_support (20) tying the expected BindingDB ID BDBM50619543 to the current selected candidate (CHEMBL5399365 / BDBM50619543). The other candidate (CHEMBL5403626 / BDBM50619539) differs in a stereo center of the piperidine ring but lacks this strong sequence support. Formula provenance is identical for both. Therefore, the current selection is the best supported."
+    },
+    "21_e061304eb2e69e08": {
+      "compound_id": "21",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5407525",
+      "selected_bindingdb_id": "BDBM50619545",
+      "confidence": 0.85,
+      "distinguishing_features": [
+        "sequence_expected_bindingdb_id BDBM50619545 matches current selected bindingdb_id BDBM50619545 with high sequence_offset_support (20).",
+        "Both candidates share same molecular formula C33H40ClF3N8O3 extracted from table with high confidence.",
+        "SMILES of Candidate 1 ends with 'C(=O)CC1CCNCC1' while Candidate 2 ends with 'C(=O)CCC1CCNC1' - the former is consistent with the structure inferred from the sequence data."
+      ],
+      "rationale": "The sequence offset support strongly indicates BDBM50619545 as the correct BindingDB ID, which corresponds to CHEMBL5407525.  The formula evidence is unambiguous and identical for both candidates, so the sequence-based support breaks the tie."
+    },
+    "22_0ec2b5e31106e455": {
+      "compound_id": "22",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5440407",
+      "selected_bindingdb_id": "BDBM50619546",
+      "confidence": 1.0,
+      "distinguishing_features": [
+        "Current selected candidate is expected by the BindingDB sequence with offset support value 20.",
+        "Formula extraction provides consistent evidence for diastereomer mixture (suffix a) and raw formula table evidence.",
+        "Candidate 2 (CHEMBL5440407) BindingDB ID BDBM50619546 matches the expected ID BDBM50619546 from sequence inference."
+      ],
+      "rationale": "The offset support of 20 indicates high confidence in the sequence-based BindingDB ID resolution, which points to BDBM50619546 (Candidate 2). This candidate matches both the expected BindingDB ID and the currently selected IDs. The formula provenance (Table S1, diastereomer mixture) provides consistent support. No strong evidence favors the alternative candidate."
+    },
+    "23_be715ce3e34304f0": {
+      "compound_id": "23",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5439684",
+      "selected_bindingdb_id": "BDBM50619547",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "BindingDB sequence offset support=20",
+        "Expected BindingDB ID from sequence (BDBM50619547) matches current selected candidate (Candidate 2)",
+        "Both candidates share formula C33H40ClF3N8O3 from table source (MH+, confidence 1.0) but only Candidate 2 is supported by sequence offset",
+        "No contradictory evidence in characterization or warnings to counter sequence-based assignment"
+      ],
+      "rationale": "The compound has a strong sequence_offset_support value of 20, which directly links the expected BindingDB ID (BDBM50619547) to the current selection (Candidate 2). The formula and its provenance are identical for both candidates, so the sequence evidence is the decisive factor. Therefore, the current selected candidate is the best supported choice."
+    },
+    "24_c40e44b7c182f642": {
+      "compound_id": "24",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5401087",
+      "selected_bindingdb_id": "BDBM50619548",
+      "confidence": 0.85,
+      "distinguishing_features": [
+        "Exact match of current selected BindingDB ID (BDBM50619548) with sequence_expected_bindingdb_id",
+        "High sequence_offset_support (20) strongly supports the inferred sequence assignment",
+        "Formula evidence from Table S1 is consistent and unambiguous",
+        "Other candidate (BDBM50619546) has a different BindingDB ID (50619546) which does not match the expected sequence"
+      ],
+      "rationale": "The current selection matches the expected BindingDB ID from sequence inference (BDBM50619548) with high offset support (20). Formula provenance is robust (table, mh_plus, confidence 1.0). The alternative candidate has a different BindingDB ID and is not supported by the sequence data."
+    },
+    "38_b9f6eb86fac98b27": {
+      "compound_id": "38",
+      "decision": "select_candidate",
+      "selected_chembl_id": "CHEMBL350236",
+      "selected_bindingdb_id": "BDBM50327159",
+      "confidence": 0.75,
+      "distinguishing_features": [
+        "All candidates share formula C14H18BrNO2",
+        "Sequence_offset_support=20 suggests inferred BindingDB BDBM50619562",
+        "Candidate 2 (CHEMBL350236/BDBM50327159) is the enantiomer of Candidate 1 with same connectivity and matches the expected bindingdb pattern",
+        "Candidate 1 has current selection but lacks strong support from sequence offset",
+        "Candidate 2 shows a delta of 50327121 which by similarity to expected bindingdb suggests better alignment",
+        "Formula extracted as mh_plus (C14H19BrNO2) supports neutral formula C14H18BrNO2"
+      ],
+      "rationale": "The sequence_offset_support of 20 and expected BindingDB ID BDBM50619562 point towards a methyl ester of a bromophenyl-substituted pipecolic acid derivative. Among the candidates, only Candidate 1 (CHEMBL423234) and Candidate 2 (CHEMBL350236) have the exact pipecolic acid methyl ester core with the bromine in para position, matching the formula and typical binding pattern. Candidate 2 (BDBM50327159) is the enantiomer of the current selection and shows a BindingDB min. ID of 50327121, which is closer in sequence to the expected BDBM50619562 than Candidate 1's 50050057. Given the strong sequence offset support and the close numerical proximity, Candidate 2 is better aligned with the expected structure. Therefore, we select Candidate 2."
+    },
+    "9_8eb40431439677ea": {
+      "compound_id": "9",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5420106",
+      "selected_bindingdb_id": "BDBM50619533",
+      "confidence": 0.85,
+      "distinguishing_features": [
+        "current_selected_chembl_id and current_selected_bindingdb_id match the expected BindingDB ID (BDBM50619533) with sequence_offset_support of 17 (high)",
+        "formula extracted from Table S1 entry for '9a' - footnote 'a' indicates diastereomer mixture; the molecular formula and calculated [M+H]+ 691.3 m/z support the entry for compound 9",
+        "formula confidence is 1.0 with high score (11.1)",
+        "candidate 2 (CHEMBL5423141/BDBM50619540) has bindingdb_minus_compound_id 50619531, which differs from the sequence_expected_bindingdb_id BDBM50619533, while candidate 1 bindingdb_minus_compound_id is 50619524, which is offset by 9 (the compound_id) from the expected 50619533 - consistent with pattern observed in many entries"
+      ],
+      "rationale": "All candidates share the same molecular formula, but the current selection (CHEMBL5420106/BDBM50619533) is the one that matches the sequence_expected_bindingdb_id, has high sequence_offset_support (17), and is aligned with the Table S1 provenance. The alternative candidate corresponds to a different BindingDB number that does not match the expected sequence-based ID, making the current selection the best supported choice."
+    },
+    "14_ace7c3653399e0cc": {
+      "compound_id": "14",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5400481",
+      "selected_bindingdb_id": "BDBM50619538",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "sequence_offset_support is high (17), and the expected BindingDB ID from the sequence matches the current selected candidate (BDBM50619538).",
+        "Formula provenance from Table S1 with high confidence (1.0) does not differentiate candidates, but no contradictory evidence exists.",
+        "Candidate 2 has a distinct stereochemical signature (C@] 1(C)CCCN1) that aligns with the sequence-based expectation, whereas other candidates show different ring structures.",
+        "Warnings explicitly state the ambiguity was resolved using the inferred BindingDB ID sequence, reinforcing the selection."
+      ],
+      "rationale": "The evidence strongly supports the current selection because the sequence_offset_support value of 17 directly ties the compound to BDBM50619538, which is the currently selected BindingDB ID. The other candidates differ in their stereochemistry and ring connectivity, but none are more consistent with the sequence-derived expectation."
+    },
+    "15_b0e437524dad06a8": {
+      "compound_id": "15",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5403626",
+      "selected_bindingdb_id": "BDBM50619539",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "sequence_offset_support 17 with expected BDBM50619539 matching current selection",
+        "no contradicting evidence from formula extraction: formula source is table (Table S1), raw formula kind mh_plus, formula confidence 1.0, high formula score 11.1",
+        "current selection BindingDB ID matches the well-supported inferred BindingDB sequence",
+        "Candidate 2 matches the expected BindingDB sequence ID"
+      ],
+      "rationale": "The sequence_offset_support is high (17) and the expected BindingDB ID from the sequence inference (BDBM50619539) exactly matches the currently selected BindingDB ID. Candidate 2 (CHEMBL5403626 / BDBM50619539) is the one consistent with that inference. Formula extraction evidence (table source, high confidence and score) does not conflict with this assignment. Therefore, the current selection is the best supported."
+    },
+    "16_db7878fe944859e2": {
+      "compound_id": "16",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5423141",
+      "selected_bindingdb_id": "BDBM50619540",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "Current selected candidate matches the expected BindingDB ID (BDBM50619540) from the sequence offset inference.",
+        "Sequence offset support is high (17), strongly favoring candidate 2.",
+        "Formula extraction evidence (Table S1, diastereomer mixture) is consistent with either candidate, but the sequence resolution tip resolves to candidate 2.",
+        "Both candidates share the same formula and near-identical SMILES substructure, differing only in the terminal group; the sequence offset uniquely identifies candidate 2."
+      ],
+      "rationale": "The sequence_offset_support of 17 strongly indicates candidate 2 (BDBM50619540) is the correct structure. The current selection already matches this candidate, so keep_current is appropriate."
+    },
+    "17_96ad1e1f97c36f33": {
+      "compound_id": "17",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5400366",
+      "selected_bindingdb_id": "BDBM50619541",
+      "confidence": 0.8,
+      "distinguishing_features": [
+        "sequence_offset_support is high (17) and expected BindingDB ID BDBM50619541 exactly matches current selected",
+        "Candidate 1 has the closest bindingdb_minus_compound_id (50619524) difference of 17 relative to the expected bindingdb_number 50619541",
+        "All candidates share identical first ~80 characters of SMILES; only the tail piperidine stereochemistry differs, but candidate 1's SMILES tail (C(=O)CC[C@H]1CCCCN1) is consistent with the structure normally associated with this compound series",
+        "No distinguishing formula or provenance evidence since all have same formula and source"
+      ],
+      "rationale": "The compound's sequence_offset_support is 17, meaning the best bindingdb_minus_compound_id is expected to be BDBM50619541 - 17 = 50619524. Only Candidate 1 has bindingdb_minus_compound_id of exactly 50619524. Additionally, the current selected is consistent with the expected BindingDB ID from sequence inference. The other candidates have different bindingdb_minus_compound_id values (50619521, 50619525) that do not match the offset. Therefore, Candidate 1 remains the best supported choice."
+    },
+    "18_d116c1292a93ff1e": {
+      "compound_id": "18",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5421903",
+      "selected_bindingdb_id": "BDBM50619542",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "sequence_offset_support=17 for BDBM50619542",
+        "expected_bindingdb_id matches current selected",
+        "current_lookup_status is resolved_bindingdb_sequence",
+        "no warnings or contradictions in candidate 3"
+      ],
+      "rationale": "The compound has a high sequence_offset_support (17) linking it to BDBM50619542. The current selection (CHEMBL5421903 / BDBM50619542) matches the expected BindingDB ID derived from the sequence. The other candidates (BDBM50619541 and BDBM50619538) have lower delta offsets (50619523 and 50619520) and are not supported by the sequence evidence. Thus the current selected candidate remains the best supported choice."
+    },
+    "19_02a328f6c868cefc": {
+      "compound_id": "19",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5399365",
+      "selected_bindingdb_id": "BDBM50619543",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "sequence_offset_support: 17 and sequence_expected_bindingdb_id exactly matches the current selected BindingDB ID BDBM50619543",
+        "formula provenance strong (Table S1, score 11.1, confidence 1.0) and identical for both candidates",
+        "The delta difference (50619524 vs 50619520) is small, but the strong sequence support for the current selection outweighs any other evidence"
+      ],
+      "rationale": "The sequence_offset_support is high (17) and the sequence-expected BindingDB ID (BDBM50619543) exactly matches the currently selected candidate (Candidate 1). No contrary evidence from formula or other metadata distinguishes the candidates, and the current candidate is therefore the best supported choice."
+    },
+    "21_0822abe100749a14": {
+      "compound_id": "21",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5407525",
+      "selected_bindingdb_id": "BDBM50619545",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "The current selected BindingDB ID (BDBM50619545) matches exactly the sequence_expected_bindingdb_id, and sequence_offset_support is 17, which is high.",
+        "Candidate 1 (CHEMBL5407525/BDBM50619545) differs from Candidate 2 by one carbon and two hydrogens in the terminal group (C(=O)CC1CCNCC1 vs C(=O)CCC1CCNC1), but both share the same neutral formula C33H40ClF3N8O3. However, the strong sequence support for BDBM50619545 indicates the current selection is correct.",
+        "No contradictory warnings or evidence exist that would weaken confidence in the current selection."
+      ],
+      "rationale": "The sequence_offset_support value of 17 strongly supports the expected BindingDB ID BDBM50619545, which is already the current selection. No candidate other than the current one matches this expected ID. Therefore, the current candidate is the best supported choice."
+    },
+    "22_059ea069f6587b20": {
+      "compound_id": "22",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5440407",
+      "selected_bindingdb_id": "BDBM50619546",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "Current selection (CHEMBL5440407 / BDBM50619546) is the expected BindingDB ID (BDBM50619546) derived from the sequence offset with support 17.",
+        "The alternative candidate (CHEMBL5401087 / BDBM50619548) corresponds to offset 50619526, not the expected ID.",
+        "Formula evidence and provenance (Table S1, mh_plus) is consistent and does not differentiate – the decision rests on the strong sequence support."
+      ],
+      "rationale": "The sequence_offset_support value of 17 strongly indicates that the correct BindingDB ID for compound 22 is BDBM50619546, which matches the current selected candidate CHEMBL5440407. The other candidate (CHEMBL5401087) corresponds to a different offset and lacks the same support. Therefore the current selection is the best supported."
+    },
+    "23_b2130c7b62c8e449": {
+      "compound_id": "23",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5439684",
+      "selected_bindingdb_id": "BDBM50619547",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "sequence_offset_support value 17 with expected BindingDB ID BDBM50619547 matches candidate 2",
+        "high formula confidence (1.0) from table provenance with [M+H]+ m/z",
+        "no contradictory characterization evidence in candidate metadata",
+        "current selected candidate is already the expected BindingDB entry"
+      ],
+      "rationale": "The sequence_offset_support score of 17 strongly supports the expected BindingDB ID BDBM50619547, which corresponds to CHEMBL5439684 (Candidate 2) and matches the current selected candidate. The table evidence provides formula confidence 1.0 and no warnings or metadata suggest an alternative assignment. Hence keeping the current selection is best supported."
+    },
+    "24_e6853e2e3e4cb6a6": {
+      "compound_id": "24",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5401087",
+      "selected_bindingdb_id": "BDBM50619548",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "The sequence_offset_support value is 17, strongly supporting the expected BindingDB ID BDBM50619548, which matches the current selection (BDBM50619548 / CHEMBL5401087).",
+        "The current_selected_bindingdb_id (BDBM50619548) aligns with the sequence_expected_bindingdb_id, providing high confidence in the assignment.",
+        "No other candidate (e.g., BDBM50619546 / CHEMBL5440407) has any evidence such as a matching expected ID, higher provenance score, or structural distinction that would override the sequence-based support."
+      ],
+      "rationale": "The sequence_offset_support is high (17) and directly points to BDBM50619548. The current selected candidate matches this expected BindingDB ID, and no other candidate has comparable support. Therefore, the current selection remains the best-supported assignment."
+    },
+    "9_2ebf0dcba0e6a809": {
+      "compound_id": "9",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5420106",
+      "selected_bindingdb_id": "BDBM50619533",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "sequence_offset_support is high (20) and expected BindingDB ID BDBM50619533 matches the current selection",
+        "BindingDB delta (50619524) is consistent with compound_id 9",
+        "Both candidates share same formula and similar structure; no counter evidence to prefer the other",
+        "Current selection is well-supported by the table provenance and sequence expectation"
+      ],
+      "rationale": "The sequence_offset_support of 20 strongly indicates that the expected BindingDB ID (BDBM50619533) corresponds to the current selection.  The candidate evidence does not outweigh this support, so we keep the current selection."
+    },
+    "14_36266ca1b6901d0e": {
+      "compound_id": "14",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5400481",
+      "selected_bindingdb_id": "BDBM50619538",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "Current selected BindingDB ID matches the expected sequence ID from offset support (support=20)",
+        "Formula evidence from table S1 with high score and confidence, no other discriminating evidence provided",
+        "All candidates share same SMILES prefix and differ only in stereochemistry or ring substitution at the tail"
+      ],
+      "rationale": "The sequence offset support of 20 directly identifies BDBM50619538 as the expected BindingDB ID, matching the current selection. Formula provenance is consistent and does not disambiguate among the three candidates. The warnings also refer to the inferred BindingDB ID sequence. Therefore the current selection is best supported."
+    },
+    "15_49b097f49e3c40d5": {
+      "compound_id": "15",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5403626",
+      "selected_bindingdb_id": "BDBM50619539",
+      "confidence": 0.85,
+      "distinguishing_features": [
+        "sequence_offset_support=20 indicates strong alignment with expected BindingDB ID BDBM50619539",
+        "current selection matches the expected BindingDB ID from sequence inference",
+        "offset difference: candidate2 matches expected offset 50619524, candidate1 has different offset 50619528"
+      ],
+      "rationale": "The compound was resolved via BindingDB sequence inference with high offset support (20). The expected BindingDB ID is BDBM50619539, which corresponds exactly to Candidate 2 (CHEMBL5403626). Candidate 1 (BDBM50619543) has a different offset and is not supported by the sequence inference. Therefore, keeping the current selection is the best supported choice."
+    },
+    "16_ec4931a289423c91": {
+      "compound_id": "16",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5423141",
+      "selected_bindingdb_id": "BDBM50619540",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "sequence_offset_support=20 with expected BDBM50619540 matches current selection",
+        "formula evidence consistent with both but no conflict",
+        "current selected candidate aligns with high offset support"
+      ],
+      "rationale": "The current selection CHEMBL5423141/BDBM50619540 matches the sequence_expected_bindingdb_id (BDBM50619540) with high sequence_offset_support of 20. No evidence favors the other candidate. Therefore, the current choice remains best supported."
+    },
+    "17_e76e68a3ccfe23c2": {
+      "compound_id": "17",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5400366",
+      "selected_bindingdb_id": "BDBM50619541",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "The sequence expected BindingDB ID (BDBM50619541) matches the current selection and is supported by a sequence_offset_support of 20, indicating strong sequence-based evidence.",
+        "All three candidates have the same molecular formula, so formula does not distinguish them.",
+        "The formula provenance (table, [M+H]+, confidence 1.0) is consistent across candidates and does not favor any alternative.",
+        "No warnings are present in the extraction metadata.",
+        "The candidate structures are nearly identical; the key difference is in the piperidine/pyrrolidine substituent. The current candidate matches the sequence expectation, and there is no evidence to override this match."
+      ],
+      "rationale": "The current selection (CHEMBL5400366 / BDBM50619541) is the only candidate whose BindingDB ID matches the sequence-expected BindingDB ID (BDBM50619541), and the high sequence_offset_support (20) provides strong evidence that this is the correct compound for this binding record. No other candidate has a greater claim based on the provided metadata. Therefore, keeping the current selection is the best supported decision."
+    },
+    "18_c12b483c77f3c94f": {
+      "compound_id": "18",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5421903",
+      "selected_bindingdb_id": "BDBM50619542",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "The current selected candidate (CHEMBL5421903/BDBM50619542) matches the expected BindingDB ID from sequence_offset_support (offset = 50619524, support = 20).",
+        "Delta value (bindingdb_minus_compound_id: 50619524) aligns exactly with the expected offset.",
+        "No other candidate matches the expected BindingDB ID derived from sequence data.",
+        "The formula evidence and high formula confidence support the structure assignment, with no counter-indications."
+      ],
+      "rationale": "The sequence_offset_support directly points to BDBM50619542 as the expected BindingDB ID, and it is the current selection. No evidence supports switching to another candidate."
+    },
+    "19_f2010cdf7358daba": {
+      "compound_id": "19",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5399365",
+      "selected_bindingdb_id": "BDBM50619543",
+      "confidence": 0.85,
+      "distinguishing_features": [
+        "sequence_offset_support is 20 for BDBM50619543, matching the current selection",
+        "sequence_expected_bindingdb_id equals current_selected_bindingdb_id",
+        "Candidate 1 (CHEMBL5399365) has a terminal amide piperidine ring (C(=O)C1CCNCC1) while Candidate 2 has a chiral substituted piperidine; both fit C32H38ClF3N8O3",
+        "The high offset support directly ties the sequence to the BindingDB ID of Candidate 1",
+        "No warnings or contradictory formula evidence"
+      ],
+      "rationale": "Keeping the current selection because the sequence_offset_support of 20 strongly associates the expected BindingDB ID (BDBM50619543) with the currently selected compound. There is no evidence favoring the other candidate, and formula provenance is identical for both."
+    },
+    "21_e840514fec23ba83": {
+      "compound_id": "21",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5407525",
+      "selected_bindingdb_id": "BDBM50619545",
+      "confidence": 0.85,
+      "distinguishing_features": [
+        "sequence_offset_support=20, with expected BindingDB ID BDBM50619545 matching Candidate 1",
+        "both candidates share same molecular formula C33H40ClF3N8O3 from table source with high confidence 1.0",
+        "no warnings or conflicting evidence",
+        "candidate metadata shows Candidate 1 matches expected BindingDB ID and is the currently selected compound"
+      ],
+      "rationale": "The sequence_offset_support value of 20 strongly indicates that BindingDB ID BDBM50619545 is the expected compound. This ID matches Candidate 1 (CHEMBL5407525/BDBM50619545) and also matches the current_selected_bindingdb_id. The formula evidence is identical and supports both structures, so the sequence-based support is the decisive factor. Therefore, the current selection should be retained."
+    },
+    "22_fa229344b0edfa65": {
+      "compound_id": "22",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5440407",
+      "selected_bindingdb_id": "BDBM50619546",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "Current selected candidate CHEMBL5440407/BDBM50619546 matches the inferred BindingDB ID from sequence_offset_support of 20 (expected BDBM50619546).",
+        "Candidate 2 has bindingdb_minus_compound_id = 50619524, consistent with the offset from the sequence-based resolution.",
+        "No contradictory table or characterization evidence; formula and raw formula same across candidates.",
+        "Candidate 1 has a different BindingDB ID (BDBM50619548) with no offset support."
+      ],
+      "rationale": "The sequence_offset_support of 20 points to BDBM50619546 as the expected binding DB ID. Candidate 2 matches that ID and is the currently selected candidate. Therefore, keep the current selection."
+    },
+    "23_8eea454edd4a998a": {
+      "compound_id": "23",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5439684",
+      "selected_bindingdb_id": "BDBM50619547",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "sequence_offset_support of 20 for BDBM50619547 matches expected BindingDB ID",
+        "compound_id difference 50619524 matches computed offset from BindingDB sequence",
+        "only Candidate 2 (CHEMBL5439684) corresponds to the expected BindingDB ID BDBM50619547",
+        "formula provenance (Table S1, [M+H]+, confidence 1.0) supports the currently selected candidate"
+      ],
+      "rationale": "The compound's current selected candidates are resolved via BindingDB sequence offset support (20), which points to BDBM50619547. Candidate 2 (CHEMBL5439684) exactly matches this expected ID. The formula evidence from Table S1 is consistent with both candidates but does not disambiguate; the sequence offset is the decisive factor. Therefore, the current selection is the best supported choice."
+    },
+    "24_1fa14732b29ac44a": {
+      "compound_id": "24",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5401087",
+      "selected_bindingdb_id": "BDBM50619548",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "sequence_offset_support value 20 strongly supports the currently selected BindingDB ID BDBM50619548",
+        "table evidence with high formula score (11.1) and confidence (1.0) is consistent with both candidates but does not distinguish",
+        "no warnings or contradictory data in provenance"
+      ],
+      "rationale": "The sequence_offset_support of 20 is high, and the expected BindingDB ID (BDBM50619548) matches the currently selected candidate. No evidence favors the other candidate (CHEMBL5440407/BDBM50619546). Therefore the current selection is kept."
+    },
+    "38_6a7d668748af3f66": {
+      "compound_id": "38",
+      "decision": "select_candidate",
+      "selected_chembl_id": "CHEMBL423234",
+      "selected_bindingdb_id": "BDBM50050095",
+      "confidence": 0.9,
+      "distinguishing_features": [
+        "The sequence_expected_bindingdb_id BDBM50619562 is not present among the candidates, but among the candidates with the highest sequence_offset_support (20), only CHEMBL423234 and CHEMBL350236 have both a ChEMBL ID and a BindingDB ID that are close to that expected value.  However, the current selected candidate CHEMBL423234 (BDBM50050095) is structurally identical to CHEMBL350236 (BDBM50327159) except for the stereochemistry of the piperidine ring.  Both have the same SMILES core (COC(=O)[C@@H]([C@H]1CCCCN1)c1ccc(Br)cc1).  The LCMS evidence from the formula extraction shows a major fragment C41H44ClF4N8O2+ which corresponds to a larger compound, but the neutral formula C14H18BrNO2 is consistent with the small molecule candidates.  The candidate list contains 29 entries, and the two with the highest sequence_offset_support are CHEMBL423234 and CHEMBL350236.  Of these, the current selected candidate CHEMBL423234 is the best supported because it has the closest BindingDB ID to the expected one (BDBM50050095 vs BDBM50327159).  Therefore, we keep the current selection.",
+        "The current selection CHEMBL423234/BDBM50050095 has a BindingDB ID of 50050095, which is the closest among all candidates to the expected BDBM50619562 (offset = 50050057).  The other candidate CHEMBL350236 has a larger offset (50327121).  No other candidate has a BindingDB ID that is close to the expected one.",
+        "The formula provenance includes a characterization of C14H18BrNO2 from an LCMS trace, which matches the neutral formula of the compound.  The candidate CHEMBL423234 has a SMILES that matches the formula and the expected stereochemistry (as inferred from the LCMS trace).  The warning about conflicting neutral formulas (C41H43ClF4N8O2 vs C14H18BrNO2) is resolved by noting that the larger formula is the [M+H]+ adduct of a different compound, and the smaller formula corresponds to the compound of interest."
+      ],
+      "rationale": "The sequence_expected_bindingdb_id is BDBM50619562, which is not listed among the candidates.  Among the candidates with BindingDB IDs, the closest in ID number is BDBM50050095 (CHEMBL423234) with a difference of 50050057, followed by BDBM50327159 (CHEMBL350236) with a difference of 50327121.  Both differ by about 50050000, but the current selection is closer.  The sequence offset support is 20, which is relatively low, but it still provides a tiebreaker.  The LCMS data supports a formula of C14H18BrNO2, which matches the candidates.  The structural similarity between the two top candidates is high, but the slight edge in BindingDB offset favors the current selection.  Therefore, the decision is to keep the current selection."
+    },
+    "14_cb008d8c660048c4": {
+      "compound_id": "14",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5400481",
+      "selected_bindingdb_id": "BDBM50619538",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "sequence_offset_support is high (22) and matches the expected BindingDB ID BDBM50619538",
+        "all candidates have identical neutral formula C34H42ClF3N8O3, formula alone does not distinguish",
+        "formula from table S1 with high confidence (1.0) and score (11.1), no contradictory evidence",
+        "no warnings that challenge the current selection; the only warning acknowledges the sequence-based resolution",
+        "the current selected candidate is the same as the sequence_expected_bindingdb_id, solidifying the choice"
+      ],
+      "rationale": "The compound has a sequence_offset_support of 22 pointing to BDBM50619538, which is the currently selected candidate. All three candidates share the same molecular formula and very similar SMILES (differing only in stereochemistry of a piperidine ring substituent). The formula evidence is unambiguous for the formula, and the sequence-based inference strongly supports the current selection. No other candidate has any additional support. Therefore, keep the current selection."
+    },
+    "15_6a2d93c78606866e": {
+      "compound_id": "15",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5403626",
+      "selected_bindingdb_id": "BDBM50619539",
+      "confidence": 0.92,
+      "distinguishing_features": [
+        "sequence_offset_support=22 for expected BindingDB ID BDBM50619539",
+        "current_selected_bindingdb_id matches sequence_expected_bindingdb_id",
+        "current_selected_chembl_id CHEMBL5403626 assigned to expected BindingDB ID",
+        "Candidate 2 (BDBM50619539) has bindingdb_minus_compound_id=50619524 matching the inferred offset"
+      ],
+      "rationale": "The compound has been resolved using a BindingDB sequence with support 22, and the expected BindingDB ID BDBM50619539 exactly matches the current selected BindingDB ID. Candidate 2 (CHEMBL5403626/BDBM50619539) is the one tied to that expected ID and is already selected. No evidence supports switching to Candidate 1. Therefore the current selection is kept."
+    },
+    "16_8453578b7cf7dce3": {
+      "compound_id": "16",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5423141",
+      "selected_bindingdb_id": "BDBM50619540",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "high sequence_offset_support of 22 for BDBM50619540",
+        "expected_bindingdb_id matches current selection",
+        "no countervailing evidence for other candidate"
+      ],
+      "rationale": "the inferred bindingdb sequence offset support is high (22) and directly matches the current selected bindingdb id BDBM50619540 and its corresponding chembl id. No evidence favors the other candidate."
+    },
+    "18_5a6da88321a35565": {
+      "compound_id": "18",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5421903",
+      "selected_bindingdb_id": "BDBM50619542",
+      "confidence": 1.0,
+      "distinguishing_features": [
+        "sequence_offset_support=22, expected BindingDB ID BDBM50619542",
+        "candidate CHEMBL5421903 matches sequence_expected_bindingdb_id",
+        "other candidates have mismatched bindingdb_minus_compound_id offsets"
+      ],
+      "rationale": "The sequence_offset_support of 22 directly links to BDBM50619542 as the expected BindingDB ID. Candidate 3 (CHEMBL5421903) has that exact BindingDB ID. The other candidates differ in the terminal ring fragment, as shown by their different bindingdb_minus_compound_id values. Formula evidence is identical for all, but the sequence-based inference strongly selects Candidate 3."
+    },
+    "22_6b62b1829d8debc2": {
+      "compound_id": "22",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5440407",
+      "selected_bindingdb_id": "BDBM50619546",
+      "confidence": 0.95,
+      "distinguishing_features": [
+        "Sequence offset support = 22, strongly supporting BDBM50619546 as the expected BindingDB ID.",
+        "Current selection matches sequence_expected_bindingdb_id.",
+        "Candidate 2 is the expected candidate with delta=50619524 matching the sequence offset.",
+        "No evidence in the record favors Candidate 1 over Candidate 2; formula provenance and table evidence are identical for both."
+      ],
+      "rationale": "The sequence_offset_support of 22 indicates high confidence in the inferred BindingDB sequence, which points to BDBM50619546 (Candidate 2). The current selected candidate is fully consistent with this evidence, and no contradictory facts favor Candidate 1."
+    },
+    "23_e1c3d2083c010735": {
+      "compound_id": "23",
+      "decision": "keep_current",
+      "selected_chembl_id": "CHEMBL5439684",
+      "selected_bindingdb_id": "BDBM50619547",
+      "confidence": 1.0,
+      "distinguishing_features": [
+        "Sequence_offset_support=22 exactly matches expected BindingDB ID BDBM50619547",
+        "Formula evidence directly maps to base ID 23 with high confidence",
+        "Candidate 2 (CHEMBL5439684) is the same as the current selection and expected by sequence inference"
+      ],
+      "rationale": "The sequence_offset_support (22) indicates that the BindingDB ID inferred from the offset is BDBM50619547, which matches the currently selected binding database ID exactly. This candidate (CHEMBL5439684/BDBM50619547) is therefore the best supported choice. The formula evidence is consistent with both candidates, so the distinguishing factor is the sequence-based inference."
+    }
+  }
+}

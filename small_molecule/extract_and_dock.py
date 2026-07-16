@@ -1,0 +1,3850 @@
+"""
+Step 1 (PDF 提取通式结构 + 活性数据)  &  Step 2 (AutoDock Vina 打分) 框架
+═══════════════════════════════════════════════════════════════════════════
+范围: 只到「拿到一批 {化合物, 完整SMILES, 实测活性} 并完成对接打分」为止,
+      不含 AI 活性预测模型。
+
+Step 1 的核心难点 = 通式 (Markush):
+  核心骨架在 PDF 里画一次 (带 R 连接点), R 基团在 SAR 表里逐行列举。
+  所以不能整图 OCSR, 必须: 识别骨架(标连接点) -> 逐行识别 R 片段
+  -> RDKit 把片段接回骨架 -> 同时解析活性列。
+  OCSR 在复杂骨架上易错, 故在 Step1 与 Step2 之间放一道「人工确认 gate」。
+
+Step 2 已实现为本地 AutoDock Vina 工作流: RDKit 生成 3D 配体,
+Meeko 转配体 PDBQT, 8UN5 共晶配体定义 docking box, Vina 打分。
+正式 docking 默认要求 Meeko 生成带电 receptor PDBQT; zero-charge receptor
+fallback 只允许显式 debug 开关开启。
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import html
+import json
+import math
+import os
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import time
+import urllib.parse
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from enum import Enum
+from pathlib import Path
+from typing import Any, Literal, Optional
+
+from pydantic import BaseModel, Field
+
+
+DEFAULT_API_TIMEOUT = 45
+DEFAULT_API_RETRIES = 6
+DEFAULT_API_BASE_DELAY = 2.0
+DEFAULT_MODEL = (
+    os.getenv("OPENROUTER_MODEL")
+    or os.getenv("OPENAI_MODEL")
+    or "MiniMax-M2.7"
+)
+KEY_FILE_CANDIDATES = (".env",)
+
+socket.setdefaulttimeout(DEFAULT_API_TIMEOUT + 15)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STEP 1 —— 从 PDF 提取通式结构与活性
+# ═══════════════════════════════════════════════════════════════════════════
+
+class MarkushScaffold(BaseModel):
+    """核心骨架, 连接点用虚原子 [*] 标记。"""
+    core_smiles: str                  # 含一个或多个 [*]; e.g. "...c1ccc([*:1])cc1..."
+    r_labels: list[str]               # ["R"] 或 ["R1","R2"], 与 [*:n] 对应
+    ocsr_confidence: float            # OCSR 置信度
+    needs_review: bool = True         # 复杂骨架默认需人工核对
+
+
+class RGroupEntry(BaseModel):
+    """SAR 表里的一行: 某化合物的某个 R 取代基 + 其活性。"""
+    compound_id: str                  # e.g. "37"
+    r_label: str                      # "R" (对应 scaffold 的连接点)
+    fragment_smiles: str              # 含 [*] 连接点的片段
+    ocsr_confidence: float
+    raw_activity: str                 # 表中原始文本, e.g. "0.34 (15x)"
+
+
+class ExtractedCompound(BaseModel):
+    """组装 + 解析后的最终记录 (Step 1 的产物)。"""
+    compound_id: str
+    full_smiles: Optional[str] = None # 完整分子; formula/API lookup 失败为 None
+    activity_nM: Optional[float] = None      # 解析出的主活性值 (nM)
+    selectivity_fold: Optional[float] = None # over WT 的倍数
+    source: str = ""                  # doi / 页码 / 表号, 供溯源
+    neutral_formula: Optional[str] = None
+    bindingdb_id: str = ""
+    source_url: str = ""
+    lookup_status: str = ""
+    activity_assay: str = ""
+    activity_target: str = ""
+    activity_endpoint: str = ""
+    raw_activity: str = ""
+    formula_evidence: str = ""
+    activity_evidence: str = ""
+    analog_group_id: str = ""
+    seed_smiles: str = ""
+    reasyn_score: Optional[float] = None
+    synthesis: str = ""
+    num_steps: Optional[int] = None
+    needs_review: bool = True
+    warnings: list[str] = Field(default_factory=list)
+
+
+for _model in (MarkushScaffold, RGroupEntry, ExtractedCompound):
+    if hasattr(_model, "model_rebuild"):
+        _model.model_rebuild(_types_namespace=globals())
+
+
+def read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def default_workflow_config() -> dict[str, Any]:
+    return {
+        "api": {
+            "api_key_env": "OPENROUTER_API_KEY",
+            "base_url_env": "OPENROUTER_BASE_URL",
+            "api_key": "",
+            "base_url": "",
+            "key_files": list(KEY_FILE_CANDIDATES),
+        },
+        "models": {"primary": DEFAULT_MODEL, "fallback": []},
+        "formula_workflow": default_formula_workflow_config(),
+    }
+
+
+def default_formula_workflow_config() -> dict[str, Any]:
+    return {
+        "pdfs": [],
+        "outdir": "formula_workflow_outputs",
+        "llm": {
+            "model": "",
+            "pages_per_chunk": 8,
+            "max_chunk_chars": 24000,
+            "max_output_tokens": 4000,
+        },
+        "request": {
+            "delay": 1.0,
+            "api_timeout": DEFAULT_API_TIMEOUT,
+            "api_retries": DEFAULT_API_RETRIES,
+            "api_base_delay": DEFAULT_API_BASE_DELAY,
+            "include_pubchem_formula": False,
+        },
+        "cache": {
+            "force": False,
+            "reuse_pdf_pages": True,
+            "reuse_page_chunks": True,
+            "reuse_compound_scope": True,
+            "reuse_formula_extract": True,
+            "reuse_activity_extract": True,
+            "reuse_external_api": True,
+        },
+        "compound_scope": {
+            "target_compound_ids": [],
+            "excluded_compound_ids": [],
+            "context_max_chars": 60000,
+            "demote_reference_only_final_compounds": True,
+        },
+        "referee": {
+            "enabled": True,
+            "statuses": ["ambiguous", "resolved_bindingdb_sequence"],
+            "context_chars_per_row": 4000,
+            "max_output_tokens": 2000,
+            "reuse_cache": True,
+        },
+        "activity": {
+            "enabled": True,
+            "primary_assay_keywords": ["IC50", "biochemical", "HTRF", "TR-FRET"],
+        },
+        "output": {
+            "pdf_pages_json": "pdf_pages.json",
+            "pdf_page_chunks_json": "pdf_page_chunks.json",
+            "compound_scope_json": "compound_scope.json",
+            "formula_records_json": "formula_records.json",
+            "activity_records_json": "activity_records.json",
+            "detailed_csv": "formula_to_smiles.csv",
+            "final_csv": "final_compounds.csv",
+            "metadata_json": "workflow_metadata.json",
+            "ambiguity_referee_json": "ambiguity_referee.json",
+        },
+    }
+
+
+def load_workflow_config(config_path: Optional[str]) -> dict[str, Any]:
+    config = default_workflow_config()
+    if not config_path:
+        return config
+    path = Path(config_path).expanduser()
+    if not path.exists():
+        return config
+    loaded = read_json(path)
+    if not isinstance(loaded, dict):
+        raise RuntimeError(f"Config file must contain a JSON object: {path}")
+    return deep_merge(config, loaded)
+
+
+def extract_api_key_from_text(text: str) -> Optional[str]:
+    assignment = re.search(
+        r"(?:OPENAI_API_KEY|OPENROUTER_API_KEY|api[_ -]?key)\s*[:=]\s*"
+        r"([A-Za-z0-9_\-]{20,}|sk-[A-Za-z0-9_\-]+)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if assignment:
+        return assignment.group(1).strip().strip("'\"")
+    sk_token = re.search(r"\bsk-[A-Za-z0-9_\-]{20,}\b", text)
+    return sk_token.group(0) if sk_token else None
+
+
+def extract_base_url_from_text(text: str) -> Optional[str]:
+    match = re.search(
+        r"(?:OPENAI_BASE_URL|OPENROUTER_BASE_URL|base[_ -]?url)\s*[:=]\s*(https?://\S+)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return match.group(1).strip().strip("'\"") if match else None
+
+
+def load_openai_config(api_config: dict[str, Any], base_dir: Path) -> tuple[str, Optional[str]]:
+    api_key_env = str(api_config.get("api_key_env") or "OPENAI_API_KEY")
+    base_url_env = str(api_config.get("base_url_env") or "OPENAI_BASE_URL")
+    api_key = str(api_config.get("api_key") or "") or os.getenv(api_key_env)
+    base_url = str(api_config.get("base_url") or "") or os.getenv(base_url_env)
+
+    key_files = []
+    for path_text in api_config.get("key_files", []):
+        path = Path(str(path_text)).expanduser()
+        key_files.append(path if path.is_absolute() else base_dir / path)
+    for key_file in key_files:
+        if not key_file.exists():
+            continue
+        text = key_file.read_text(encoding="utf-8", errors="ignore")
+        api_key = api_key or extract_api_key_from_text(text)
+        base_url = base_url or extract_base_url_from_text(text)
+    if not api_key:
+        searched = ", ".join(str(path) for path in key_files)
+        raise RuntimeError(
+            "No OpenAI-compatible API key found. Set the configured API key env "
+            f"or put the key in one of: {searched}"
+        )
+    return api_key, base_url
+
+
+def require_openai_client(api_config: dict[str, Any], base_dir: Path):
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise RuntimeError("The openai package is not installed.") from exc
+    api_key, base_url = load_openai_config(api_config, base_dir)
+    kwargs: dict[str, Any] = {"api_key": api_key}
+    if base_url:
+        kwargs["base_url"] = base_url
+    return OpenAI(**kwargs)
+
+
+def extract_response_text(response: Any) -> str:
+    output_text = getattr(response, "output_text", None)
+    if output_text:
+        return output_text
+    chunks: list[str] = []
+    for item in getattr(response, "output", []) or []:
+        for content in getattr(item, "content", []) or []:
+            content_type = getattr(content, "type", None)
+            if content_type is None and isinstance(content, dict):
+                content_type = content.get("type")
+            if content_type != "output_text":
+                continue
+            text = getattr(content, "text", None)
+            if text:
+                chunks.append(text.strip())
+            elif isinstance(content, dict) and content.get("text"):
+                chunks.append(str(content["text"]).strip())
+    if chunks:
+        return "\n".join(chunks)
+    raise RuntimeError("Response did not contain output_text.")
+
+
+def parse_json_response_text(text: str) -> dict[str, Any]:
+    text = text.strip()
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        parsed = json.loads(text[start : end + 1])
+        if isinstance(parsed, dict):
+            return parsed
+    raise json.JSONDecodeError("No complete JSON object found", text, 0)
+
+
+def call_json_agent(
+    client: Any,
+    model: str,
+    prompt: str,
+    schema_name: str,
+    schema: dict[str, Any],
+    max_output_tokens: int,
+) -> dict[str, Any]:
+    response = client.responses.create(
+        model=model,
+        input=prompt,
+        text={
+            "format": {
+                "type": "json_schema",
+                "name": schema_name,
+                "strict": True,
+                "schema": schema,
+            }
+        },
+        max_output_tokens=max_output_tokens,
+    )
+    text = extract_response_text(response)
+    try:
+        return parse_json_response_text(text)
+    except Exception:
+        repair_prompt = (
+            "Repair the following invalid JSON into valid JSON that matches the requested schema. "
+            "Return JSON only.\n\n"
+            f"Invalid JSON/text:\n{text}"
+        )
+        repaired = client.responses.create(
+            model=model,
+            input=repair_prompt,
+            text={
+                "format": {
+                    "type": "json_schema",
+                    "name": f"{schema_name}_repair",
+                    "strict": True,
+                    "schema": schema,
+                }
+            },
+            max_output_tokens=max_output_tokens,
+        )
+        return parse_json_response_text(extract_response_text(repaired))
+
+
+FORMULA_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "tables": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "table_ref": {"type": "string"},
+                    "page_refs": {"type": "array", "items": {"type": "string"}},
+                    "description": {"type": "string"},
+                },
+                "required": ["table_ref", "page_refs", "description"],
+            },
+        },
+        "records": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "compound_id": {"type": "string"},
+                    "raw_formula": {"type": "string"},
+                    "formula_kind": {"type": "string", "enum": ["neutral", "mh_plus", "unknown"]},
+                    "source_type": {"type": "string", "enum": ["table", "characterization", "other"]},
+                    "page_refs": {"type": "array", "items": {"type": "string"}},
+                    "evidence": {"type": "string"},
+                    "confidence": {"type": "number"},
+                },
+                "required": [
+                    "compound_id",
+                    "raw_formula",
+                    "formula_kind",
+                    "source_type",
+                    "page_refs",
+                    "evidence",
+                    "confidence",
+                ],
+            },
+        },
+        "notes": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["tables", "records", "notes"],
+}
+
+
+ACTIVITY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "tables": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "table_ref": {"type": "string"},
+                    "page_refs": {"type": "array", "items": {"type": "string"}},
+                    "description": {"type": "string"},
+                    "activity_columns": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["table_ref", "page_refs", "description", "activity_columns"],
+            },
+        },
+        "records": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "compound_id": {"type": "string"},
+                    "assay_name": {"type": "string"},
+                    "target": {"type": "string"},
+                    "endpoint": {"type": "string"},
+                    "value_text": {"type": "string"},
+                    "qualifier": {"type": "string"},
+                    "value_numeric": {"type": "string"},
+                    "unit": {"type": "string"},
+                    "selectivity_fold": {"type": "string"},
+                    "source_type": {"type": "string", "enum": ["table", "text", "figure", "other"]},
+                    "page_refs": {"type": "array", "items": {"type": "string"}},
+                    "evidence": {"type": "string"},
+                    "confidence": {"type": "number"},
+                },
+                "required": [
+                    "compound_id",
+                    "assay_name",
+                    "target",
+                    "endpoint",
+                    "value_text",
+                    "qualifier",
+                    "value_numeric",
+                    "unit",
+                    "selectivity_fold",
+                    "source_type",
+                    "page_refs",
+                    "evidence",
+                    "confidence",
+                ],
+            },
+        },
+        "notes": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["tables", "records", "notes"],
+}
+
+
+COMPOUND_SCOPE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "paper": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string"},
+                "abstract_summary": {"type": "string"},
+                "primary_target_or_assay": {"type": "string"},
+            },
+            "required": ["title", "abstract_summary", "primary_target_or_assay"],
+        },
+        "final_compounds": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "compound_id": {"type": "string"},
+                    "role": {"type": "string"},
+                    "source_refs": {"type": "array", "items": {"type": "string"}},
+                    "evidence": {"type": "string"},
+                    "confidence": {"type": "number"},
+                },
+                "required": ["compound_id", "role", "source_refs", "evidence", "confidence"],
+            },
+        },
+        "intermediates": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "compound_id": {"type": "string"},
+                    "reason": {"type": "string"},
+                    "source_refs": {"type": "array", "items": {"type": "string"}},
+                    "evidence": {"type": "string"},
+                    "confidence": {"type": "number"},
+                },
+                "required": ["compound_id", "reason", "source_refs", "evidence", "confidence"],
+            },
+        },
+        "excluded_compounds": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "compound_id": {"type": "string"},
+                    "reason": {"type": "string"},
+                    "source_refs": {"type": "array", "items": {"type": "string"}},
+                    "evidence": {"type": "string"},
+                    "confidence": {"type": "number"},
+                },
+                "required": ["compound_id", "reason", "source_refs", "evidence", "confidence"],
+            },
+        },
+        "notes": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["paper", "final_compounds", "intermediates", "excluded_compounds", "notes"],
+}
+
+
+AMBIGUITY_REFEREE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "decision": {"type": "string", "enum": ["keep_current", "select_candidate", "unresolved"]},
+        "selected_chembl_id": {"type": "string"},
+        "selected_bindingdb_id": {"type": "string"},
+        "confidence": {"type": "number"},
+        "distinguishing_features": {"type": "array", "items": {"type": "string"}},
+        "rationale": {"type": "string"},
+    },
+    "required": [
+        "decision",
+        "selected_chembl_id",
+        "selected_bindingdb_id",
+        "confidence",
+        "distinguishing_features",
+        "rationale",
+    ],
+}
+
+
+def resolve_path(path_text: str, base_dir: Path) -> Path:
+    path = Path(path_text).expanduser()
+    return path if path.is_absolute() else base_dir / path
+
+
+def resolve_output_path(path_text: str, outdir: Path) -> Path:
+    path = Path(path_text).expanduser()
+    return path if path.is_absolute() else outdir / path
+
+
+def load_pdf(pdf_path: str) -> object:
+    """用 PyMuPDF (fitz) 打开 PDF, 返回可按页取图/取文本的句柄。"""
+    try:
+        import fitz
+    except ImportError as exc:
+        raise RuntimeError("PyMuPDF is required for PDF text extraction: pip install pymupdf") from exc
+    return fitz.open(pdf_path)
+
+
+def read_pdf_pages(pdf_paths: list[Path]) -> list[dict[str, Any]]:
+    pages: list[dict[str, Any]] = []
+    for pdf_path in pdf_paths:
+        doc = load_pdf(str(pdf_path))
+        try:
+            for index, page in enumerate(doc, start=1):
+                text = page.get_text("text")
+                pages.append(
+                    {
+                        "pdf": pdf_path.name,
+                        "path": str(pdf_path),
+                        "page": index,
+                        "page_ref": f"{pdf_path.name}:p{index}",
+                        "text": text,
+                    }
+                )
+        finally:
+            doc.close()
+    return pages
+
+
+def page_chunks(
+    pages: list[dict[str, Any]],
+    pages_per_chunk: int,
+    max_chunk_chars: int,
+) -> list[dict[str, Any]]:
+    chunks: list[dict[str, Any]] = []
+    current_pages: list[dict[str, Any]] = []
+    current_text: list[str] = []
+    for page in pages:
+        block = f"\n\n--- {page['page_ref']} ---\n{page.get('text', '')}"
+        would_exceed_pages = len(current_pages) >= pages_per_chunk
+        would_exceed_chars = sum(len(item) for item in current_text) + len(block) > max_chunk_chars
+        if current_pages and (would_exceed_pages or would_exceed_chars):
+            chunk_index = len(chunks) + 1
+            chunks.append(
+                {
+                    "chunk_id": f"chunk_{chunk_index:03d}",
+                    "page_refs": [item["page_ref"] for item in current_pages],
+                    "text": "".join(current_text).strip(),
+                }
+            )
+            current_pages = []
+            current_text = []
+        current_pages.append(page)
+        current_text.append(block)
+    if current_pages:
+        chunk_index = len(chunks) + 1
+        chunks.append(
+            {
+                "chunk_id": f"chunk_{chunk_index:03d}",
+                "page_refs": [item["page_ref"] for item in current_pages],
+                "text": "".join(current_text).strip(),
+            }
+        )
+    return chunks
+
+
+def cache_signature(paths: list[Path]) -> list[dict[str, Any]]:
+    return [
+        {"path": str(path), "mtime": path.stat().st_mtime, "size": path.stat().st_size}
+        for path in paths
+        if path.exists()
+    ]
+
+
+def load_cached_payload(path: Path, pdf_paths: list[Path]) -> Optional[Any]:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if payload.get("source_files") != cache_signature(pdf_paths):
+        return None
+    return payload.get("data")
+
+
+def write_cached_payload(path: Path, pdf_paths: list[Path], data: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"source_files": cache_signature(pdf_paths), "data": data}
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def build_or_load_page_chunks(
+    pdf_paths: list[Path],
+    pages_per_chunk: int,
+    max_chunk_chars: int,
+    pdf_pages_cache_path: Path,
+    page_chunks_cache_path: Path,
+    reuse_pdf_pages: bool,
+    reuse_page_chunks: bool,
+    force: bool,
+) -> list[dict[str, Any]]:
+    if reuse_page_chunks and not force:
+        cached_chunks = load_cached_payload(page_chunks_cache_path, pdf_paths)
+        if cached_chunks:
+            print(f"Using cached page chunks: {page_chunks_cache_path}")
+            return cached_chunks
+    pages = None
+    if reuse_pdf_pages and not force:
+        pages = load_cached_payload(pdf_pages_cache_path, pdf_paths)
+        if pages:
+            print(f"Using cached PDF pages: {pdf_pages_cache_path}")
+    if pages is None:
+        pages = read_pdf_pages(pdf_paths)
+        write_cached_payload(pdf_pages_cache_path, pdf_paths, pages)
+    chunks = page_chunks(pages, pages_per_chunk, max_chunk_chars)
+    write_cached_payload(page_chunks_cache_path, pdf_paths, chunks)
+    return chunks
+
+
+def normalize_compound_id(compound_id: str) -> str:
+    return re.sub(r"\s+", "", str(compound_id or "")).strip()
+
+
+def compound_sort_key(compound_id: str) -> tuple[Any, ...]:
+    text = normalize_compound_id(compound_id)
+    match = re.match(r"^([A-Za-z]*)(\d+)([A-Za-z]*)$", text)
+    if not match:
+        return (1, text)
+    prefix, number, suffix = match.groups()
+    return (0, prefix, int(number), suffix)
+
+
+def expand_compound_id_text(text: str) -> list[str]:
+    text = str(text or "")
+    expanded: list[str] = []
+    for part in re.split(r"[,;/]\s*|\band\b", text):
+        part = normalize_compound_id(part)
+        if not part:
+            continue
+        range_match = re.match(r"^([A-Za-z]*)(\d+)\s*[-–]\s*([A-Za-z]*)(\d+)([A-Za-z]*)$", part)
+        if range_match:
+            prefix_a, start, prefix_b, end, suffix = range_match.groups()
+            if prefix_a == prefix_b and not suffix:
+                for number in range(int(start), int(end) + 1):
+                    expanded.append(f"{prefix_a}{number}")
+                continue
+        expanded.append(part)
+    return expanded
+
+
+def scope_entries_to_ids(entries: list[dict[str, Any]]) -> list[str]:
+    ids: list[str] = []
+    for entry in entries:
+        for compound_id in expand_compound_id_text(str(entry.get("compound_id", ""))):
+            if compound_id and compound_id not in ids:
+                ids.append(compound_id)
+    return sorted(ids, key=compound_sort_key)
+
+
+def canonical_target_compound_id(compound_id: str, target_set: set[str]) -> str:
+    normalized = normalize_compound_id(compound_id)
+    if normalized in target_set:
+        return normalized
+    base_match = re.match(r"^(\d+)[a-z]$", normalized, flags=re.IGNORECASE)
+    if base_match and base_match.group(1) in target_set:
+        return base_match.group(1)
+    return normalized
+
+
+def compound_id_summary(compound_ids: list[str]) -> str:
+    return ", ".join(sorted({normalize_compound_id(item) for item in compound_ids if item}, key=compound_sort_key))
+
+
+def build_compound_scope_context(chunks: list[dict[str, Any]], max_chars: int) -> str:
+    selected: list[str] = []
+    budget = max_chars
+    title_patterns = re.compile(r"\b(title|abstract|introduction|results|scheme|table|caption)\b", re.I)
+    for chunk in chunks:
+        text = str(chunk.get("text", ""))
+        lines = [
+            line
+            for line in text.splitlines()
+            if title_patterns.search(line) or re.search(r"\b(compound|compd|IC50|Table|Scheme)\b", line, re.I)
+        ]
+        block = f"\n\n--- {chunk['chunk_id']} {', '.join(chunk['page_refs'])} ---\n" + "\n".join(lines[:220])
+        if len(block) > budget:
+            block = block[:budget]
+        selected.append(block)
+        budget -= len(block)
+        if budget <= 0:
+            break
+    return "".join(selected)
+
+
+def compound_scope_prompt(context: str) -> str:
+    return f"""\
+You analyze a medicinal chemistry paper and decide which compound IDs are final target compounds.
+
+Return JSON only.
+
+Definitions:
+- final_compounds: compounds that are the paper's final designed/tested analogs or title library members.
+- intermediates: synthetic intermediates, protected precursors, salts/reagents, or compounds used only in schemes.
+- excluded_compounds: reference-only comparators, off-scope compounds, SI-only intermediates, or IDs explicitly not part of the final target library.
+
+Read title, abstract, result tables, Scheme captions, Table captions, and SAR context. When a range such as 7-41 is the final library, include it as a range or expanded IDs. Exclude IDs like S12, 57, 60, 64 when context says they are intermediates/reference/off-scope.
+
+PDF context:
+{context}
+"""
+
+
+def discover_compound_scope(
+    client: Any,
+    model: str,
+    chunks: list[dict[str, Any]],
+    cache_path: Path,
+    max_output_tokens: int,
+    context_max_chars: int,
+    target_ids: list[str],
+    excluded_ids: list[str],
+    reuse_cache: bool,
+    force: bool,
+) -> dict[str, Any]:
+    if cache_path.exists() and reuse_cache and not force:
+        scope = json.loads(cache_path.read_text(encoding="utf-8"))
+        print(f"Using cached {cache_path.name}")
+    else:
+        print(f"Calling {model} for compound scope")
+        context = build_compound_scope_context(chunks, context_max_chars)
+        scope = call_json_agent(
+            client,
+            model,
+            compound_scope_prompt(context),
+            "compound_scope",
+            COMPOUND_SCOPE_SCHEMA,
+            min(max_output_tokens, 2500),
+        )
+    final_ids = set(scope_entries_to_ids(scope.get("final_compounds", [])))
+    excluded_set = set(scope_entries_to_ids(scope.get("excluded_compounds", [])))
+    for compound_id in target_ids:
+        for expanded in expand_compound_id_text(compound_id):
+            final_ids.add(expanded)
+            excluded_set.discard(expanded)
+    for compound_id in excluded_ids:
+        for expanded in expand_compound_id_text(compound_id):
+            excluded_set.add(expanded)
+            final_ids.discard(expanded)
+    scope["final_compounds"] = [
+        {
+            "compound_id": compound_id,
+            "role": "final_target",
+            "source_refs": [],
+            "evidence": "LLM/manual scope result.",
+            "confidence": 1.0,
+        }
+        for compound_id in sorted(final_ids, key=compound_sort_key)
+    ]
+    scope["excluded_compounds"] = [
+        {
+            "compound_id": compound_id,
+            "reason": "excluded_or_intermediate",
+            "source_refs": [],
+            "evidence": "LLM/manual scope result.",
+            "confidence": 1.0,
+        }
+        for compound_id in sorted(excluded_set, key=compound_sort_key)
+    ]
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps(scope, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return scope
+
+
+def scope_hash(scope: dict[str, Any]) -> str:
+    payload = {
+        "final_compounds": scope_entries_to_ids(scope.get("final_compounds", [])),
+        "excluded_compounds": scope_entries_to_ids(scope.get("excluded_compounds", [])),
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+
+
+def formula_prompt(chunk: dict[str, Any], scope: dict[str, Any]) -> str:
+    final_ids = scope_entries_to_ids(scope.get("final_compounds", []))
+    intermediate_ids = scope_entries_to_ids(scope.get("intermediates", []))
+    excluded_ids = scope_entries_to_ids(scope.get("excluded_compounds", []))
+    paper = scope.get("paper", {})
+    return f"""\
+You extract molecular formula records from PDF text.
+
+Goal:
+- Find formulas for final target compounds identified by paper-level scope analysis.
+- First identify table-like regions/captions, then extract formula records from tables or characterization lines.
+
+Rules:
+- Only include final target compound IDs listed below.
+- Do not include intermediate or excluded IDs.
+- If the table uses suffixes such as 9a or 22a, map them to listed base target IDs such as 9 or 22.
+- If text says "[M+H]+", formula_kind="mh_plus"; raw_formula is the printed protonated formula.
+- If formula is printed as a neutral molecular formula, formula_kind="neutral".
+- Do not infer formulas from SMILES or drawings.
+
+Paper title: {paper.get("title", "")}
+Primary target/assay: {paper.get("primary_target_or_assay", "")}
+
+Final target compound IDs to include:
+{compound_id_summary(final_ids)}
+
+Intermediate IDs to exclude:
+{compound_id_summary(intermediate_ids)}
+
+Other excluded IDs:
+{compound_id_summary(excluded_ids)}
+
+Chunk pages: {", ".join(chunk["page_refs"])}
+
+PDF text:
+{chunk["text"]}
+"""
+
+
+def activity_prompt(
+    chunk: dict[str, Any],
+    scope: dict[str, Any],
+    primary_assay_keywords: Optional[list[str]] = None,
+) -> str:
+    final_ids = scope_entries_to_ids(scope.get("final_compounds", []))
+    intermediate_ids = scope_entries_to_ids(scope.get("intermediates", []))
+    excluded_ids = scope_entries_to_ids(scope.get("excluded_compounds", []))
+    paper = scope.get("paper", {})
+    primary_keywords = [str(item) for item in (primary_assay_keywords or []) if str(item).strip()]
+    return f"""\
+You extract biological/activity records from medicinal chemistry PDF text.
+
+Goal:
+- Find measured activity/selectivity/assay data for final target compounds.
+- Focus on SAR/result/activity tables and nearby text.
+- Extract one record per compound per endpoint when values are explicit.
+
+Rules:
+- Only include final target compound IDs listed below.
+- Do not include intermediates or excluded IDs.
+- Do not extract LCMS, HRMS, NMR, yield, RT, MW, formula, PK exposure, crystallography, or synthetic procedure values as activity.
+- Valid endpoints include IC50, EC50, Ki, Kd, inhibition %, selectivity fold, biochemical potency, cellular potency, viability, and similar assay readouts.
+- Preserve raw value text enough to audit units and qualifiers.
+- Put numeric value without unit in value_numeric when obvious; otherwise empty string.
+- Put unit as nM, uM, mM, %, fold, or empty string.
+- If a table gives "0.34 (15x)", value_text keeps full text, value_numeric="0.34", unit follows table header, selectivity_fold="15".
+- Prioritize records matching these primary assay keywords: {", ".join(primary_keywords) if primary_keywords else "(not specified)"}
+
+Paper title: {paper.get("title", "")}
+Primary target/assay: {paper.get("primary_target_or_assay", "")}
+
+Final target compound IDs to include:
+{compound_id_summary(final_ids)}
+
+Intermediate IDs to exclude:
+{compound_id_summary(intermediate_ids)}
+
+Other excluded IDs:
+{compound_id_summary(excluded_ids)}
+
+Chunk pages: {", ".join(chunk["page_refs"])}
+
+PDF text:
+{chunk["text"]}
+"""
+
+
+def focused_formula_snippets(missing_ids: list[str], chunks: list[dict[str, Any]]) -> list[str]:
+    snippets: list[str] = []
+    for compound_id in missing_ids:
+        cid = re.escape(normalize_compound_id(compound_id))
+        patterns = [
+            rf"(?:afford(?:ed)?|obtain(?:ed)?|provide(?:d)?|yield(?:ed)?)\s+"
+            rf"(?:the\s+)?(?:compound\s+)?{cid}\b.{{0,1800}}?(?:LCMS|LC/MS|HRMS).{{0,900}}",
+            rf"(?:Synthesis\s+of\s+compound\s+{cid}|afford(?:ed)?\s+(?:compound\s+)?{cid}|"
+            rf"obtain(?:ed)?\s+(?:the\s+)?compound\s+{cid}|compound\s+{cid})"
+            rf".{{0,3600}}?(?:LCMS|LC/MS|HRMS).{{0,900}}",
+        ]
+        for chunk in chunks:
+            text = str(chunk.get("text", ""))
+            for pattern in patterns:
+                for match in re.finditer(pattern, text, flags=re.IGNORECASE | re.DOTALL):
+                    snippet = re.sub(r"\n{3,}", "\n\n", match.group(0)).strip()
+                    if not snippet:
+                        continue
+                    if "calcd" not in snippet.lower() or not re.search(r"\bC\d+H\d+", snippet):
+                        continue
+                    block = (
+                        f"--- Missing compound {compound_id}; "
+                        f"{chunk.get('chunk_id', '')}; {', '.join(chunk.get('page_refs', []))} ---\n"
+                        f"{snippet}"
+                    )
+                    if block not in snippets:
+                        snippets.append(block)
+                    if sum(f"Missing compound {compound_id};" in item for item in snippets) >= 6:
+                        break
+                if sum(f"Missing compound {compound_id};" in item for item in snippets) >= 6:
+                    break
+            if sum(f"Missing compound {compound_id};" in item for item in snippets) >= 6:
+                break
+    return snippets
+
+
+def chunk_mentions_compound_id(chunk: dict[str, Any], compound_id: str) -> bool:
+    text = str(chunk.get("text", ""))
+    cid = re.escape(normalize_compound_id(compound_id))
+    patterns = [
+        rf"\bcompound\s+{cid}\b",
+        rf"\bcompd\.?\s+{cid}\b",
+        rf"\bcpd\.?\s+{cid}\b",
+        rf"\bafford(?:ed)?\s+(?:compound\s+)?{cid}\b",
+        rf"\bobtain(?:ed)?\s+(?:the\s+)?(?:compound\s+)?{cid}\b",
+        rf"\b{cid}\s*\(",
+        rf"\b{cid}\s*:",
+    ]
+    return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def focused_formula_prompt(missing_ids: list[str], snippets: list[str], scope: dict[str, Any]) -> str:
+    focused_text = "\n\n".join(snippets)
+    return f"""\
+You extract missing molecular formula records from focused PDF text.
+
+Only extract these final target compound IDs:
+{compound_id_summary(missing_ids)}
+
+Rules:
+- Return JSON matching the formula schema.
+- Do not include intermediates or reagents.
+- If an ID appears as a final product in a synthesis section, extract its LCMS/HRMS formula.
+- If the text says "[M+H]+", set formula_kind="mh_plus"; raw_formula is the printed protonated formula.
+- If a table has a neutral molecular formula column, set formula_kind="neutral".
+- If a table uses footnote suffixes like 31a, map to base target ID 31 when listed above.
+- Evidence should mention the short LCMS/HRMS line or table row.
+
+Paper title: {scope.get("paper", {}).get("title", "")}
+
+Focused PDF text:
+{focused_text}
+"""
+
+
+def formula_records_from_snippets(missing_ids: list[str], snippets: list[str]) -> dict[str, Any]:
+    records: list[dict[str, Any]] = []
+    for compound_id in missing_ids:
+        matching = [snippet for snippet in snippets if f"Missing compound {compound_id};" in snippet]
+        best: Optional[tuple[float, str, list[str], str]] = None
+        for snippet in matching:
+            matches = list(
+                re.finditer(
+                    r"(?:LCMS|LC/MS|HRMS)[\s\S]{0,180}?calcd\.?\s*(?:for\s*)?([A-Z][A-Za-z0-9]+)\+?\s*\[M\+H\]\+",
+                    snippet,
+                    flags=re.IGNORECASE,
+                )
+            )
+            if not matches:
+                continue
+            page_refs_match = re.search(r";\s*([^\n]+?)\s*---", snippet)
+            page_refs = []
+            if page_refs_match:
+                page_refs = [item.strip() for item in page_refs_match.group(1).split(",") if item.strip()]
+            for index, match in enumerate(matches):
+                start = max(0, match.start() - 900)
+                end = min(len(snippet), match.end() + 250)
+                context = re.sub(r"\s+", " ", snippet[start:end]).strip()
+                context_lower = context.lower()
+                score = float(index) * 0.05
+                cid = re.escape(normalize_compound_id(compound_id))
+                if re.search(
+                    rf"(?:afford(?:ed)?|obtain(?:ed)?|provide(?:d)?|yield(?:ed)?)\s+"
+                    rf"(?:the\s+)?(?:title\s+)?(?:compound\s+)?{cid}\b",
+                    context_lower,
+                    flags=re.IGNORECASE,
+                ):
+                    score += 3.0
+                if re.search(r"\btitle\s+compound\b", context_lower):
+                    score += 2.0
+                if re.search(r"\bcompound\s+" + cid + r"\b", context_lower, flags=re.IGNORECASE):
+                    score += 0.5
+                if re.search(r"\b(?:tert-butyl|boc|protected|intermediate|crude product|compound\s+S\d+)\b", context_lower):
+                    score -= 1.5
+                candidate = (score, match.group(1), page_refs, context[:300])
+                if best is None or candidate[0] > best[0]:
+                    best = candidate
+        if best is None:
+            continue
+        _, raw_formula, page_refs, evidence = best
+        records.append(
+            {
+                "compound_id": compound_id,
+                "raw_formula": raw_formula,
+                "formula_kind": "mh_plus",
+                "source_type": "characterization",
+                "page_refs": page_refs,
+                "evidence": evidence,
+                "confidence": 0.9,
+            }
+        )
+    return {"tables": [], "records": records, "notes": ["Deterministic focused LCMS formula fallback."]}
+
+
+def extract_missing_formula_records(
+    client: Any,
+    model: str,
+    chunks: list[dict[str, Any]],
+    scope: dict[str, Any],
+    missing_ids: list[str],
+    cache_path: Path,
+    max_output_tokens: int,
+    reuse_cache: bool,
+    force: bool,
+) -> Optional[dict[str, Any]]:
+    focused_chunks = [
+        chunk
+        for chunk in chunks
+        if any(chunk_mentions_compound_id(chunk, compound_id) for compound_id in missing_ids)
+    ]
+    if not focused_chunks:
+        return None
+    snippets = focused_formula_snippets(missing_ids, focused_chunks)
+    if not snippets:
+        return None
+    fallback_result = formula_records_from_snippets(missing_ids, snippets)
+    if cache_path.exists() and reuse_cache and not force:
+        print(f"Using cached {cache_path.name}")
+        return json.loads(cache_path.read_text(encoding="utf-8"))
+
+    print(f"Calling {model} for missing formula IDs: {compound_id_summary(missing_ids)}")
+    try:
+        result = call_json_agent(
+            client,
+            model,
+            focused_formula_prompt(missing_ids, snippets, scope),
+            "formula_extract_missing",
+            FORMULA_SCHEMA,
+            max_output_tokens,
+        )
+    except Exception:
+        result = {"tables": [], "records": [], "notes": ["Focused missing formula LLM call failed."]}
+    existing_ids = {
+        canonical_target_compound_id(record.get("compound_id", ""), set(missing_ids))
+        for record in result.get("records", [])
+    }
+    for record in fallback_result.get("records", []):
+        if record["compound_id"] not in existing_ids:
+            result.setdefault("records", []).append(record)
+        else:
+            result.setdefault("records", []).append(record)
+    result.setdefault("notes", []).extend(fallback_result.get("notes", []))
+    cache_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return result
+
+
+def parse_formula(formula: str) -> Optional[dict[str, int]]:
+    formula = re.sub(r"[\s\+\-]+$", "", str(formula or "").strip())
+    if not formula:
+        return None
+    counts: dict[str, int] = {}
+    pos = 0
+    for match in re.finditer(r"([A-Z][a-z]?)(\d*)", formula):
+        if match.start() != pos:
+            return None
+        element, count_text = match.groups()
+        counts[element] = counts.get(element, 0) + int(count_text or "1")
+        pos = match.end()
+    return counts if pos == len(formula) and counts else None
+
+
+def format_formula(counts: dict[str, int]) -> str:
+    order = ["C", "H"]
+    rest = sorted(element for element in counts if element not in order)
+    parts: list[str] = []
+    for element in order + rest:
+        count = counts.get(element, 0)
+        if count <= 0:
+            continue
+        parts.append(element + (str(count) if count != 1 else ""))
+    return "".join(parts)
+
+
+def formula_text_looks_protonated(raw_formula: str) -> bool:
+    text = str(raw_formula or "").strip()
+    return bool(re.search(r"\[?M\s*\+\s*H\]?\+|\+$", text, flags=re.IGNORECASE))
+
+
+def normalize_formula_with_reason(
+    raw_formula: str,
+    formula_kind: str,
+    source_type: str = "",
+) -> tuple[str, str]:
+    counts = parse_formula(raw_formula)
+    if not counts:
+        return "", "invalid_or_missing_formula"
+    source_norm = str(source_type or "").strip().lower()
+    kind_norm = str(formula_kind or "").strip().lower()
+    if source_norm == "table":
+        return format_formula(counts), "table_formula_treated_as_neutral"
+    if kind_norm == "mh_plus" and counts.get("H", 0) > 0 and formula_text_looks_protonated(raw_formula):
+        counts = dict(counts)
+        counts["H"] -= 1
+        return format_formula(counts), "subtracted_h_from_explicit_mh_plus_formula"
+    if kind_norm == "mh_plus":
+        return format_formula(counts), "mh_plus_label_without_ion_marker_treated_as_neutral"
+    return format_formula(counts), "neutral_formula"
+
+
+def normalize_formula(raw_formula: str, formula_kind: str) -> str:
+    formula, _reason = normalize_formula_with_reason(raw_formula, formula_kind)
+    return formula
+
+
+def formula_from_smiles(smiles: Any) -> str:
+    text = str(smiles or "").strip()
+    if not text:
+        return ""
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import rdMolDescriptors
+    except ImportError:
+        return ""
+    mol = Chem.MolFromSmiles(text)
+    if mol is None:
+        return ""
+    return rdMolDescriptors.CalcMolFormula(mol)
+
+
+def formula_record_score(record: dict[str, Any]) -> float:
+    confidence = float(record.get("confidence", 0) or 0)
+    source_type = record.get("source_type", "other")
+    evidence = str(record.get("evidence", "")).lower()
+    score = confidence * 10
+    score += {"characterization": 0.8, "table": 0.6, "other": 0.0}.get(source_type, 0.0)
+    if "lcms" in evidence or "[m+h]" in evidence or "hrms" in evidence:
+        score += 0.5
+    if "intermediate" in evidence or "protected" in evidence:
+        score -= 1.5
+    return score
+
+
+def parse_activity_numeric(value_text: Any) -> Optional[float]:
+    text = str(value_text or "").strip().replace(",", "")
+    if not text:
+        return None
+    match = re.search(r"[-+]?\d+(?:\.\d+)?", text)
+    return float(match.group(0)) if match else None
+
+
+def normalize_activity_to_nM(value: Optional[float], unit: str) -> Optional[float]:
+    if value is None:
+        return None
+    unit_norm = unit.strip().lower().replace("μ", "u").replace("µ", "u")
+    if unit_norm in {"nm", "nanomolar", "nanomol/l", "nanomole"}:
+        return value
+    if unit_norm in {"um", "micromolar", "umol/l", "micromole"}:
+        return value * 1000.0
+    if unit_norm in {"mm", "millimolar", "mmol/l", "millimole"}:
+        return value * 1_000_000.0
+    return None
+
+
+def parse_selectivity_fold(value_text: Any) -> Optional[float]:
+    text = str(value_text or "").strip()
+    if not text:
+        return None
+    match = re.search(r"(\d+(?:\.\d+)?)\s*[x×]", text, flags=re.IGNORECASE)
+    if match:
+        return float(match.group(1))
+    if re.search(r"\bfold\b", text, flags=re.IGNORECASE):
+        return parse_activity_numeric(text)
+    if re.search(r"\bselectivit(?:y|ies)\b", text, flags=re.IGNORECASE):
+        return parse_activity_numeric(text)
+    return None
+
+
+def parse_activity(raw_activity: str) -> tuple[Optional[float], Optional[float]]:
+    """
+    把活性文本解析成结构化数值。e.g. "0.34 (15x)" -> (0.34 nM, 15.0 倍)。
+    正则处理单位 (nM/µM)、不等号 (>、<)、范围、缺失等情形。
+    """
+    text = str(raw_activity or "")
+    value = parse_activity_numeric(text)
+    unit = "nM"
+    lowered = text.lower().replace("μ", "u").replace("µ", "u")
+    if "um" in lowered or "micromolar" in lowered:
+        unit = "uM"
+    elif "mm" in lowered or "millimolar" in lowered:
+        unit = "mM"
+    elif "%" in lowered:
+        value = None
+    return normalize_activity_to_nM(value, unit), parse_selectivity_fold(text)
+
+
+def activity_record_score(
+    record: dict[str, Any],
+    primary_assay_keywords: Optional[list[str]] = None,
+) -> float:
+    score = float(record.get("confidence", 0) or 0) * 10
+    text = " ".join(
+        str(record.get(key, ""))
+        for key in ("assay_name", "target", "endpoint", "evidence", "value_text")
+    ).lower()
+    for keyword in primary_assay_keywords or []:
+        keyword_text = str(keyword).strip().lower()
+        if keyword_text and keyword_text in text:
+            score += 2.5
+    if "ic50" in text:
+        score += 2.0
+    if "ec50" in text or "ki" in text or "kd" in text:
+        score += 1.0
+    if "biochemical" in text or "htrf" in text or "tr-fret" in text or "tr fret" in text:
+        score += 1.5
+    if "selectivity" in text:
+        score += 1.0
+    if "cell" in text or "viability" in text:
+        score -= 1.0
+    if normalize_activity_to_nM(
+        parse_activity_numeric(record.get("value_numeric") or record.get("value_text")),
+        str(record.get("unit", "")),
+    ) is not None:
+        score += 1.0
+    return score
+
+
+def compact_float(value: Optional[float]) -> str:
+    if value is None:
+        return ""
+    return f"{value:.6g}"
+
+
+def normalize_activity_record(
+    record: dict[str, Any],
+    primary_assay_keywords: Optional[list[str]] = None,
+) -> dict[str, Any]:
+    value = parse_activity_numeric(record.get("value_numeric") or record.get("value_text"))
+    unit = str(record.get("unit", ""))
+    value_nM = normalize_activity_to_nM(value, unit)
+    selectivity = parse_selectivity_fold(record.get("selectivity_fold"))
+    if selectivity is None:
+        selectivity = parse_selectivity_fold(record.get("value_text"))
+    normalized = {
+        "compound_id": str(record.get("compound_id", "")).strip(),
+        "assay_name": str(record.get("assay_name", "")).strip(),
+        "target": str(record.get("target", "")).strip(),
+        "endpoint": str(record.get("endpoint", "")).strip(),
+        "value_text": str(record.get("value_text", "")).strip(),
+        "qualifier": str(record.get("qualifier", "")).strip(),
+        "value_numeric": compact_float(value),
+        "unit": unit.strip(),
+        "value_nM": compact_float(value_nM),
+        "selectivity_fold": compact_float(selectivity),
+        "source_type": str(record.get("source_type", "")).strip(),
+        "page_refs": list(record.get("page_refs", []) or []),
+        "evidence": str(record.get("evidence", "")).strip(),
+        "confidence": float(record.get("confidence", 0) or 0),
+    }
+    normalized["score"] = activity_record_score(normalized, primary_assay_keywords)
+    return normalized
+
+
+def merge_activity_records(
+    chunk_results: list[dict[str, Any]],
+    target_ids: list[str],
+    excluded_ids: list[str],
+    primary_assay_keywords: Optional[list[str]] = None,
+) -> dict[str, Any]:
+    target_set = {normalize_compound_id(compound_id) for compound_id in target_ids}
+    excluded_set = {normalize_compound_id(compound_id) for compound_id in excluded_ids}
+    by_id: dict[str, dict[str, Any]] = {}
+    tables: list[dict[str, Any]] = []
+    notes: list[str] = []
+    seen: set[tuple[str, str, str, str, str]] = set()
+    for result in chunk_results:
+        tables.extend(result.get("tables", []))
+        notes.extend(result.get("notes", []))
+        for record in result.get("records", []):
+            cid = canonical_target_compound_id(record.get("compound_id", ""), target_set)
+            if not cid or (target_set and cid not in target_set) or cid in excluded_set:
+                continue
+            normalized = normalize_activity_record({**record, "compound_id": cid}, primary_assay_keywords)
+            if not normalized.get("value_text") and not normalized.get("selectivity_fold"):
+                continue
+            dedupe_key = (
+                cid,
+                normalized.get("assay_name", ""),
+                normalized.get("target", ""),
+                normalized.get("endpoint", ""),
+                normalized.get("value_text", ""),
+            )
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            dest = by_id.setdefault(
+                cid,
+                {
+                    "compound_id": cid,
+                    "activities": [],
+                    "activity_source_pages": [],
+                    "activity_evidence": [],
+                },
+            )
+            dest["activities"].append(normalized)
+            for page_ref in normalized.get("page_refs", []):
+                if page_ref not in dest["activity_source_pages"]:
+                    dest["activity_source_pages"].append(page_ref)
+            if normalized.get("evidence"):
+                dest["activity_evidence"].append(normalized["evidence"])
+    for dest in by_id.values():
+        activities = sorted(dest["activities"], key=lambda item: (-float(item.get("score", 0) or 0), item.get("assay_name", "")))
+        dest["activities"] = activities
+        primary = activities[0] if activities else {}
+        dest["primary_activity_assay"] = primary.get("assay_name", "")
+        dest["primary_activity_target"] = primary.get("target", "")
+        dest["primary_activity_endpoint"] = primary.get("endpoint", "")
+        dest["primary_activity_value_text"] = primary.get("value_text", "")
+        dest["primary_activity_value_nM"] = primary.get("value_nM", "")
+        dest["primary_activity_selectivity_fold"] = primary.get("selectivity_fold", "")
+    return {
+        "tables": tables,
+        "records": sorted(by_id.values(), key=lambda row: compound_sort_key(row["compound_id"])),
+        "notes": sorted(set(notes)),
+    }
+
+
+def merge_formula_records(
+    chunk_results: list[dict[str, Any]],
+    target_ids: list[str],
+    excluded_ids: list[str],
+) -> dict[str, Any]:
+    by_id: dict[str, dict[str, Any]] = {}
+    tables: list[dict[str, Any]] = []
+    notes: list[str] = []
+    target_set = {normalize_compound_id(compound_id) for compound_id in target_ids}
+    excluded_set = {normalize_compound_id(compound_id) for compound_id in excluded_ids}
+    for result in chunk_results:
+        tables.extend(result.get("tables", []))
+        notes.extend(result.get("notes", []))
+        for record in result.get("records", []):
+            cid = canonical_target_compound_id(record.get("compound_id", ""), target_set)
+            if not cid or (target_set and cid not in target_set) or cid in excluded_set:
+                continue
+            formula_kind = record.get("formula_kind", "unknown")
+            source_type = record.get("source_type", "other")
+            neutral, normalization_reason = normalize_formula_with_reason(
+                record.get("raw_formula", ""),
+                formula_kind,
+                source_type,
+            )
+            if not neutral:
+                continue
+            score = formula_record_score(record)
+            dest = by_id.setdefault(
+                cid,
+                {
+                    "compound_id": cid,
+                    "neutral_formula": neutral,
+                    "formula_score": score,
+                    "raw_formulas": [],
+                    "formula_kinds": [],
+                    "formula_normalization_reasons": [],
+                    "source_types": [],
+                    "page_refs": [],
+                    "evidence": [],
+                    "confidence": 0.0,
+                    "warnings": [],
+                },
+            )
+            if dest["neutral_formula"] != neutral:
+                warning = f"Conflicting neutral formula: {dest['neutral_formula']} vs {neutral}"
+                if warning not in dest["warnings"]:
+                    dest["warnings"].append(warning)
+                if score > float(dest.get("formula_score", 0)):
+                    dest["neutral_formula"] = neutral
+                    dest["formula_score"] = score
+            else:
+                dest["formula_score"] = max(float(dest.get("formula_score", 0)), score)
+            for key, source_key in (
+                ("raw_formulas", "raw_formula"),
+                ("formula_kinds", "formula_kind"),
+                ("source_types", "source_type"),
+            ):
+                value = str(record.get(source_key, "")).strip()
+                if value and value not in dest[key]:
+                    dest[key].append(value)
+            if normalization_reason and normalization_reason not in dest["formula_normalization_reasons"]:
+                dest["formula_normalization_reasons"].append(normalization_reason)
+            for page_ref in record.get("page_refs", []):
+                if page_ref not in dest["page_refs"]:
+                    dest["page_refs"].append(page_ref)
+            if record.get("evidence"):
+                dest["evidence"].append(str(record["evidence"]))
+            dest["confidence"] = max(dest["confidence"], float(record.get("confidence", 0)))
+    return {
+        "tables": tables,
+        "records": sorted(by_id.values(), key=lambda row: compound_sort_key(row["compound_id"])),
+        "notes": sorted(set(notes)),
+    }
+
+
+def attach_activity_records(
+    merged_formula: dict[str, Any],
+    merged_activity: dict[str, Any],
+) -> dict[str, Any]:
+    activity_by_id = {
+        normalize_compound_id(record.get("compound_id", "")): record
+        for record in merged_activity.get("records", [])
+    }
+    for record in merged_formula.get("records", []):
+        activity = activity_by_id.get(normalize_compound_id(record.get("compound_id", "")), {})
+        record["primary_activity_assay"] = activity.get("primary_activity_assay", "")
+        record["primary_activity_target"] = activity.get("primary_activity_target", "")
+        record["primary_activity_endpoint"] = activity.get("primary_activity_endpoint", "")
+        record["primary_activity_value_text"] = activity.get("primary_activity_value_text", "")
+        record["primary_activity_value_nM"] = activity.get("primary_activity_value_nM", "")
+        record["primary_activity_selectivity_fold"] = activity.get("primary_activity_selectivity_fold", "")
+        record["activity_source_pages"] = activity.get("activity_source_pages", [])
+        record["activity_evidence"] = activity.get("activity_evidence", [])
+        record["activities_json"] = json.dumps(activity.get("activities", []), ensure_ascii=False, separators=(",", ":"))
+    return merged_formula
+
+
+def cache_path_for_url(cache_dir: Optional[Path], prefix: str, url: str) -> Optional[Path]:
+    if cache_dir is None:
+        return None
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:24]
+    return cache_dir / f"{prefix}_{digest}.json"
+
+
+def fetch_json(
+    url: str,
+    *,
+    timeout: int = DEFAULT_API_TIMEOUT,
+    retries: int = DEFAULT_API_RETRIES,
+    base_delay: float = DEFAULT_API_BASE_DELAY,
+    cache_dir: Optional[Path] = None,
+    cache_prefix: str = "api",
+    cache_empty_lists: bool = True,
+) -> Optional[dict[str, Any]]:
+    cache_path = cache_path_for_url(cache_dir, cache_prefix, url)
+    if cache_path and cache_path.exists():
+        try:
+            return json.loads(cache_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            cache_path.unlink(missing_ok=True)
+    request = urllib.request.Request(url, headers={"User-Agent": "MarkushExtractor/0.2"})
+    last_error = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                data = json.loads(response.read().decode("utf-8"))
+            if cache_path and (cache_empty_lists or data):
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            return data
+        except Exception as exc:
+            if getattr(exc, "code", None) == 404:
+                if cache_path:
+                    cache_path.parent.mkdir(parents=True, exist_ok=True)
+                    cache_path.write_text("{}\n", encoding="utf-8")
+                return None
+            last_error = exc
+            time.sleep(base_delay * (2 ** attempt))
+    print(f"Request failed after retries: {url} ({last_error})")
+    return None
+
+
+def fetch_text(
+    url: str,
+    *,
+    timeout: int = DEFAULT_API_TIMEOUT,
+    retries: int = DEFAULT_API_RETRIES,
+    base_delay: float = DEFAULT_API_BASE_DELAY,
+    cache_dir: Optional[Path] = None,
+    cache_prefix: str = "text",
+) -> str:
+    cache_path = cache_path_for_url(cache_dir, cache_prefix, url)
+    if cache_path and cache_path.exists():
+        return cache_path.read_text(encoding="utf-8", errors="replace")
+    request = urllib.request.Request(url, headers={"User-Agent": "MarkushExtractor/0.2"})
+    last_error = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                text = response.read().decode("utf-8", errors="replace")
+            if cache_path and text.strip():
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_text(text, encoding="utf-8")
+            return text
+        except Exception as exc:
+            last_error = exc
+            time.sleep(base_delay * (2 ** attempt))
+    print(f"Text request failed after retries: {url} ({last_error})")
+    return ""
+
+
+def chembl_by_formula(
+    formula: str,
+    *,
+    cache_dir: Optional[Path] = None,
+    timeout: int = DEFAULT_API_TIMEOUT,
+    retries: int = DEFAULT_API_RETRIES,
+    base_delay: float = DEFAULT_API_BASE_DELAY,
+) -> list[dict[str, Any]]:
+    url = (
+        "https://www.ebi.ac.uk/chembl/api/data/molecule.json?"
+        "molecule_properties__full_molformula="
+        + urllib.parse.quote(formula)
+        + "&limit=50"
+    )
+    data = fetch_json(url, timeout=timeout, retries=retries, base_delay=base_delay, cache_dir=cache_dir, cache_prefix="chembl_formula")
+    return (data or {}).get("molecules", [])
+
+
+def pubchem_fastformula(
+    formula: str,
+    *,
+    max_records: int = 10,
+    cache_dir: Optional[Path] = None,
+    timeout: int = DEFAULT_API_TIMEOUT,
+    retries: int = DEFAULT_API_RETRIES,
+    base_delay: float = DEFAULT_API_BASE_DELAY,
+) -> list[int]:
+    url = (
+        "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/fastformula/"
+        + urllib.parse.quote(formula)
+        + f"/cids/JSON?MaxRecords={max_records}"
+    )
+    data = fetch_json(url, timeout=timeout, retries=retries, base_delay=base_delay, cache_dir=cache_dir, cache_prefix="pubchem_formula")
+    cids = (((data or {}).get("IdentifierList") or {}).get("CID") or [])
+    return [int(cid) for cid in cids if str(cid).isdigit()]
+
+
+def pubchem_properties(
+    cids: list[int],
+    *,
+    cache_dir: Optional[Path] = None,
+    timeout: int = DEFAULT_API_TIMEOUT,
+    retries: int = DEFAULT_API_RETRIES,
+    base_delay: float = DEFAULT_API_BASE_DELAY,
+) -> dict[int, dict[str, Any]]:
+    if not cids:
+        return {}
+    props = "MolecularFormula,CanonicalSMILES,IsomericSMILES"
+    url = (
+        "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/"
+        + ",".join(str(cid) for cid in cids)
+        + f"/property/{props}/JSON"
+    )
+    data = fetch_json(url, timeout=timeout, retries=retries, base_delay=base_delay, cache_dir=cache_dir, cache_prefix="pubchem_props")
+    rows = (((data or {}).get("PropertyTable") or {}).get("Properties") or [])
+    return {int(row["CID"]): row for row in rows if str(row.get("CID", "")).isdigit()}
+
+
+def pubchem_synonyms_by_name(
+    name: str,
+    *,
+    cache_dir: Optional[Path] = None,
+    timeout: int = DEFAULT_API_TIMEOUT,
+    retries: int = DEFAULT_API_RETRIES,
+    base_delay: float = DEFAULT_API_BASE_DELAY,
+) -> dict[str, Any]:
+    url = (
+        "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/"
+        + urllib.parse.quote(name)
+        + "/synonyms/JSON"
+    )
+    data = fetch_json(url, timeout=timeout, retries=retries, base_delay=base_delay, cache_dir=cache_dir, cache_prefix="pubchem_synonyms")
+    info = (((data or {}).get("InformationList") or {}).get("Information") or [{}])[0]
+    return {"cid": str(info.get("CID", "")), "synonyms": [str(item) for item in info.get("Synonym", [])]}
+
+
+def bindingdb_source_url(bindingdb_id: str) -> str:
+    if not bindingdb_id:
+        return ""
+    numeric = re.sub(r"^BDBM", "", bindingdb_id)
+    return f"https://www.bindingdb.org/rwd/bind/chemsearch/marvin/MolStructure.jsp?google={bindingdb_id}&monomerid={numeric}"
+
+
+def bdbm_number(bindingdb_id: str) -> Optional[int]:
+    match = re.match(r"^BDBM(\d+)$", str(bindingdb_id or "").strip())
+    return int(match.group(1)) if match else None
+
+
+def bindingdb_smiles_by_id(
+    bindingdb_id: str,
+    *,
+    cache_dir: Optional[Path] = None,
+    timeout: int = DEFAULT_API_TIMEOUT,
+    retries: int = DEFAULT_API_RETRIES,
+    base_delay: float = DEFAULT_API_BASE_DELAY,
+) -> str:
+    source_url = bindingdb_source_url(bindingdb_id)
+    if not source_url:
+        return ""
+    page = fetch_text(source_url, timeout=min(timeout, 20), retries=min(retries, 2), base_delay=min(base_delay, 2.0), cache_dir=cache_dir, cache_prefix="bindingdb_html")
+    match = re.search(
+        r"<b>\s*SMILES\s*</b>\s*<span[^>]*class=\"darkgray\"[^>]*>([^<]+)</span>",
+        page,
+        flags=re.IGNORECASE,
+    )
+    return html.unescape(match.group(1)).strip() if match else ""
+
+
+def append_warning(row: dict[str, Any], note: str) -> None:
+    warnings = [item for item in str(row.get("warnings", "")).split("; ") if item]
+    if note not in warnings:
+        warnings.append(note)
+    row["warnings"] = "; ".join(warnings)
+
+
+def initial_resolution_method(status: str) -> str:
+    return {
+        "ok_unique": "chembl_exact_formula_unique",
+        "ambiguous": "chembl_exact_formula_ambiguous_first_candidate",
+        "ok_pubchem_formula": "pubchem_fastformula_first_exact_formula",
+        "not_found": "unresolved_formula_lookup",
+    }.get(status, status)
+
+
+def parse_candidate_entries(row: dict[str, Any]) -> list[dict[str, Any]]:
+    try:
+        parsed = json.loads(str(row.get("chembl_candidates_json", "[]")))
+    except json.JSONDecodeError:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def candidate_bindingdb_numbers(candidates: list[dict[str, Any]]) -> str:
+    numbers: list[str] = []
+    for candidate in candidates:
+        number = bdbm_number(str(candidate.get("bindingdb_id", "")))
+        if number is not None:
+            numbers.append(str(number))
+    return ";".join(numbers)
+
+
+def candidate_sequence_deltas(candidates: list[dict[str, Any]], compound_id: str) -> str:
+    if not str(compound_id).isdigit():
+        return ""
+    compound_number = int(str(compound_id))
+    deltas: list[str] = []
+    for candidate in candidates:
+        bindingdb_id = str(candidate.get("bindingdb_id", ""))
+        number = bdbm_number(bindingdb_id)
+        if number is not None:
+            deltas.append(f"{bindingdb_id}:{number - compound_number}")
+    return ";".join(deltas)
+
+
+def lookup_one_record(
+    record: dict[str, Any],
+    include_pubchem: bool = True,
+    cache_dir: Optional[Path] = None,
+    request_timeout: int = DEFAULT_API_TIMEOUT,
+    request_retries: int = DEFAULT_API_RETRIES,
+    request_base_delay: float = DEFAULT_API_BASE_DELAY,
+) -> dict[str, Any]:
+    formula = record["neutral_formula"]
+    chembl_hits = chembl_by_formula(formula, cache_dir=cache_dir, timeout=request_timeout, retries=request_retries, base_delay=request_base_delay)
+    candidate_entries: list[dict[str, str]] = []
+    for hit in chembl_hits:
+        chembl_id = hit.get("molecule_chembl_id", "")
+        structures = hit.get("molecule_structures") or {}
+        properties = hit.get("molecule_properties") or {}
+        synonym_info = pubchem_synonyms_by_name(chembl_id, cache_dir=cache_dir, timeout=request_timeout, retries=request_retries, base_delay=request_base_delay)
+        bindingdb_ids = [syn for syn in synonym_info["synonyms"] if syn.startswith("BDBM")]
+        bindingdb_id = bindingdb_ids[0] if bindingdb_ids else ""
+        bindingdb_smiles = bindingdb_smiles_by_id(bindingdb_id, cache_dir=cache_dir, timeout=request_timeout, retries=request_retries, base_delay=request_base_delay)
+        candidate_entries.append(
+            {
+                "chembl_id": chembl_id,
+                "chembl_formula": properties.get("full_molformula", ""),
+                "smiles": structures.get("canonical_smiles", ""),
+                "bindingdb_id": bindingdb_id,
+                "bindingdb_source_url": bindingdb_source_url(bindingdb_id),
+                "bindingdb_smiles": bindingdb_smiles,
+                "pubchem_cid_by_chembl": synonym_info["cid"],
+            }
+        )
+    first_entry = candidate_entries[0] if candidate_entries else {}
+    selected_smiles = first_entry.get("bindingdb_smiles", "") or first_entry.get("smiles", "")
+    pubchem_cids = pubchem_fastformula(formula, max_records=10, cache_dir=cache_dir, timeout=request_timeout, retries=request_retries, base_delay=request_base_delay) if include_pubchem else []
+    pubchem_props = pubchem_properties(pubchem_cids[:10], cache_dir=cache_dir, timeout=request_timeout, retries=request_retries, base_delay=request_base_delay) if include_pubchem else {}
+    exact_pubchem_cids = [cid for cid in pubchem_cids if pubchem_props.get(cid, {}).get("MolecularFormula") == formula]
+    first_pubchem_cid = exact_pubchem_cids[0] if exact_pubchem_cids else pubchem_cids[0] if pubchem_cids else 0
+    first_pubchem_smiles = pubchem_props.get(first_pubchem_cid, {}).get("IsomericSMILES", "") if first_pubchem_cid else ""
+    first_pubchem_formula = pubchem_props.get(first_pubchem_cid, {}).get("MolecularFormula", "") if first_pubchem_cid else ""
+    if not selected_smiles and first_pubchem_smiles:
+        selected_smiles = first_pubchem_smiles
+    if len(chembl_hits) == 1:
+        status = "ok_unique"
+    elif chembl_hits:
+        status = "ambiguous"
+    elif first_pubchem_smiles:
+        status = "ok_pubchem_formula"
+    else:
+        status = "not_found"
+    bindingdb_id = first_entry.get("bindingdb_id", "")
+    candidate_numbers = candidate_bindingdb_numbers(candidate_entries)
+    candidate_deltas = candidate_sequence_deltas(candidate_entries, str(record.get("compound_id", "")))
+    return {
+        "compound_id": record["compound_id"],
+        "neutral_formula": formula,
+        "selected_smiles": selected_smiles,
+        "lookup_status": status,
+        "resolution_method": initial_resolution_method(status),
+        "resolution_confidence": "high" if status == "ok_unique" else "medium" if selected_smiles else "low",
+        "chembl_hit_count": len(chembl_hits),
+        "first_chembl_id": first_entry.get("chembl_id", ""),
+        "chembl_candidate_ids": ";".join(hit.get("molecule_chembl_id", "") for hit in chembl_hits),
+        "chembl_candidates_json": json.dumps(candidate_entries, ensure_ascii=False, separators=(",", ":")),
+        "bindingdb_id": bindingdb_id,
+        "bindingdb_source_url": bindingdb_source_url(bindingdb_id),
+        "bindingdb_smiles": first_entry.get("bindingdb_smiles", ""),
+        "pubchem_cid_count_max10": len(pubchem_cids),
+        "pubchem_cids": ";".join(str(cid) for cid in pubchem_cids[:10]),
+        "first_pubchem_formula": first_pubchem_formula,
+        "first_pubchem_smiles": first_pubchem_smiles,
+        "formula_source_types": ";".join(str(item) for item in record.get("source_types", [])),
+        "formula_kinds": ";".join(str(item) for item in record.get("formula_kinds", [])),
+        "formula_normalization_reason": ";".join(str(item) for item in record.get("formula_normalization_reasons", [])),
+        "formula_raw_formulas": ";".join(str(item) for item in record.get("raw_formulas", [])),
+        "formula_score": str(record.get("formula_score", "")),
+        "formula_confidence": str(record.get("confidence", "")),
+        "formula_source_pages": ";".join(record.get("page_refs", [])),
+        "formula_evidence": " | ".join(record.get("evidence", [])[:3]),
+        "primary_activity_assay": record.get("primary_activity_assay", ""),
+        "primary_activity_target": record.get("primary_activity_target", ""),
+        "primary_activity_endpoint": record.get("primary_activity_endpoint", ""),
+        "primary_activity_value_text": record.get("primary_activity_value_text", ""),
+        "primary_activity_value_nM": record.get("primary_activity_value_nM", ""),
+        "primary_activity_selectivity_fold": record.get("primary_activity_selectivity_fold", ""),
+        "activity_evidence": " | ".join(record.get("activity_evidence", [])[:3]),
+        "activities_json": record.get("activities_json", ""),
+        "candidate_bindingdb_numbers": candidate_numbers,
+        "candidate_sequence_deltas": candidate_deltas,
+        "sequence_expected_bindingdb_id": "",
+        "sequence_offset_support": "",
+        "referee_decision": "",
+        "referee_selected_chembl_id": "",
+        "referee_selected_bindingdb_id": "",
+        "referee_confidence": "",
+        "referee_rationale": "",
+        "warnings": "; ".join(record.get("warnings", [])),
+    }
+
+
+def add_quality_flag(row: dict[str, Any], flag: str) -> None:
+    flags = [item for item in str(row.get("quality_flags", "")).split(";") if item]
+    if flag not in flags:
+        flags.append(flag)
+    row["quality_flags"] = ";".join(flags)
+    row["needs_review"] = "true"
+
+
+def apply_extraction_quality_checks(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    for row in rows:
+        row.setdefault("quality_flags", "")
+        row.setdefault("needs_review", "")
+        selected_formula = formula_from_smiles(row.get("selected_smiles", ""))
+        row["selected_smiles_formula"] = selected_formula
+        extracted_formula = str(row.get("neutral_formula", "")).strip()
+        pubchem_formula = str(row.get("first_pubchem_formula", "")).strip()
+
+        external_formulas: list[str] = []
+        for candidate in parse_candidate_entries(row):
+            formula = str(candidate.get("chembl_formula", "")).strip()
+            if formula and formula not in external_formulas:
+                external_formulas.append(formula)
+        if pubchem_formula and pubchem_formula not in external_formulas:
+            external_formulas.append(pubchem_formula)
+        row["external_formula_evidence"] = ";".join(external_formulas)
+
+        if selected_formula and extracted_formula and selected_formula != extracted_formula:
+            add_quality_flag(row, "formula_smiles_mismatch")
+            append_warning(row, f"Formula/SMILES mismatch: extracted={extracted_formula}, smiles={selected_formula}")
+        if pubchem_formula and extracted_formula and pubchem_formula != extracted_formula:
+            add_quality_flag(row, "formula_pubchem_mismatch")
+            append_warning(row, f"Formula/PubChem mismatch: extracted={extracted_formula}, pubchem={pubchem_formula}")
+        for external_formula in external_formulas:
+            if extracted_formula and external_formula != extracted_formula:
+                add_quality_flag(row, "formula_external_mismatch")
+                append_warning(row, f"Formula/external mismatch: extracted={extracted_formula}, external={external_formula}")
+                break
+        if row.get("lookup_status") in {"ambiguous", "not_found"}:
+            add_quality_flag(row, f"lookup_{row.get('lookup_status')}")
+        if not row.get("selected_smiles"):
+            add_quality_flag(row, "missing_selected_smiles")
+    return rows
+
+
+def external_lookup(
+    records: list[dict[str, Any]],
+    delay: float,
+    include_pubchem: bool = True,
+    cache_dir: Optional[Path] = None,
+    request_timeout: int = DEFAULT_API_TIMEOUT,
+    request_retries: int = DEFAULT_API_RETRIES,
+    request_base_delay: float = DEFAULT_API_BASE_DELAY,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for record in records:
+        rows.append(
+            lookup_one_record(
+                record,
+                include_pubchem=include_pubchem,
+                cache_dir=cache_dir,
+                request_timeout=request_timeout,
+                request_retries=request_retries,
+                request_base_delay=request_base_delay,
+            )
+        )
+        print(rows[-1]["compound_id"], rows[-1]["neutral_formula"], rows[-1]["lookup_status"], rows[-1].get("first_chembl_id", ""))
+        if delay:
+            time.sleep(delay)
+    return rows
+
+
+def resolve_bindingdb_sequence(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    offsets: dict[int, int] = {}
+    for row in rows:
+        number = bdbm_number(row.get("bindingdb_id", ""))
+        compound_id = str(row.get("compound_id", ""))
+        if row.get("lookup_status") == "ok_unique" and number is not None and compound_id.isdigit():
+            offsets[number - int(compound_id)] = offsets.get(number - int(compound_id), 0) + 1
+    if not offsets:
+        return rows
+    offset, support = max(offsets.items(), key=lambda item: item[1])
+    if support < 5:
+        return rows
+    for row in rows:
+        compound_id = str(row.get("compound_id", ""))
+        if not compound_id.isdigit():
+            continue
+        expected_bdbm = f"BDBM{offset + int(compound_id)}"
+        row["sequence_expected_bindingdb_id"] = expected_bdbm
+        row["sequence_offset_support"] = str(support)
+        if row.get("lookup_status") != "ambiguous":
+            continue
+        candidates = parse_candidate_entries(row)
+        selected = next((item for item in candidates if item.get("bindingdb_id") == expected_bdbm), None)
+        if not selected:
+            continue
+        row["selected_smiles"] = selected.get("bindingdb_smiles", "") or selected.get("smiles", "")
+        row["first_chembl_id"] = selected.get("chembl_id", "")
+        row["bindingdb_id"] = expected_bdbm
+        row["bindingdb_source_url"] = selected.get("bindingdb_source_url", bindingdb_source_url(expected_bdbm))
+        row["bindingdb_smiles"] = selected.get("bindingdb_smiles", "")
+        row["lookup_status"] = "resolved_bindingdb_sequence"
+        row["resolution_method"] = "bindingdb_sequence_expected_id"
+        row["resolution_confidence"] = "high"
+        append_warning(row, f"Resolved formula ambiguity using inferred BindingDB ID sequence (support={support})")
+    return rows
+
+
+def repair_rows_with_expected_bindingdb(
+    rows: list[dict[str, Any]],
+    *,
+    cache_dir: Optional[Path] = None,
+    request_timeout: int = DEFAULT_API_TIMEOUT,
+    request_retries: int = DEFAULT_API_RETRIES,
+    request_base_delay: float = DEFAULT_API_BASE_DELAY,
+) -> list[dict[str, Any]]:
+    for row in rows:
+        if row.get("lookup_status") not in {"not_found", "ambiguous"}:
+            continue
+        expected_bdbm = str(row.get("sequence_expected_bindingdb_id", "")).strip()
+        if not expected_bdbm:
+            continue
+        try:
+            support = int(row.get("sequence_offset_support") or 0)
+        except (TypeError, ValueError):
+            support = 0
+        if support < 5:
+            continue
+        synonym_info = pubchem_synonyms_by_name(expected_bdbm, cache_dir=cache_dir, timeout=request_timeout, retries=request_retries, base_delay=request_base_delay)
+        pubchem_cid = str(synonym_info.get("cid", ""))
+        pubchem_props: dict[str, Any] = {}
+        if pubchem_cid.isdigit():
+            pubchem_props = pubchem_properties([int(pubchem_cid)], cache_dir=cache_dir, timeout=request_timeout, retries=request_retries, base_delay=request_base_delay).get(int(pubchem_cid), {})
+        expected_formula = str(pubchem_props.get("MolecularFormula", ""))
+        expected_smiles = str(pubchem_props.get("IsomericSMILES", "") or pubchem_props.get("CanonicalSMILES", ""))
+        expected_bindingdb_smiles = bindingdb_smiles_by_id(expected_bdbm, cache_dir=cache_dir, timeout=request_timeout, retries=request_retries, base_delay=request_base_delay)
+        selected_smiles = expected_bindingdb_smiles or expected_smiles
+        if not expected_formula and not selected_smiles:
+            continue
+        if expected_formula:
+            row["neutral_formula"] = expected_formula
+        if selected_smiles:
+            row["selected_smiles"] = selected_smiles
+        row["bindingdb_id"] = expected_bdbm
+        row["bindingdb_source_url"] = bindingdb_source_url(expected_bdbm)
+        row["bindingdb_smiles"] = expected_bindingdb_smiles
+        row["lookup_status"] = "resolved_bindingdb_sequence_mismatch"
+        row["resolution_method"] = "bindingdb_sequence_expected_id"
+        row["resolution_confidence"] = "high"
+        append_warning(row, f"Corrected formula/SMILES using inferred BindingDB ID sequence (expected={expected_bdbm}, support={support})")
+    return rows
+
+
+def trim_for_prompt(text: Any, limit: int) -> str:
+    value = str(text or "").strip()
+    if len(value) <= limit:
+        return value
+    half = max(1, limit // 2)
+    return value[:half].rstrip() + "\n...[truncated]...\n" + value[-half:].lstrip()
+
+
+def referee_cache_key(row: dict[str, Any]) -> str:
+    payload = {
+        "compound_id": row.get("compound_id", ""),
+        "neutral_formula": row.get("neutral_formula", ""),
+        "lookup_status": row.get("lookup_status", ""),
+        "candidates": row.get("chembl_candidates_json", ""),
+        "sequence_expected_bindingdb_id": row.get("sequence_expected_bindingdb_id", ""),
+    }
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return f"{row.get('compound_id', 'compound')}_{digest}"
+
+
+def ambiguity_referee_prompt(row: dict[str, Any], context_chars: int) -> str:
+    candidates = parse_candidate_entries(row)
+    candidate_lines: list[str] = []
+    for index, candidate in enumerate(candidates, start=1):
+        candidate_lines.append(
+            "\n".join(
+                [
+                    f"Candidate {index}",
+                    f"- chembl_id: {candidate.get('chembl_id', '')}",
+                    f"- bindingdb_id: {candidate.get('bindingdb_id', '')}",
+                    f"- smiles: {candidate.get('bindingdb_smiles', '') or candidate.get('smiles', '')}",
+                ]
+            )
+        )
+    return f"""\
+You are a chemistry data-curation referee. Resolve one ambiguous formula-to-SMILES assignment.
+
+Decision rules:
+- All candidates share the same molecular formula, so formula alone is not distinguishing.
+- Prefer a candidate whose BindingDB ID matches a well-supported inferred BindingDB sequence.
+- If evidence does not distinguish candidates, return decision "unresolved".
+
+Compound:
+- compound_id: {row.get("compound_id", "")}
+- neutral_formula: {row.get("neutral_formula", "")}
+- current_lookup_status: {row.get("lookup_status", "")}
+- current_selected_chembl_id: {row.get("first_chembl_id", "")}
+- current_selected_bindingdb_id: {row.get("bindingdb_id", "")}
+- sequence_expected_bindingdb_id: {row.get("sequence_expected_bindingdb_id", "")}
+- sequence_offset_support: {row.get("sequence_offset_support", "")}
+- formula_evidence: {trim_for_prompt(row.get("formula_evidence", ""), context_chars)}
+
+Candidate records:
+{chr(10).join(candidate_lines) if candidate_lines else "- none"}
+"""
+
+
+def apply_referee_decision(row: dict[str, Any], decision: dict[str, Any]) -> None:
+    row["referee_decision"] = str(decision.get("decision", ""))
+    row["referee_selected_chembl_id"] = str(decision.get("selected_chembl_id", ""))
+    row["referee_selected_bindingdb_id"] = str(decision.get("selected_bindingdb_id", ""))
+    row["referee_confidence"] = str(decision.get("confidence", ""))
+    row["referee_rationale"] = str(decision.get("rationale", ""))
+    if row["referee_decision"] == "unresolved":
+        append_warning(row, "Formula ambiguity left unresolved by LLM referee")
+        return
+    selected_bindingdb_id = row["referee_selected_bindingdb_id"]
+    selected_chembl_id = row["referee_selected_chembl_id"]
+    selected = None
+    for candidate in parse_candidate_entries(row):
+        if selected_bindingdb_id and candidate.get("bindingdb_id") == selected_bindingdb_id:
+            selected = candidate
+            break
+        if selected_chembl_id and candidate.get("chembl_id") == selected_chembl_id:
+            selected = candidate
+            break
+    if not selected:
+        return
+    row["selected_smiles"] = selected.get("bindingdb_smiles", "") or selected.get("smiles", "")
+    row["first_chembl_id"] = selected.get("chembl_id", "")
+    row["bindingdb_id"] = selected.get("bindingdb_id", "")
+    row["bindingdb_source_url"] = selected.get("bindingdb_source_url", bindingdb_source_url(row["bindingdb_id"]))
+    row["bindingdb_smiles"] = selected.get("bindingdb_smiles", "")
+    if row.get("lookup_status") == "ambiguous":
+        row["lookup_status"] = "resolved_llm_referee"
+    row["resolution_method"] = "llm_referee"
+    row["resolution_confidence"] = row.get("referee_confidence", "")
+    append_warning(row, "Formula ambiguity reviewed by LLM referee")
+
+
+def run_ambiguity_referee(
+    rows: list[dict[str, Any]],
+    *,
+    client: Any,
+    model: str,
+    cache_path: Path,
+    enabled: bool,
+    statuses: list[str],
+    context_chars_per_row: int,
+    max_output_tokens: int,
+    reuse_cache: bool,
+    force: bool,
+) -> list[dict[str, Any]]:
+    if not enabled:
+        return rows
+    status_set = {str(status) for status in statuses}
+    cache: dict[str, Any] = {"decisions": {}}
+    if cache_path.exists() and reuse_cache and not force:
+        try:
+            loaded = json.loads(cache_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                cache = loaded
+        except json.JSONDecodeError:
+            pass
+    decisions = cache.setdefault("decisions", {})
+    for row in rows:
+        if str(row.get("lookup_status", "")) not in status_set:
+            continue
+        if not parse_candidate_entries(row):
+            continue
+        key = referee_cache_key(row)
+        if key not in decisions or force:
+            print(f"Calling {model} referee for compound {row.get('compound_id', '')}")
+            decisions[key] = call_json_agent(
+                client,
+                model,
+                ambiguity_referee_prompt(row, context_chars_per_row),
+                "ambiguity_referee",
+                AMBIGUITY_REFEREE_SCHEMA,
+                max_output_tokens,
+            )
+        apply_referee_decision(row, decisions[key])
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps(cache, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return rows
+
+
+LOOKUP_FIELDNAMES = [
+    "compound_id",
+    "neutral_formula",
+    "selected_smiles",
+    "lookup_status",
+    "resolution_method",
+    "resolution_confidence",
+    "chembl_hit_count",
+    "first_chembl_id",
+    "chembl_candidate_ids",
+    "chembl_candidates_json",
+    "bindingdb_id",
+    "bindingdb_source_url",
+    "bindingdb_smiles",
+    "pubchem_cid_count_max10",
+    "pubchem_cids",
+    "first_pubchem_formula",
+    "first_pubchem_smiles",
+    "selected_smiles_formula",
+    "external_formula_evidence",
+    "quality_flags",
+    "needs_review",
+    "formula_source_types",
+    "formula_kinds",
+    "formula_normalization_reason",
+    "formula_raw_formulas",
+    "formula_score",
+    "formula_confidence",
+    "formula_source_pages",
+    "formula_evidence",
+    "primary_activity_assay",
+    "primary_activity_target",
+    "primary_activity_endpoint",
+    "primary_activity_value_text",
+    "primary_activity_value_nM",
+    "primary_activity_selectivity_fold",
+    "activity_evidence",
+    "activities_json",
+    "candidate_bindingdb_numbers",
+    "candidate_sequence_deltas",
+    "sequence_expected_bindingdb_id",
+    "sequence_offset_support",
+    "referee_decision",
+    "referee_selected_chembl_id",
+    "referee_selected_bindingdb_id",
+    "referee_confidence",
+    "referee_rationale",
+    "warnings",
+]
+
+
+def write_lookup_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=LOOKUP_FIELDNAMES, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+FINAL_FIELDNAMES = [
+    "Compound",
+    "Neutral_formula",
+    "SMILES",
+    "BindingDB_ID",
+    "Activity_nM",
+    "Selectivity_fold",
+    "Needs_review",
+    "Quality_flags",
+    "Note",
+]
+
+
+def write_final_compounds_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=FINAL_FIELDNAMES)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {
+                    "Compound": row.get("compound_id", ""),
+                    "Neutral_formula": row.get("neutral_formula", ""),
+                    "SMILES": row.get("selected_smiles", ""),
+                    "BindingDB_ID": row.get("bindingdb_id", ""),
+                    "Activity_nM": row.get("primary_activity_value_nM", ""),
+                    "Selectivity_fold": row.get("primary_activity_selectivity_fold", ""),
+                    "Needs_review": row.get("needs_review", ""),
+                    "Quality_flags": row.get("quality_flags", ""),
+                    "Note": row.get("warnings", ""),
+                }
+            )
+
+
+def write_workflow_metadata(
+    path: Path,
+    *,
+    pdf_paths: list[Path],
+    config_path: Path,
+    model: str,
+    formula_config: dict[str, Any],
+    output_paths: dict[str, str],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    safe_formula_config = json.loads(json.dumps(formula_config, ensure_ascii=False))
+    metadata = {
+        "source_files": cache_signature(pdf_paths),
+        "config_path": str(config_path),
+        "model": model,
+        "formula_workflow_config": safe_formula_config,
+        "outputs": output_paths,
+        "notes": [
+            "formula_to_smiles.csv is the audit table with provenance and quality flags.",
+            "final_compounds.csv is compact and should not be used without checking Needs_review/Quality_flags.",
+        ],
+    }
+    path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def lookup_and_write_csv(
+    path: Path,
+    records: list[dict[str, Any]],
+    delay: float,
+    include_pubchem: bool = True,
+    cache_dir: Optional[Path] = None,
+    request_timeout: int = DEFAULT_API_TIMEOUT,
+    request_retries: int = DEFAULT_API_RETRIES,
+    request_base_delay: float = DEFAULT_API_BASE_DELAY,
+) -> list[dict[str, Any]]:
+    rows = external_lookup(
+        records,
+        delay,
+        include_pubchem=include_pubchem,
+        cache_dir=cache_dir,
+        request_timeout=request_timeout,
+        request_retries=request_retries,
+        request_base_delay=request_base_delay,
+    )
+    rows = resolve_bindingdb_sequence(rows)
+    write_lookup_rows_csv(path, rows)
+    return rows
+
+
+def safe_float(value: Any) -> Optional[float]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def safe_int(value: Any) -> Optional[int]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return int(float(text))
+    except ValueError:
+        return None
+
+
+def row_to_extracted_compound(row: dict[str, Any], source_ref: str) -> ExtractedCompound:
+    status = str(row.get("lookup_status", ""))
+    review_statuses = {"ambiguous", "not_found"}
+    warnings = [item for item in str(row.get("warnings", "")).split("; ") if item]
+    quality_flags = [item for item in str(row.get("quality_flags", "")).split(";") if item]
+    if status in review_statuses:
+        warnings.append(f"lookup_status={status}")
+    for flag in quality_flags:
+        warnings.append(f"quality_flag={flag}")
+    source_bits = [
+        source_ref,
+        str(row.get("formula_source_pages", "")),
+        str(row.get("bindingdb_source_url", "")),
+    ]
+    return ExtractedCompound(
+        compound_id=str(row.get("compound_id", "")),
+        full_smiles=str(row.get("selected_smiles", "")) or None,
+        activity_nM=safe_float(row.get("primary_activity_value_nM")),
+        selectivity_fold=safe_float(row.get("primary_activity_selectivity_fold")),
+        source="; ".join(bit for bit in source_bits if bit),
+        neutral_formula=str(row.get("neutral_formula", "")) or None,
+        bindingdb_id=str(row.get("bindingdb_id", "")),
+        source_url=str(row.get("bindingdb_source_url", "")),
+        lookup_status=status,
+        activity_assay=str(row.get("primary_activity_assay", "")),
+        activity_target=str(row.get("primary_activity_target", "")),
+        activity_endpoint=str(row.get("primary_activity_endpoint", "")),
+        raw_activity=str(row.get("primary_activity_value_text", "")),
+        formula_evidence=str(row.get("formula_evidence", "")),
+        activity_evidence=str(row.get("activity_evidence", "")),
+        needs_review=(
+            status in review_statuses
+            or not row.get("selected_smiles")
+            or str(row.get("needs_review", "")).lower() == "true"
+            or bool(quality_flags)
+        ),
+        warnings=warnings,
+    )
+
+
+def locate_regions(pdf: object) -> tuple[list[bytes], list[object]]:
+    """
+    传统 OCSR Markush 路线的 ROI 定位接口。
+
+    当前新版 workflow 不再依赖图像 OCSR: build_dataset() 会直接走 PDF 文本、
+    LLM 表格抽取、formula -> BindingDB/PubChem/ChEMBL -> SMILES。
+    这里保留接口, 方便以后接 MolScribe/DECIMER。
+    """
+    return [], []
+
+
+def extract_scaffold(scaffold_image: bytes) -> MarkushScaffold:
+    """传统图像 OCSR 接口保留；当前 end-to-end 路线不调用它。"""
+    raise NotImplementedError("Image OCSR scaffold extraction is not wired in this text/API workflow.")
+
+
+def extract_rgroup_table(table_region: object) -> list[RGroupEntry]:
+    """传统 R-group 表格 OCSR 接口保留；当前 end-to-end 路线不调用它。"""
+    raise NotImplementedError("Image OCSR R-group extraction is not wired in this text/API workflow.")
+
+
+def assemble_molecule(scaffold: MarkushScaffold, entry: RGroupEntry) -> Optional[str]:
+    """传统 RDKit Markush 拼接接口保留；当前 end-to-end 路线不调用它。"""
+    raise NotImplementedError("RDKit Markush assembly is not wired in this text/API workflow.")
+
+
+def extract_markush_dataset(
+    pdf_paths: list[str],
+    source_ref: str = "",
+    config_path: str = "markush_config.json",
+    outdir: Optional[str] = None,
+    force: Optional[bool] = None,
+) -> list[ExtractedCompound]:
+    """
+    新版 Step 1:
+      PDF 分页文本 -> LLM 判断 final/intermediate/excluded compound scope
+      -> LLM 抽 formula/activity -> ChEMBL/PubChem/BindingDB 查 SMILES
+      -> ambiguous-only referee -> ExtractedCompound。
+    """
+    config_path_obj = Path(config_path).expanduser()
+    config_base_dir = config_path_obj.resolve().parent if config_path_obj.exists() else Path.cwd()
+    config = load_workflow_config(str(config_path_obj))
+    formula_config = deep_merge(default_formula_workflow_config(), config.get("formula_workflow", {}))
+    model = str(formula_config.get("llm", {}).get("model") or config.get("models", {}).get("primary") or DEFAULT_MODEL)
+    output_dir = resolve_path(outdir or str(formula_config.get("outdir", "formula_workflow_outputs")), config_base_dir).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    resolved_pdf_paths = [resolve_path(str(path), config_base_dir).resolve() for path in pdf_paths]
+    if not resolved_pdf_paths:
+        resolved_pdf_paths = sorted(config_base_dir.glob("*.pdf"))
+    if not resolved_pdf_paths:
+        raise RuntimeError("No PDF inputs found.")
+
+    llm_config = formula_config.get("llm", {})
+    request_config = formula_config.get("request", {})
+    cache_config = formula_config.get("cache", {})
+    output_config = formula_config.get("output", {})
+    runtime_force = bool(cache_config.get("force", False)) if force is None else bool(force)
+    pages_per_chunk = int(llm_config.get("pages_per_chunk", 8))
+    max_chunk_chars = int(llm_config.get("max_chunk_chars", 24000))
+    max_output_tokens = int(llm_config.get("max_output_tokens", 4000))
+    delay = float(request_config.get("delay", 1.0))
+    api_timeout = int(request_config.get("api_timeout", DEFAULT_API_TIMEOUT))
+    api_retries = int(request_config.get("api_retries", DEFAULT_API_RETRIES))
+    api_base_delay = float(request_config.get("api_base_delay", DEFAULT_API_BASE_DELAY))
+    include_pubchem_formula = bool(request_config.get("include_pubchem_formula", False))
+
+    pdf_pages_cache_path = resolve_output_path(output_config.get("pdf_pages_json", "pdf_pages.json"), output_dir)
+    page_chunks_cache_path = resolve_output_path(output_config.get("pdf_page_chunks_json", "pdf_page_chunks.json"), output_dir)
+    compound_scope_cache_path = resolve_output_path(output_config.get("compound_scope_json", "compound_scope.json"), output_dir)
+    formula_records_path = resolve_output_path(output_config.get("formula_records_json", "formula_records.json"), output_dir)
+    activity_records_path = resolve_output_path(output_config.get("activity_records_json", "activity_records.json"), output_dir)
+    detailed_csv_path = resolve_output_path(output_config.get("detailed_csv", "formula_to_smiles.csv"), output_dir)
+    final_csv_path = resolve_output_path(output_config.get("final_csv", "final_compounds.csv"), output_dir)
+    metadata_json_path = resolve_output_path(output_config.get("metadata_json", "workflow_metadata.json"), output_dir)
+    ambiguity_referee_cache_path = resolve_output_path(output_config.get("ambiguity_referee_json", "ambiguity_referee.json"), output_dir)
+
+    chunks = build_or_load_page_chunks(
+        resolved_pdf_paths,
+        pages_per_chunk,
+        max_chunk_chars,
+        pdf_pages_cache_path,
+        page_chunks_cache_path,
+        bool(cache_config.get("reuse_pdf_pages", True)),
+        bool(cache_config.get("reuse_page_chunks", True)),
+        runtime_force,
+    )
+
+    client = require_openai_client(config["api"], config_base_dir)
+    scope_config = formula_config.get("compound_scope", {})
+    compound_scope = discover_compound_scope(
+        client,
+        model,
+        chunks,
+        compound_scope_cache_path,
+        max_output_tokens,
+        int(scope_config.get("context_max_chars", 60000)),
+        [str(item) for item in scope_config.get("target_compound_ids", [])],
+        [str(item) for item in scope_config.get("excluded_compound_ids", [])],
+        bool(cache_config.get("reuse_compound_scope", True)),
+        runtime_force,
+    )
+    final_target_ids = scope_entries_to_ids(compound_scope.get("final_compounds", []))
+    intermediate_ids = scope_entries_to_ids(compound_scope.get("intermediates", []))
+    excluded_ids = sorted(
+        set(intermediate_ids + scope_entries_to_ids(compound_scope.get("excluded_compounds", []))),
+        key=compound_sort_key,
+    )
+    if not final_target_ids:
+        raise RuntimeError("Compound scope discovery found no final target compound IDs.")
+    print(f"Final target compound IDs: {compound_id_summary(final_target_ids)}")
+    print(f"Excluded/intermediate IDs: {compound_id_summary(excluded_ids)}")
+
+    scope_digest = scope_hash(compound_scope)
+    activity_config = formula_config.get("activity", {})
+    primary_assay_keywords = [str(item) for item in activity_config.get("primary_assay_keywords", [])]
+    activity_results: list[dict[str, Any]] = []
+    if bool(activity_config.get("enabled", True)):
+        for chunk in chunks:
+            cache_path = output_dir / f"activity_extract_{scope_digest}_{chunk['chunk_id']}.json"
+            if cache_path.exists() and bool(cache_config.get("reuse_activity_extract", True)) and not runtime_force:
+                result = json.loads(cache_path.read_text(encoding="utf-8"))
+                print(f"Using cached {cache_path.name}")
+            else:
+                print(f"Calling {model} for activity {chunk['chunk_id']}")
+                result = call_json_agent(
+                    client,
+                    model,
+                    activity_prompt(chunk, compound_scope, primary_assay_keywords),
+                    f"activity_extract_{chunk['chunk_id']}",
+                    ACTIVITY_SCHEMA,
+                    max_output_tokens,
+                )
+                cache_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            activity_results.append(result)
+    merged_activity = merge_activity_records(activity_results, final_target_ids, excluded_ids, primary_assay_keywords)
+    activity_records_path.write_text(json.dumps(merged_activity, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    formula_results: list[dict[str, Any]] = []
+    for chunk in chunks:
+        cache_path = output_dir / f"formula_extract_{scope_digest}_{chunk['chunk_id']}.json"
+        if cache_path.exists() and bool(cache_config.get("reuse_formula_extract", True)) and not runtime_force:
+            result = json.loads(cache_path.read_text(encoding="utf-8"))
+            print(f"Using cached {cache_path.name}")
+        else:
+            print(f"Calling {model} for formula {chunk['chunk_id']}")
+            result = call_json_agent(
+                client,
+                model,
+                formula_prompt(chunk, compound_scope),
+                f"formula_extract_{chunk['chunk_id']}",
+                FORMULA_SCHEMA,
+                max_output_tokens,
+            )
+            cache_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        formula_results.append(result)
+
+    merged_formula = merge_formula_records(formula_results, final_target_ids, excluded_ids)
+    found_ids = {normalize_compound_id(record.get("compound_id", "")) for record in merged_formula.get("records", [])}
+    missing_ids = [
+        compound_id
+        for compound_id in final_target_ids
+        if normalize_compound_id(compound_id) not in found_ids
+    ]
+    if missing_ids:
+        missing_hash = hashlib.sha256(json.dumps(missing_ids, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+        missing_cache_path = output_dir / f"formula_extract_{scope_digest}_missing_v6_{missing_hash}.json"
+        missing_result = extract_missing_formula_records(
+            client,
+            model,
+            chunks,
+            compound_scope,
+            missing_ids,
+            missing_cache_path,
+            max_output_tokens,
+            bool(cache_config.get("reuse_formula_extract", True)),
+            runtime_force,
+        )
+        if missing_result and missing_result.get("records"):
+            formula_results.append(missing_result)
+            merged_formula = merge_formula_records(formula_results, final_target_ids, excluded_ids)
+    merged_formula = attach_activity_records(merged_formula, merged_activity)
+    formula_records_path.write_text(json.dumps(merged_formula, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    api_cache_dir = output_dir / "api_cache" if bool(cache_config.get("reuse_external_api", True)) else None
+    lookup_rows = lookup_and_write_csv(
+        detailed_csv_path,
+        merged_formula["records"],
+        delay,
+        include_pubchem=include_pubchem_formula,
+        cache_dir=api_cache_dir,
+        request_timeout=api_timeout,
+        request_retries=api_retries,
+        request_base_delay=api_base_delay,
+    )
+    lookup_rows = repair_rows_with_expected_bindingdb(
+        lookup_rows,
+        cache_dir=api_cache_dir,
+        request_timeout=api_timeout,
+        request_retries=api_retries,
+        request_base_delay=api_base_delay,
+    )
+    referee_config = formula_config.get("referee", {})
+    lookup_rows = run_ambiguity_referee(
+        lookup_rows,
+        client=client,
+        model=model,
+        cache_path=ambiguity_referee_cache_path,
+        enabled=bool(referee_config.get("enabled", True)),
+        statuses=[str(item) for item in referee_config.get("statuses", ["ambiguous"])],
+        context_chars_per_row=int(referee_config.get("context_chars_per_row", 4000)),
+        max_output_tokens=int(referee_config.get("max_output_tokens", 2000)),
+        reuse_cache=bool(referee_config.get("reuse_cache", True)),
+        force=runtime_force,
+    )
+    lookup_rows = apply_extraction_quality_checks(lookup_rows)
+    write_lookup_rows_csv(detailed_csv_path, lookup_rows)
+    write_final_compounds_csv(final_csv_path, lookup_rows)
+    write_workflow_metadata(
+        metadata_json_path,
+        pdf_paths=resolved_pdf_paths,
+        config_path=config_path_obj,
+        model=model,
+        formula_config=formula_config,
+        output_paths={
+            "pdf_pages_json": str(pdf_pages_cache_path),
+            "pdf_page_chunks_json": str(page_chunks_cache_path),
+            "compound_scope_json": str(compound_scope_cache_path),
+            "formula_records_json": str(formula_records_path),
+            "activity_records_json": str(activity_records_path),
+            "audit_csv": str(detailed_csv_path),
+            "final_csv": str(final_csv_path),
+            "ambiguity_referee_json": str(ambiguity_referee_cache_path),
+            "api_cache_dir": str(api_cache_dir) if api_cache_dir else "",
+        },
+    )
+    return [row_to_extracted_compound(row, source_ref) for row in lookup_rows]
+
+
+def build_dataset(
+    pdf_path: str | list[str],
+    source_ref: str,
+    config_path: str = "markush_config.json",
+    outdir: Optional[str] = None,
+) -> list[ExtractedCompound]:
+    """
+    Step 1 编排:
+      PDF 分页文本 -> scope/formula/activity LLM agent -> external molecule APIs
+      -> ambiguity referee -> ExtractedCompound 列表。
+
+    pdf_path 可以是单个 PDF, 也可以是 [paper.pdf, SI.pdf]。
+    """
+    pdf_paths = [pdf_path] if isinstance(pdf_path, str) else [str(item) for item in pdf_path]
+    return extract_markush_dataset(pdf_paths, source_ref=source_ref, config_path=config_path, outdir=outdir)
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# 人工确认 gate (Step1 -> Step2 之间, 必经)
+# ───────────────────────────────────────────────────────────────────────────
+
+def render_for_review(compounds: list[ExtractedCompound]) -> str:
+    """把每个 full_smiles 渲染成 2D 结构图 (RDKit), 连同活性汇总成一张核对表/句柄。"""
+    lines = [
+        "| Compound | SMILES | Formula | Activity | BindingDB | Status | Warnings |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for compound in sorted(compounds, key=lambda item: compound_sort_key(item.compound_id)):
+        activity = compound.raw_activity or (f"{compound.activity_nM:g} nM" if compound.activity_nM is not None else "")
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    compound.compound_id,
+                    compound.full_smiles or "",
+                    compound.neutral_formula or "",
+                    activity,
+                    compound.bindingdb_id,
+                    compound.lookup_status,
+                    "; ".join(compound.warnings),
+                ]
+            )
+            + " |"
+        )
+    return "\n".join(lines)
+
+
+def confirm_dataset(
+    compounds: list[ExtractedCompound],
+    approved_ids: list[str],
+) -> list[ExtractedCompound]:
+    """只放行人工确认无误的化合物进入 Step 2, 其余保留待修正。"""
+    approved = {normalize_compound_id(compound_id) for compound_id in approved_ids}
+    confirmed: list[ExtractedCompound] = []
+    for compound in compounds:
+        if normalize_compound_id(compound.compound_id) not in approved:
+            continue
+        compound.needs_review = False
+        confirmed.append(compound)
+    return confirmed
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STEP 2 —— AutoDock Vina 对接打分
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ReceptorConfig(BaseModel):
+    """受体与对接盒子配置 (一次性准备好, 复用)。"""
+    pdb_id: str = "8UN5"
+    receptor_pdbqt: str               # 预处理后的受体文件句柄
+    box_center: tuple[float, float, float]
+    box_size: tuple[float, float, float]
+    chain_id: str = "A"
+    ligand_resname: str = ""
+    ligand_resseq: str = ""
+    ligand_chain: str = ""
+    prepared_pdb: str = ""
+    prep_method: str = ""
+    prep_command: str = ""
+    prep_log: str = ""
+    prep_metadata: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class DockingResult(BaseModel):
+    compound_id: str
+    canonical_smiles: str
+    score: Optional[float]            # kcal/mol, 越负越好; 失败为 None
+    pose_ref: Optional[str]           # pose 文件 (sdf/pdbqt) 句柄
+    status: Literal["ok", "prep_failed", "dock_failed"]
+    cached: bool = False
+    message: str = ""
+
+
+for _model in (ReceptorConfig, DockingResult):
+    if hasattr(_model, "model_rebuild"):
+        _model.model_rebuild(_types_namespace=globals())
+
+
+DOCKING_DEFAULT_WORKDIR = "docking_work"
+PDB_DOWNLOAD_TEMPLATE = "https://files.rcsb.org/download/{pdb_id}.pdb"
+NON_BINDING_HET_RESNAMES = {
+    "HOH",
+    "WAT",
+    "DOD",
+    "SOL",
+    "GOL",
+    "EDO",
+    "PEG",
+    "SO4",
+    "PO4",
+    "CL",
+    "NA",
+    "K",
+    "CA",
+    "MG",
+    "MN",
+    "ZN",
+    "GDP",
+    "GTP",
+    "GNP",
+    "GSP",
+}
+PDBQT_ATOM_TYPES = {
+    "C": "C",
+    "N": "N",
+    "O": "O",
+    "S": "S",
+    "P": "P",
+    "F": "F",
+    "CL": "Cl",
+    "BR": "Br",
+    "I": "I",
+    "MG": "Mg",
+    "ZN": "Zn",
+    "MN": "Mn",
+    "FE": "Fe",
+}
+
+
+def docking_work_dir(work_dir: Optional[str | Path] = None) -> Path:
+    return Path(work_dir or os.getenv("DOCKING_WORKDIR", DOCKING_DEFAULT_WORKDIR)).expanduser()
+
+
+def model_to_plain_dict(model: BaseModel) -> dict[str, Any]:
+    if hasattr(model, "model_dump"):
+        return model.model_dump()
+    return model.dict()
+
+
+def hash_text(value: str, length: int = 16) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:length]
+
+
+def find_local_tool(name: str, work_dir: Optional[str | Path] = None) -> Optional[str]:
+    candidates: list[Path] = []
+    if name == "vina" and os.getenv("VINA_BIN"):
+        candidates.append(Path(os.environ["VINA_BIN"]).expanduser())
+    candidates.append(Path(sys.prefix) / "bin" / name)
+    candidates.append(Path(sys.executable).parent / name)
+    candidates.append(Path(sys.executable).resolve().parent / name)
+    candidates.append(docking_work_dir(work_dir) / "bin" / name)
+    candidates.append(Path.cwd() / "docking_work" / "bin" / name)
+    for candidate in candidates:
+        if candidate.exists() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    found = shutil.which(name)
+    return found
+
+
+def command_error_tail(proc: subprocess.CompletedProcess[str], limit: int = 1200) -> str:
+    text = "\n".join(part for part in [proc.stdout, proc.stderr] if part)
+    text = text.strip()
+    return text[-limit:] if len(text) > limit else text
+
+
+def run_logged_command(cmd: list[str], log_path: Path, timeout: int = 1800) -> subprocess.CompletedProcess[str]:
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(
+        "COMMAND:\n"
+        + " ".join(cmd)
+        + "\n\nSTDOUT:\n"
+        + (proc.stdout or "")
+        + "\n\nSTDERR:\n"
+        + (proc.stderr or ""),
+        encoding="utf-8",
+    )
+    return proc
+
+
+def tool_version(tool_path: Optional[str]) -> str:
+    if not tool_path:
+        return ""
+    for args in (["--version"], ["--help"]):
+        try:
+            proc = subprocess.run(
+                [tool_path, *args],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+        except Exception:
+            continue
+        text = "\n".join(part.strip() for part in [proc.stdout, proc.stderr] if part.strip())
+        if text:
+            return text.splitlines()[0].strip()
+    return ""
+
+
+def receptor_prep_error_message(
+    reason: str,
+    *,
+    log_path: Optional[Path] = None,
+    proc: Optional[subprocess.CompletedProcess[str]] = None,
+) -> str:
+    parts = [reason]
+    if log_path is not None:
+        parts.append(f"Meeko receptor prep log: {log_path}")
+    if proc is not None:
+        tail = command_error_tail(proc, limit=1200)
+        if tail:
+            parts.append(f"Meeko output tail:\n{tail}")
+    parts.append(
+        "Production docking requires a charged receptor PDBQT generated by Meeko. "
+        "For smoke/debug runs only, call prepare_receptor(..., allow_zero_charge_fallback=True) "
+        "and dock_batch(..., allow_debug_receptor=True)."
+    )
+    return "\n".join(parts)
+
+
+def canonicalize_smiles(smiles: str) -> str:
+    text = str(smiles or "").strip()
+    if not text:
+        return ""
+    try:
+        from rdkit import Chem
+    except ImportError:
+        return text
+    mol = Chem.MolFromSmiles(text)
+    if mol is None:
+        return text
+    return Chem.MolToSmiles(mol, isomericSmiles=True)
+
+
+def pdb_atom_element(line: str) -> str:
+    element = line[76:78].strip().upper()
+    if element:
+        return element
+    atom_name = line[12:16].strip().upper()
+    return re.sub(r"[^A-Z]", "", atom_name)[:2] or atom_name[:1]
+
+
+def is_pdb_hydrogen(line: str) -> bool:
+    atom_name = line[12:16].strip().upper()
+    return pdb_atom_element(line) == "H" or atom_name.startswith("H")
+
+
+def pdb_atom_coords(line: str) -> tuple[float, float, float]:
+    return (float(line[30:38]), float(line[38:46]), float(line[46:54]))
+
+
+def download_pdb_if_needed(pdb_id: str, receptor_dir: Path) -> Path:
+    pdb_path = receptor_dir / f"{pdb_id.upper()}.pdb"
+    if pdb_path.exists() and pdb_path.stat().st_size > 0:
+        return pdb_path
+    url = PDB_DOWNLOAD_TEMPLATE.format(pdb_id=pdb_id.upper())
+    receptor_dir.mkdir(parents=True, exist_ok=True)
+    request = urllib.request.Request(url, headers={"User-Agent": "MarkushDocking/0.1"})
+    with urllib.request.urlopen(request, timeout=DEFAULT_API_TIMEOUT) as response:
+        pdb_path.write_bytes(response.read())
+    if pdb_path.stat().st_size == 0:
+        raise RuntimeError(f"Downloaded empty PDB file for {pdb_id}")
+    return pdb_path
+
+
+def select_reference_ligand(
+    pdb_path: Path,
+    *,
+    chain_id: str = "A",
+    ligand_resname: Optional[str] = None,
+) -> dict[str, Any]:
+    groups: dict[tuple[str, str, str, str], list[tuple[float, float, float]]] = {}
+    for line in pdb_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.startswith("HETATM") or is_pdb_hydrogen(line):
+            continue
+        resname = line[17:20].strip()
+        if ligand_resname and resname != ligand_resname:
+            continue
+        if not ligand_resname and resname in NON_BINDING_HET_RESNAMES:
+            continue
+        chain = line[21].strip()
+        resseq = line[22:26].strip()
+        icode = line[26].strip()
+        key = (resname, chain, resseq, icode)
+        try:
+            groups.setdefault(key, []).append(pdb_atom_coords(line))
+        except ValueError:
+            continue
+    if not groups:
+        hint = f" named {ligand_resname}" if ligand_resname else ""
+        raise RuntimeError(f"No reference ligand{hint} found in {pdb_path.name}")
+
+    def ligand_rank(item: tuple[tuple[str, str, str, str], list[tuple[float, float, float]]]) -> tuple[int, int]:
+        key, coords = item
+        chain_match = 1 if chain_id and key[1] == chain_id else 0
+        return (chain_match, len(coords))
+
+    key, coords = max(groups.items(), key=ligand_rank)
+    return {
+        "resname": key[0],
+        "chain": key[1],
+        "resseq": key[2],
+        "icode": key[3],
+        "coords": coords,
+    }
+
+
+def box_from_ligand_coords(
+    coords: list[tuple[float, float, float]],
+    *,
+    padding: float = 8.0,
+    min_size: float = 18.0,
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    if not coords:
+        raise RuntimeError("Cannot define docking box from empty ligand coordinates.")
+    center = tuple(sum(coord[i] for coord in coords) / len(coords) for i in range(3))
+    mins = [min(coord[i] for coord in coords) for i in range(3)]
+    maxs = [max(coord[i] for coord in coords) for i in range(3)]
+    size = tuple(max(maxs[i] - mins[i] + padding, min_size) for i in range(3))
+    return (
+        tuple(round(value, 3) for value in center),
+        tuple(round(value, 3) for value in size),
+    )
+
+
+def write_clean_receptor_pdb(
+    pdb_path: Path,
+    clean_pdb_path: Path,
+    *,
+    chain_id: str = "A",
+    altloc: str = "A",
+    drop_resseq_zero: bool = True,
+) -> Path:
+    lines: list[str] = []
+    last_serial = 0
+    for line in pdb_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.startswith("ATOM"):
+            continue
+        if chain_id and line[21].strip() != chain_id:
+            continue
+        if line[16] not in {" ", altloc}:
+            continue
+        if drop_resseq_zero and line[22:26].strip() == "0":
+            continue
+        if is_pdb_hydrogen(line):
+            continue
+        if line[16] == altloc:
+            line = line[:16] + " " + line[17:]
+        try:
+            last_serial = max(last_serial, int(line[6:11]))
+        except ValueError:
+            pass
+        lines.append(line)
+    if not lines:
+        raise RuntimeError(f"No receptor ATOM records kept from {pdb_path}")
+    lines.append(f"TER   {last_serial + 1:5d}")
+    lines.append("END")
+    clean_pdb_path.parent.mkdir(parents=True, exist_ok=True)
+    clean_pdb_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return clean_pdb_path
+
+
+def write_zero_charge_receptor_pdbqt(clean_pdb_path: Path, receptor_pdbqt_path: Path) -> Path:
+    lines = [
+        "REMARK zero-charge receptor PDBQT fallback generated from cleaned PDB",
+        "REMARK install/use mk_prepare_receptor.py for charged receptor preparation",
+    ]
+    serial = 1
+    for line in clean_pdb_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.startswith("ATOM"):
+            continue
+        atom_type = PDBQT_ATOM_TYPES.get(pdb_atom_element(line), pdb_atom_element(line).title())
+        pdb_part = f"ATOM  {serial:5d}{line[11:66]}"
+        lines.append(f"{pdb_part}    {0.0:6.3f} {atom_type:<2s}")
+        serial += 1
+    if serial == 1:
+        raise RuntimeError(f"No ATOM records available for PDBQT fallback: {clean_pdb_path}")
+    lines.append("END")
+    receptor_pdbqt_path.parent.mkdir(parents=True, exist_ok=True)
+    receptor_pdbqt_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return receptor_pdbqt_path
+
+
+def prepare_receptor(
+    pdb_id: str = "8UN5",
+    *,
+    work_dir: Optional[str | Path] = None,
+    chain_id: str = "A",
+    ligand_resname: Optional[str] = None,
+    padding: float = 8.0,
+    min_box_size: float = 18.0,
+    allow_zero_charge_fallback: bool = False,
+) -> ReceptorConfig:
+    """
+    一次性受体准备: 取 8UN5, 去水/补氢/加电荷 -> pdbqt;
+    用共晶配体的几何中心与范围定义对接盒子 (box_center / box_size)。
+    """
+    work_path = docking_work_dir(work_dir)
+    receptor_dir = work_path / "receptors"
+    pdb_path = download_pdb_if_needed(pdb_id, receptor_dir)
+    reference_ligand = select_reference_ligand(
+        pdb_path,
+        chain_id=chain_id,
+        ligand_resname=ligand_resname,
+    )
+    box_center, box_size = box_from_ligand_coords(
+        reference_ligand["coords"],
+        padding=padding,
+        min_size=min_box_size,
+    )
+    suffix = f"{pdb_id.upper()}_{chain_id or 'all'}_{reference_ligand['resname']}"
+    clean_pdb_path = receptor_dir / f"{suffix}_clean.pdb"
+    write_clean_receptor_pdb(pdb_path, clean_pdb_path, chain_id=chain_id)
+
+    warnings: list[str] = []
+    receptor_pdbqt_path = receptor_dir / f"{suffix}_receptor.pdbqt"
+    prep_method = ""
+    prep_command = ""
+    prep_log = ""
+    mk_prepare_receptor = find_local_tool("mk_prepare_receptor.py", work_path)
+    if not mk_prepare_receptor:
+        message = receptor_prep_error_message("mk_prepare_receptor.py not found.")
+        if not allow_zero_charge_fallback:
+            raise RuntimeError(message)
+        warnings.append(message)
+    else:
+        meeko_basename = receptor_dir / f"{suffix}_meeko"
+        log_path = receptor_dir / f"{suffix}_mk_prepare_receptor.log"
+        prep_log = str(log_path)
+        cmd = [
+            mk_prepare_receptor,
+            "--read_pdb",
+            str(clean_pdb_path),
+            "-o",
+            str(meeko_basename),
+            "-p",
+            "--box_center",
+            *(f"{value:.3f}" for value in box_center),
+            "--box_size",
+            *(f"{value:.3f}" for value in box_size),
+            "-v",
+            "-a",
+        ]
+        prep_command = " ".join(cmd)
+        proc: Optional[subprocess.CompletedProcess[str]]
+        try:
+            proc = run_logged_command(cmd, log_path, timeout=600)
+        except Exception as exc:
+            message = receptor_prep_error_message(
+                f"mk_prepare_receptor.py failed to run: {exc}",
+                log_path=log_path,
+            )
+            if not allow_zero_charge_fallback:
+                raise RuntimeError(message) from exc
+            proc = None
+            warnings.append(message)
+        if proc is not None and proc.returncode == 0:
+            candidates = [
+                meeko_basename.with_suffix(".pdbqt"),
+                receptor_dir / f"{meeko_basename.name}_rigid.pdbqt",
+            ]
+            prepared = next((path for path in candidates if path.exists() and path.stat().st_size > 0), None)
+            if prepared:
+                receptor_pdbqt_path = prepared
+                prep_method = "meeko"
+            else:
+                message = receptor_prep_error_message(
+                    "mk_prepare_receptor.py exited successfully but no receptor PDBQT was produced.",
+                    log_path=log_path,
+                    proc=proc,
+                )
+                if not allow_zero_charge_fallback:
+                    raise RuntimeError(message)
+                warnings.append(message)
+        elif proc is not None:
+            message = receptor_prep_error_message(
+                "mk_prepare_receptor.py failed.",
+                log_path=log_path,
+                proc=proc,
+            )
+            if not allow_zero_charge_fallback:
+                raise RuntimeError(message)
+            warnings.append(message)
+
+    if prep_method != "meeko":
+        warnings.append("Using debug-only zero-charge receptor PDBQT fallback.")
+        write_zero_charge_receptor_pdbqt(clean_pdb_path, receptor_pdbqt_path)
+        prep_method = "zero_charge_pdbqt_fallback"
+
+    return ReceptorConfig(
+        pdb_id=pdb_id.upper(),
+        receptor_pdbqt=str(receptor_pdbqt_path),
+        box_center=box_center,
+        box_size=box_size,
+        chain_id=chain_id,
+        ligand_resname=str(reference_ligand["resname"]),
+        ligand_resseq=str(reference_ligand["resseq"]),
+        ligand_chain=str(reference_ligand["chain"]),
+        prepared_pdb=str(clean_pdb_path),
+        prep_method=prep_method,
+        prep_command=prep_command,
+        prep_log=prep_log,
+        prep_metadata={
+            "allow_zero_charge_fallback": allow_zero_charge_fallback,
+            "mk_prepare_receptor": mk_prepare_receptor or "",
+            "mk_prepare_receptor_version": tool_version(mk_prepare_receptor),
+            "reference_ligand": {
+                "resname": str(reference_ligand["resname"]),
+                "chain": str(reference_ligand["chain"]),
+                "resseq": str(reference_ligand["resseq"]),
+            },
+        },
+        warnings=warnings,
+    )
+
+
+def prepare_ligand(
+    smiles: str,
+    *,
+    work_dir: Optional[str | Path] = None,
+    seed: int = 42,
+) -> Optional[str]:
+    """
+    配体准备: RDKit ETKDG 生成 3D 构象 + 质子化 (目标 pH) -> Meeko 转 pdbqt。
+    返回 pdbqt 句柄; 失败返回 None。
+    """
+    canonical = canonicalize_smiles(smiles)
+    if not canonical:
+        return None
+    ligand_dir = docking_work_dir(work_dir) / "ligands" / hash_text(canonical, 20)
+    ligand_pdbqt_path = ligand_dir / "ligand.pdbqt"
+    if ligand_pdbqt_path.exists() and ligand_pdbqt_path.stat().st_size > 0:
+        return str(ligand_pdbqt_path)
+
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+    except ImportError:
+        return None
+
+    ligand_dir.mkdir(parents=True, exist_ok=True)
+    log_path = ligand_dir / "prepare_ligand.log"
+    mol = Chem.MolFromSmiles(canonical)
+    if mol is None:
+        log_path.write_text(f"RDKit failed to parse SMILES:\n{smiles}\n", encoding="utf-8")
+        return None
+    mol = Chem.AddHs(mol)
+    mol.SetProp("_Name", hash_text(canonical, 12))
+
+    params = AllChem.ETKDGv3()
+    params.randomSeed = int(seed)
+    params.useRandomCoords = True
+    try:
+        params.maxAttempts = 1000
+    except Exception:
+        pass
+    embed_status = AllChem.EmbedMolecule(mol, params)
+    if embed_status != 0:
+        log_path.write_text(f"RDKit EmbedMolecule failed with code {embed_status}\n", encoding="utf-8")
+        return None
+    try:
+        if AllChem.MMFFHasAllMoleculeParams(mol):
+            AllChem.MMFFOptimizeMolecule(mol, maxIters=300)
+        else:
+            AllChem.UFFOptimizeMolecule(mol, maxIters=300)
+    except Exception as exc:
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(f"Geometry optimization warning: {exc}\n")
+
+    sdf_path = ligand_dir / "ligand.sdf"
+    Chem.MolToMolFile(mol, str(sdf_path))
+
+    mk_prepare_ligand = find_local_tool("mk_prepare_ligand.py", work_dir)
+    if not mk_prepare_ligand:
+        log_path.write_text("mk_prepare_ligand.py not found. Install meeko in the active Python environment.\n", encoding="utf-8")
+        return None
+    cmd = [mk_prepare_ligand, "-i", str(sdf_path), "-o", str(ligand_pdbqt_path)]
+    try:
+        proc = run_logged_command(cmd, log_path, timeout=300)
+    except Exception as exc:
+        log_path.write_text(f"mk_prepare_ligand.py failed to run: {exc}\n", encoding="utf-8")
+        return None
+    if proc.returncode != 0 or not ligand_pdbqt_path.exists() or ligand_pdbqt_path.stat().st_size == 0:
+        return None
+    return str(ligand_pdbqt_path)
+
+
+def parse_vina_score_from_text(text: str) -> Optional[float]:
+    for line in text.splitlines():
+        match = re.match(r"^\s*1\s+(-?\d+(?:\.\d+)?)\s+", line)
+        if match:
+            return float(match.group(1))
+        remark = re.search(r"REMARK\s+VINA\s+RESULT:\s+(-?\d+(?:\.\d+)?)", line)
+        if remark:
+            return float(remark.group(1))
+    return None
+
+
+def parse_vina_score_from_pose(pose_path: Path) -> Optional[float]:
+    if not pose_path.exists():
+        return None
+    return parse_vina_score_from_text(pose_path.read_text(encoding="utf-8", errors="replace"))
+
+
+def work_dir_for_receptor(receptor: ReceptorConfig) -> Path:
+    receptor_path = Path(receptor.receptor_pdbqt).expanduser()
+    if receptor_path.parent.name == "receptors":
+        return receptor_path.parent.parent
+    return docking_work_dir()
+
+
+def require_production_receptor(receptor: ReceptorConfig, *, allow_debug_receptor: bool = False) -> None:
+    if receptor.prep_method == "meeko":
+        return
+    if allow_debug_receptor and receptor.prep_method == "zero_charge_pdbqt_fallback":
+        return
+    raise RuntimeError(
+        "Refusing to run production docking without a charged Meeko receptor PDBQT. "
+        f"Current receptor prep_method={receptor.prep_method!r}, receptor={receptor.receptor_pdbqt!r}. "
+        "Use prepare_receptor(..., allow_zero_charge_fallback=True) together with "
+        "dock_batch(..., allow_debug_receptor=True) only for smoke/debug runs."
+    )
+
+
+def dock_one(
+    smiles: str,
+    receptor: ReceptorConfig,
+    exhaustiveness: int = 16,
+    n_poses: int = 5,
+    seed: int = 42,
+    compound_id: str = "",
+    allow_debug_receptor: bool = False,
+) -> DockingResult:
+    """单分子对接 (AutoDock Vina)。seed 固定保证可复现。"""
+    require_production_receptor(receptor, allow_debug_receptor=allow_debug_receptor)
+    canonical = canonicalize_smiles(smiles)
+    result_id = compound_id or hash_text(canonical, 12)
+    work_path = work_dir_for_receptor(receptor)
+    if not canonical:
+        return DockingResult(
+            compound_id=result_id,
+            canonical_smiles="",
+            score=None,
+            pose_ref=None,
+            status="prep_failed",
+            message="Empty SMILES.",
+        )
+    ligand_pdbqt = prepare_ligand(canonical, work_dir=work_path, seed=seed)
+    if not ligand_pdbqt:
+        return DockingResult(
+            compound_id=result_id,
+            canonical_smiles=canonical,
+            score=None,
+            pose_ref=None,
+            status="prep_failed",
+            message="Ligand PDBQT preparation failed.",
+        )
+
+    vina_bin = find_local_tool("vina", work_path)
+    if not vina_bin:
+        return DockingResult(
+            compound_id=result_id,
+            canonical_smiles=canonical,
+            score=None,
+            pose_ref=None,
+            status="dock_failed",
+            message="AutoDock Vina executable not found. Set VINA_BIN or put vina on PATH.",
+        )
+
+    pose_dir = work_path / "poses"
+    pose_dir.mkdir(parents=True, exist_ok=True)
+    cache_key = hash_text(
+        json.dumps(
+            {
+                "smiles": canonical,
+                "receptor": str(Path(receptor.receptor_pdbqt).resolve()),
+                "box_center": receptor.box_center,
+                "box_size": receptor.box_size,
+                "prep_method": receptor.prep_method,
+                "exhaustiveness": exhaustiveness,
+                "n_poses": n_poses,
+                "seed": seed,
+            },
+            sort_keys=True,
+        ),
+        20,
+    )
+    pose_path = pose_dir / f"{result_id}_{cache_key}.pdbqt"
+    log_path = pose_dir / f"{result_id}_{cache_key}.log"
+    cmd = [
+        vina_bin,
+        "--receptor",
+        receptor.receptor_pdbqt,
+        "--ligand",
+        ligand_pdbqt,
+        "--center_x",
+        f"{receptor.box_center[0]:.3f}",
+        "--center_y",
+        f"{receptor.box_center[1]:.3f}",
+        "--center_z",
+        f"{receptor.box_center[2]:.3f}",
+        "--size_x",
+        f"{receptor.box_size[0]:.3f}",
+        "--size_y",
+        f"{receptor.box_size[1]:.3f}",
+        "--size_z",
+        f"{receptor.box_size[2]:.3f}",
+        "--exhaustiveness",
+        str(exhaustiveness),
+        "--num_modes",
+        str(n_poses),
+        "--seed",
+        str(seed),
+        "--out",
+        str(pose_path),
+    ]
+    try:
+        proc = run_logged_command(cmd, log_path, timeout=3600)
+    except Exception as exc:
+        return DockingResult(
+            compound_id=result_id,
+            canonical_smiles=canonical,
+            score=None,
+            pose_ref=str(log_path),
+            status="dock_failed",
+            message=f"Vina execution failed: {exc}",
+        )
+    if proc.returncode != 0:
+        return DockingResult(
+            compound_id=result_id,
+            canonical_smiles=canonical,
+            score=None,
+            pose_ref=str(log_path),
+            status="dock_failed",
+            message=command_error_tail(proc),
+        )
+    score = parse_vina_score_from_text(proc.stdout or "")
+    if score is None:
+        score = parse_vina_score_from_pose(pose_path)
+    if score is None:
+        return DockingResult(
+            compound_id=result_id,
+            canonical_smiles=canonical,
+            score=None,
+            pose_ref=str(pose_path) if pose_path.exists() else str(log_path),
+            status="dock_failed",
+            message="Vina finished but no score could be parsed.",
+        )
+    return DockingResult(
+        compound_id=result_id,
+        canonical_smiles=canonical,
+        score=score,
+        pose_ref=str(pose_path),
+        status="ok",
+    )
+
+
+def dock_batch(
+    compounds: list[ExtractedCompound],
+    receptor: ReceptorConfig,
+    engine: Literal["vina", "unidock"] = "vina",
+    use_cache: bool = True,
+    exhaustiveness: int = 16,
+    n_poses: int = 5,
+    seed: int = 42,
+    allow_debug_receptor: bool = False,
+    max_workers: int = 1,
+) -> list[DockingResult]:
+    """
+    批量对接, 集群并行。按 canonical SMILES 缓存, 命中直接返回。
+    engine=vina 对齐文献; engine=unidock 走 GPU 提速。
+    """
+    if engine != "vina":
+        raise NotImplementedError("Only AutoDock Vina is implemented in this local workflow.")
+    require_production_receptor(receptor, allow_debug_receptor=allow_debug_receptor)
+    work_path = work_dir_for_receptor(receptor)
+    cache_dir = work_path / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def dock_or_read_cache(compound: ExtractedCompound) -> DockingResult:
+        canonical = canonicalize_smiles(compound.full_smiles or "")
+        if not canonical:
+            return DockingResult(
+                compound_id=compound.compound_id,
+                canonical_smiles="",
+                score=None,
+                pose_ref=None,
+                status="prep_failed",
+                message="Compound has no SMILES.",
+            )
+        cache_key = hash_text(
+            json.dumps(
+                {
+                    "engine": engine,
+                    "smiles": canonical,
+                    "receptor": str(Path(receptor.receptor_pdbqt).resolve()),
+                    "box_center": receptor.box_center,
+                    "box_size": receptor.box_size,
+                    "prep_method": receptor.prep_method,
+                    "exhaustiveness": exhaustiveness,
+                    "n_poses": n_poses,
+                    "seed": seed,
+                },
+                sort_keys=True,
+            ),
+            20,
+        )
+        cache_path = cache_dir / f"docking_{cache_key}.json"
+        if use_cache and cache_path.exists():
+            try:
+                cached = json.loads(cache_path.read_text(encoding="utf-8"))
+                result = DockingResult(**cached)
+                if result.status == "ok" and result.pose_ref and Path(result.pose_ref).exists():
+                    result.compound_id = compound.compound_id
+                    result.cached = True
+                    return result
+            except Exception:
+                pass
+        result = dock_one(
+            canonical,
+            receptor,
+            exhaustiveness=exhaustiveness,
+            n_poses=n_poses,
+            seed=seed,
+            compound_id=compound.compound_id,
+            allow_debug_receptor=allow_debug_receptor,
+        )
+        if result.status == "ok":
+            cache_path.write_text(
+                json.dumps(model_to_plain_dict(result), ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+        return result
+
+    if max_workers <= 1 or len(compounds) <= 1:
+        return [dock_or_read_cache(compound) for compound in compounds]
+
+    results: list[Optional[DockingResult]] = [None] * len(compounds)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(dock_or_read_cache, compound): (index, compound) for index, compound in enumerate(compounds)}
+        for future in as_completed(futures):
+            index, compound = futures[future]
+            try:
+                results[index] = future.result()
+            except Exception as exc:
+                results[index] = DockingResult(
+                    compound_id=compound.compound_id,
+                    canonical_smiles=canonicalize_smiles(compound.full_smiles or ""),
+                    score=None,
+                    pose_ref=None,
+                    status="dock_failed",
+                    message=f"Docking worker failed: {exc}",
+                )
+    return [result for result in results if result is not None]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 顶层编排
+# ═══════════════════════════════════════════════════════════════════════════
+
+def run(pdf_path: str, source_ref: str) -> tuple[list[ExtractedCompound], list[DockingResult]]:
+    """
+    Step1 -> 人工确认 -> Step2 的串联骨架。
+
+        compounds = build_dataset(pdf_path, source_ref)
+        # render_for_review(compounds) -> 人工核对 -> approved_ids
+        # confirmed = confirm_dataset(compounds, approved_ids)
+        receptor  = prepare_receptor("8UN5")
+        docking   = dock_batch(confirmed, receptor)
+        return confirmed, docking
+
+    备注: confirmed 同时带着 activity_nM, 所以后续 Step3 (对接分 vs 实测活性
+    交叉验证) 无需再提取活性, 直接可做 —— 但那是下一阶段的事, 本框架不含。
+    """
+    compounds = build_dataset(pdf_path, source_ref)
+    confirmed = [compound for compound in compounds if compound.full_smiles and not compound.needs_review]
+    if not confirmed:
+        confirmed = [compound for compound in compounds if compound.full_smiles]
+    receptor = prepare_receptor("8UN5")
+    docking = dock_batch(confirmed, receptor)
+    return confirmed, docking
+
+
+def parse_id_list(values: Optional[list[str]], file_path: Optional[str]) -> list[str]:
+    ids: list[str] = []
+    for value in values or []:
+        for part in re.split(r"[,;\s]+", value):
+            part = normalize_compound_id(part)
+            if part and part not in ids:
+                ids.append(part)
+    if file_path:
+        text = Path(file_path).read_text(encoding="utf-8")
+        for part in re.split(r"[,;\s\r\n]+", text):
+            part = normalize_compound_id(part)
+            if part and part not in ids:
+                ids.append(part)
+    return ids
+
+
+def csv_row_value(row: dict[str, Any], columns: tuple[str, ...]) -> str:
+    for column in columns:
+        value = str(row.get(column) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def compounds_from_csv(path: Path, approved_ids: list[str], allow_unreviewed: bool) -> list[ExtractedCompound]:
+    approved = {normalize_compound_id(item) for item in approved_ids}
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    compounds: list[ExtractedCompound] = []
+    target_group_ids: dict[str, str] = {}
+    group_counts: dict[str, int] = {}
+    for row in rows:
+        compound_id = normalize_compound_id(
+            str(row.get("compound_id") or row.get("Compound") or row.get("compound") or "")
+        )
+        smiles = csv_row_value(row, ("selected_smiles", "SMILES", "smiles", "canonical_smiles", "product_smiles"))
+        seed_smiles = csv_row_value(row, ("target", "seed_smiles", "target_smiles", "parent_smiles"))
+        seed_compound_id = normalize_compound_id(
+            csv_row_value(row, ("seed_compound_id", "target_compound_id", "source_compound_id"))
+        )
+        analog_group_id = normalize_compound_id(csv_row_value(row, ("analog_group_id", "group_id", "root_seed_id")))
+        is_reasyn_analog = bool(seed_smiles and smiles)
+        if is_reasyn_analog:
+            target_key = canonicalize_smiles(seed_smiles)
+            if seed_compound_id:
+                analog_group_id = seed_compound_id
+            elif not analog_group_id:
+                analog_group_id = target_group_ids.setdefault(target_key, f"seed_{len(target_group_ids) + 1}")
+            if not compound_id:
+                group_counts[analog_group_id] = group_counts.get(analog_group_id, 0) + 1
+                compound_id = f"{analog_group_id}_analog_{group_counts[analog_group_id]}"
+        elif not compound_id and smiles and allow_unreviewed and not approved:
+            compound_id = f"analog_{len(compounds) + 1}"
+        if not compound_id or not smiles:
+            continue
+        row_needs_review = str(row.get("needs_review") or row.get("Needs_review") or "").lower() == "true"
+        if approved:
+            if compound_id not in approved:
+                continue
+            needs_review = False
+        else:
+            if not allow_unreviewed:
+                raise RuntimeError("Production docking requires --approved-ids/--approved-ids-file or --allow-unreviewed.")
+            needs_review = row_needs_review
+        if needs_review and not allow_unreviewed and not approved:
+            raise RuntimeError(f"Compound {compound_id} needs review; pass approved IDs or --allow-unreviewed.")
+        compounds.append(
+            ExtractedCompound(
+                compound_id=compound_id,
+                full_smiles=smiles,
+                activity_nM=safe_float(row.get("primary_activity_value_nM") or row.get("Activity_nM")),
+                selectivity_fold=safe_float(
+                    row.get("primary_activity_selectivity_fold") or row.get("Selectivity_fold")
+                ),
+                source=str(row.get("Source_URL") or row.get("source_url") or ""),
+                neutral_formula=str(row.get("neutral_formula") or row.get("Neutral_formula") or "") or None,
+                bindingdb_id=str(row.get("bindingdb_id") or row.get("BindingDB_ID") or ""),
+                source_url=str(row.get("Source_URL") or row.get("source_url") or ""),
+                lookup_status=str(row.get("lookup_status") or ""),
+                activity_assay=str(row.get("primary_activity_assay") or row.get("Activity_Assay") or ""),
+                activity_target=str(row.get("primary_activity_target") or row.get("Activity_Target") or ""),
+                activity_endpoint=str(row.get("primary_activity_endpoint") or row.get("Activity_Endpoint") or ""),
+                raw_activity=str(row.get("primary_activity_value_text") or row.get("Activity_Value") or ""),
+                activity_evidence=str(row.get("activity_evidence") or row.get("Activity_Evidence") or ""),
+                analog_group_id=analog_group_id,
+                seed_smiles=seed_smiles,
+                reasyn_score=safe_float(row.get("reasyn_score") if row.get("reasyn_score") not in (None, "") else row.get("score"))
+                if is_reasyn_analog
+                else None,
+                synthesis=str(row.get("synthesis") or row.get("route") or ""),
+                num_steps=safe_int(row.get("num_steps")),
+                needs_review=needs_review,
+                warnings=[item for item in str(row.get("warnings") or row.get("Note") or "").split("; ") if item],
+            )
+        )
+    if not compounds:
+        raise RuntimeError(f"No dockable compounds found in {path}")
+    return compounds
+
+
+def write_docking_results_csv(path: Path, results: list[DockingResult]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fields = ["compound_id", "canonical_smiles", "score", "pose_ref", "status", "cached", "message"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for result in results:
+            writer.writerow(model_to_plain_dict(result))
+
+
+def pIC50_from_nM(value_nM: Optional[float]) -> Optional[float]:
+    if value_nM is None or value_nM <= 0:
+        return None
+    return 9.0 - math.log10(value_nM)
+
+
+def ranked_values(items: list[tuple[str, Optional[float]]], *, lower_is_better: bool) -> dict[str, int]:
+    present = [(key, value) for key, value in items if value is not None]
+    present.sort(key=lambda item: item[1], reverse=not lower_is_better)
+    ranks: dict[str, int] = {}
+    previous_value: Optional[float] = None
+    previous_rank = 0
+    for index, (key, value) in enumerate(present, start=1):
+        if previous_value is not None and value == previous_value:
+            rank = previous_rank
+        else:
+            rank = index
+        ranks[key] = rank
+        previous_value = value
+        previous_rank = rank
+    return ranks
+
+
+def write_joint_score_csv(path: Path, compounds: list[ExtractedCompound], results: list[DockingResult]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    results_by_id = {result.compound_id: result for result in results}
+    vina_ranks = ranked_values(
+        [(result.compound_id, result.score) for result in results if result.status == "ok"],
+        lower_is_better=True,
+    )
+    activity_ranks = ranked_values(
+        [(compound.compound_id, compound.activity_nM) for compound in compounds],
+        lower_is_better=True,
+    )
+    fields = [
+        "compound_id",
+        "canonical_smiles",
+        "vina_score_kcal_mol",
+        "vina_rank",
+        "activity_nM",
+        "pIC50",
+        "activity_rank",
+        "combined_rank_score",
+        "pose_ref",
+        "docking_status",
+        "activity_assay",
+        "activity_target",
+        "activity_endpoint",
+        "activity_value_text",
+        "bindingdb_id",
+        "source_url",
+        "message",
+    ]
+    rows: list[dict[str, Any]] = []
+    for compound in compounds:
+        result = results_by_id.get(compound.compound_id)
+        vina_rank = vina_ranks.get(compound.compound_id)
+        activity_rank = activity_ranks.get(compound.compound_id)
+        combined_rank_score = (
+            float(vina_rank + activity_rank) / 2.0
+            if vina_rank is not None and activity_rank is not None
+            else ""
+        )
+        rows.append(
+            {
+                "compound_id": compound.compound_id,
+                "canonical_smiles": result.canonical_smiles if result else canonicalize_smiles(compound.full_smiles or ""),
+                "vina_score_kcal_mol": result.score if result else "",
+                "vina_rank": vina_rank or "",
+                "activity_nM": compound.activity_nM if compound.activity_nM is not None else "",
+                "pIC50": pIC50_from_nM(compound.activity_nM) if compound.activity_nM is not None else "",
+                "activity_rank": activity_rank or "",
+                "combined_rank_score": combined_rank_score,
+                "pose_ref": result.pose_ref if result else "",
+                "docking_status": result.status if result else "dock_failed",
+                "activity_assay": compound.activity_assay,
+                "activity_target": compound.activity_target,
+                "activity_endpoint": compound.activity_endpoint,
+                "activity_value_text": compound.raw_activity,
+                "bindingdb_id": compound.bindingdb_id,
+                "source_url": compound.source_url,
+                "message": result.message if result else "No docking result.",
+            }
+        )
+    rows.sort(
+        key=lambda row: (
+            row["combined_rank_score"] == "",
+            row["combined_rank_score"] if row["combined_rank_score"] != "" else 10**9,
+            row["vina_rank"] if row["vina_rank"] != "" else 10**9,
+            compound_sort_key(str(row["compound_id"])),
+        )
+    )
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def write_analog_group_score_csvs(
+    topk_path: Path,
+    overall_best_path: Path,
+    compounds: list[ExtractedCompound],
+    results: list[DockingResult],
+    *,
+    top_k: int,
+) -> dict[str, Any]:
+    grouped_compounds = [compound for compound in compounds if compound.analog_group_id or compound.seed_smiles]
+    if not grouped_compounds:
+        return {"written": False}
+
+    topk_path.parent.mkdir(parents=True, exist_ok=True)
+    results_by_id = {result.compound_id: result for result in results}
+    fields = [
+        "group_id",
+        "seed_smiles",
+        "analog_rank",
+        "compound_id",
+        "analog_smiles",
+        "vina_score_kcal_mol",
+        "pose_ref",
+        "docking_status",
+        "reasyn_score",
+        "synthesis",
+        "num_steps",
+        "seed_activity_nM",
+        "seed_activity_assay",
+        "seed_activity_target",
+        "message",
+    ]
+
+    by_group: dict[str, list[tuple[ExtractedCompound, DockingResult]]] = {}
+    for compound in grouped_compounds:
+        result = results_by_id.get(compound.compound_id)
+        if result is None or result.status != "ok" or result.score is None:
+            continue
+        group_id = compound.analog_group_id or compound.seed_smiles
+        by_group.setdefault(group_id, []).append((compound, result))
+
+    topk_rows: list[dict[str, Any]] = []
+    group_best_rows: list[dict[str, Any]] = []
+    for group_id in sorted(by_group):
+        group_items = sorted(
+            by_group[group_id],
+            key=lambda item: (
+                item[1].score if item[1].score is not None else float("inf"),
+                compound_sort_key(item[0].compound_id),
+            ),
+        )
+        for rank, (compound, result) in enumerate(group_items[:top_k], start=1):
+            row = {
+                "group_id": group_id,
+                "seed_smiles": compound.seed_smiles,
+                "analog_rank": rank,
+                "compound_id": compound.compound_id,
+                "analog_smiles": result.canonical_smiles or canonicalize_smiles(compound.full_smiles or ""),
+                "vina_score_kcal_mol": result.score,
+                "pose_ref": result.pose_ref or "",
+                "docking_status": result.status,
+                "reasyn_score": compound.reasyn_score if compound.reasyn_score is not None else "",
+                "synthesis": compound.synthesis,
+                "num_steps": compound.num_steps if compound.num_steps is not None else "",
+                "seed_activity_nM": compound.activity_nM if compound.activity_nM is not None else "",
+                "seed_activity_assay": compound.activity_assay,
+                "seed_activity_target": compound.activity_target,
+                "message": result.message,
+            }
+            topk_rows.append(row)
+            if rank == 1:
+                group_best_rows.append(row)
+
+    overall_best_rows = sorted(
+        topk_rows,
+        key=lambda row: (
+            row["vina_score_kcal_mol"] if row["vina_score_kcal_mol"] != "" else float("inf"),
+            str(row["group_id"]),
+            compound_sort_key(str(row["compound_id"])),
+        ),
+    )[:1]
+
+    for path, rows_to_write in (
+        (topk_path, topk_rows),
+        (overall_best_path, overall_best_rows),
+    ):
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(rows_to_write)
+
+    return {
+        "written": True,
+        "top_k": top_k,
+        "group_count": len({compound.analog_group_id or compound.seed_smiles for compound in grouped_compounds}),
+        "scored_group_count": len(by_group),
+        "topk_csv": str(topk_path),
+        "overall_best_csv": str(overall_best_path),
+        "group_best": group_best_rows,
+    }
+
+
+def run_docking_cli(args: argparse.Namespace) -> int:
+    approved_ids = parse_id_list(args.approved_ids, args.approved_ids_file)
+    if not approved_ids and not args.allow_unreviewed:
+        raise RuntimeError("Refusing production docking without approved IDs. Use --approved-ids or --allow-unreviewed.")
+    if args.analog_top_k < 1:
+        raise RuntimeError("--analog-top-k must be at least 1.")
+    compounds = compounds_from_csv(Path(args.csv), approved_ids, args.allow_unreviewed)
+    receptor = prepare_receptor(
+        args.pdb_id,
+        chain_id=args.chain_id,
+        ligand_resname=args.ligand_resname,
+        work_dir=args.work_dir,
+        allow_zero_charge_fallback=args.allow_zero_charge_fallback,
+    )
+    results = dock_batch(
+        compounds,
+        receptor,
+        exhaustiveness=args.exhaustiveness,
+        n_poses=args.num_modes,
+        seed=args.seed,
+        use_cache=not args.no_cache,
+        allow_debug_receptor=args.allow_debug_receptor,
+    )
+    output_dir = Path(args.output_dir)
+    results_path = output_dir / "docking_results.csv"
+    metadata_path = output_dir / "docking_metadata.json"
+    joint_score_path = output_dir / "docking_activity_joint_score.csv"
+    analog_topk_path = output_dir / "analog_group_topk.csv"
+    analog_overall_best_path = output_dir / "analog_overall_best.csv"
+    write_docking_results_csv(results_path, results)
+    write_joint_score_csv(joint_score_path, compounds, results)
+    analog_summary = write_analog_group_score_csvs(
+        analog_topk_path,
+        analog_overall_best_path,
+        compounds,
+        results,
+        top_k=args.analog_top_k,
+    )
+    metadata = {
+        "input_csv": str(Path(args.csv)),
+        "approved_ids": approved_ids,
+        "allow_unreviewed": args.allow_unreviewed,
+        "receptor": model_to_plain_dict(receptor),
+        "parameters": {
+            "exhaustiveness": args.exhaustiveness,
+            "num_modes": args.num_modes,
+            "seed": args.seed,
+            "analog_top_k": args.analog_top_k,
+            "allow_zero_charge_fallback": args.allow_zero_charge_fallback,
+            "allow_debug_receptor": args.allow_debug_receptor,
+        },
+        "results_csv": str(results_path),
+        "joint_score_csv": str(joint_score_path),
+        "analog_summary": analog_summary,
+    }
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"Wrote {results_path}")
+    print(f"Wrote {joint_score_path}")
+    if analog_summary.get("written"):
+        print(f"Wrote {analog_topk_path}")
+        print(f"Wrote {analog_overall_best_path}")
+        print("Best analog per seed:")
+        for row in analog_summary.get("group_best", []):
+            print(f"  {row['group_id']}: {row['compound_id']} score={row['vina_score_kcal_mol']}")
+    print(f"Wrote {metadata_path}")
+    return 0
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="PDF extraction and docking workflow.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    dock_parser = subparsers.add_parser("dock", help="Run AutoDock Vina on reviewed compounds from a CSV.")
+    dock_parser.add_argument("--csv", required=True, help="Audit/final CSV with compound_id/SMILES columns.")
+    dock_parser.add_argument("--approved-ids", action="append", help="Approved compound IDs, comma/space separated.")
+    dock_parser.add_argument("--approved-ids-file", help="File containing approved compound IDs.")
+    dock_parser.add_argument("--allow-unreviewed", action="store_true", help="Allow docking without approved IDs.")
+    dock_parser.add_argument("--pdb-id", default="8UN5")
+    dock_parser.add_argument("--chain-id", default="A")
+    dock_parser.add_argument("--ligand-resname", default=None)
+    dock_parser.add_argument("--work-dir", default=DOCKING_DEFAULT_WORKDIR)
+    dock_parser.add_argument("--output-dir", default="docking_work/results")
+    dock_parser.add_argument("--exhaustiveness", type=int, default=16)
+    dock_parser.add_argument("--num-modes", type=int, default=5)
+    dock_parser.add_argument(
+        "--analog-top-k",
+        type=int,
+        default=3,
+        help="For ReaSyn analog CSVs, keep top K Vina-ranked analogs per initial seed group.",
+    )
+    dock_parser.add_argument("--seed", type=int, default=42)
+    dock_parser.add_argument("--no-cache", action="store_true")
+    dock_parser.add_argument("--allow-zero-charge-fallback", action="store_true", help="Debug-only receptor fallback.")
+    dock_parser.add_argument("--allow-debug-receptor", action="store_true", help="Debug-only: allow fallback receptor in docking.")
+    return parser
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = build_arg_parser()
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "dock":
+            return run_docking_cli(args)
+    except RuntimeError as exc:
+        parser.exit(1, f"error: {exc}\n")
+    parser.error(f"Unknown command: {args.command}")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
