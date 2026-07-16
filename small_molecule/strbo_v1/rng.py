@@ -10,8 +10,8 @@ the GP fit (torch) all use a single reproducible stream.
 
 Why this exists
 ---------------
-The pre-existing :func:`bayesian_analog_search` accepted
-``rng: Optional[random.Random]``. Multi-objective EHVI is a Monte-Carlo
+The search entry points accept ``rng: Optional[random.Random]``.
+Multi-objective EHVI is a Monte-Carlo
 estimate of the expected hypervolume improvement, which calls
 ``numpy.random`` — using the global ``numpy.random`` would break
 reproducibility. ``RNG.numpy`` exposes a seeded
@@ -26,8 +26,7 @@ surprising side effects on the GP.
 Backwards-compatibility
 -----------------------
 A :class:`random.Random` instance is auto-promoted to :class:`RNG` at
-all entry points (``bayesian_analog_search``, ``random_analog_search``,
-``acquisition.expected_hypervolume_improvement``). The promotion
+all search entry points. The promotion
 derives a deterministic ``SeedSequence`` from the random instance's
 internal state, so pre-existing single-objective code that passes a
 plain ``random.Random(seed)`` keeps working unchanged.

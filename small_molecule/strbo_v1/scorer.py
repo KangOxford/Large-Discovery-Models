@@ -15,9 +15,8 @@ Contract details (enforced by the BO / random-search loops via
 - The i-th element of the returned sequence is the score of the i-th
   SMILES in the input sequence. Length must equal
   ``len(smiles_list)``.
-- Lower scores are not assumed to be better universally; both
-  ``bayesian_analog_search`` and ``random_analog_search`` take a
-  ``minimize`` flag (default ``True`` for Vina) and the BO loop's
+- Lower scores are not assumed to be better universally; the LDM-TTS
+  loop takes a ``minimize`` flag (default ``True`` for Vina) and the BO
   acquisition functions are written uniformly as "higher = better".
 - Failed evaluations are signalled with ``float("nan")``. The loops
   convert non-finite floats to ``None`` internally and exclude them
@@ -48,7 +47,7 @@ point. :data:`DEFAULT_REF` is a registry mapping scorer backend names
 :func:`register_ref` adds a new backend's default at runtime;
 :func:`resolve_ref_point` looks up the user-supplied override first,
 falls back to the registry, and finally to ``0.0`` for unknown
-backends. The CLI (``run_search.py``) constructs the
+backends. The LDM-TTS CLI constructs the
 ``objective_parts`` list from ``--objective`` and passes it to
 :func:`resolve_ref_point` to derive the per-run ``ref_point`` tuple.
 """
@@ -63,8 +62,7 @@ Scorer: TypeAlias = Callable[[Sequence[str]], Sequence[float]]
 
 The i-th element of the returned sequence is the score of the i-th
 SMILES in the input sequence. Failed evaluations are signalled with
-``float("nan")``; the ``bayesian_analog_search`` and
-``random_analog_search`` loops convert non-finite floats to ``None``
+``float("nan")``; the LDM-TTS loop converts non-finite floats to ``None``
 internally and exclude them from the GP fit. Any callable matching
 this signature is accepted as a ``scorer`` argument.
 """
@@ -134,7 +132,7 @@ Units / semantics:
       neutral default that callers can override).
 
 Unknown backend names fall back to ``0.0``; :func:`register_ref` adds
-a new backend's default at runtime. Callers (e.g. ``run_search.py``)
+a new backend's default at runtime. Callers such as the LDM-TTS runner
 typically never mutate this dict directly; ``register_ref`` is the
 public extension point.
 """

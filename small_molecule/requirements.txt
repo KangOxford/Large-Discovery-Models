@@ -1,20 +1,17 @@
 openai>=1.99.0
-PyMuPDF>=1.24.0
 pydantic>=2
 rdkit>=2025.9.2
 meeko>=0.7.1
 scipy>=1.13.0
-gemmi>=0.7.0
+numpy>=1.26
+pandas>=2.0
+python-dotenv>=1.0
 
 # strbo_v1 GP stack (strbo_v1/gp.py)
 gpytorch>=1.15
 gauche>=0.1.6
 
-# plotting (plot_search_results.py)
-matplotlib>=3.5
-
 # activity_modeling NNScorer (strbo_v1/objective_nn.py) — G12C pIC50 ensemble
 scikit-learn>=1.0
 joblib>=1.0
 lightgbm>=3.3
-

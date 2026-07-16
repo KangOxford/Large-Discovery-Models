@@ -1,9 +1,9 @@
-"""LLM advisor public re-exports.
+"""LLM advisor public re-exports kept for the LDM-TTS loop.
 
-Importing this module is cheap; it pulls in only data containers and
-the (lazy) schema validator. The LLM client and orchestrator are
-imported on demand to keep the import graph narrow for callers that
-only need the dataclasses.
+The legacy advisor/orchestrator/parser stack has been removed from this
+repository. This package initializer now exposes only the block dataclasses,
+client implementations, and environment configuration used by the current
+test-time-search workflow.
 """
 
 from strbo_v1.llm_advisor.blocks import (
@@ -23,36 +23,31 @@ from strbo_v1.llm_advisor.blocks import (
     block_from_dict,
 )
 from strbo_v1.llm_advisor.config import (
+    DEFAULT_LLM_MODEL,
+    LLM_API_KEY,
+    LLM_BASE_URL,
     LLMClientConfig,
     load_env,
+    refresh_module_globals,
 )
-from strbo_v1.llm_advisor.fallback import (
-    fallback_actions,
-    fallback_review_analogs,
-    fallback_review_suggestions,
+from strbo_v1.llm_advisor.client import (
+    LLMClient,
+    MockLLMClient,
+    OpenAIChatClient,
 )
-from strbo_v1.llm_advisor.advisor import LLMAdvisor, LLMAttemptRecord
-from strbo_v1.llm_advisor.parser import (
-    ParseError,
-    SchemaError,
-    SemanticError,
-    format_error_for_prompt,
-    parse_blocks,
-    validate_blocks_phase,
-    validate_semantics,
-)
-from strbo_v1.llm_advisor.round_state import (
-    PostSuggestionState,
-    PreActionState,
-    PreReviewAnalogsState,
-)
-from strbo_v1.llm_advisor.schema import BLOCKS_SCHEMA_JSON, get_validator
-from strbo_v1.llm_advisor.state import AnalogueRecord, GPSummary, PickRecord, ScoreValue
 
 __all__ = [
     # config
+    "DEFAULT_LLM_MODEL",
+    "LLM_API_KEY",
+    "LLM_BASE_URL",
     "LLMClientConfig",
     "load_env",
+    "refresh_module_globals",
+    # clients
+    "LLMClient",
+    "MockLLMClient",
+    "OpenAIChatClient",
     # blocks
     "AnalogueVerdict",
     "GeneratorHint",
@@ -68,30 +63,4 @@ __all__ = [
     "PHASE_A_REVIEW_ANALOGS_ALLOWED",
     "PHASE_B_SUGGESTIONS_ALLOWED",
     "block_from_dict",
-    # state
-    "GPSummary",
-    "PickRecord",
-    "AnalogueRecord",
-    "ScoreValue",
-    "PreActionState",
-    "PreReviewAnalogsState",
-    "PostSuggestionState",
-    # schema
-    "BLOCKS_SCHEMA_JSON",
-    "get_validator",
-    # parser
-    "parse_blocks",
-    "validate_blocks_phase",
-    "validate_semantics",
-    "format_error_for_prompt",
-    "ParseError",
-    "SchemaError",
-    "SemanticError",
-    # fallback
-    "fallback_actions",
-    "fallback_review_analogs",
-    "fallback_review_suggestions",
-    # advisor
-    "LLMAdvisor",
-    "LLMAttemptRecord",
 ]

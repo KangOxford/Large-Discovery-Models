@@ -30,12 +30,6 @@ from __future__ import annotations
 from bo.ldm.config import DSLConfig
 from bo.ldm.dsl.bias import BiasAtom
 from bo.ldm.dsl.search_space import SearchSpaceAtom
-from bo.ldm.integrate import (
-    apply_decision,
-    build_status,
-    sample_candidates,
-    score_with_bias,
-)
 from bo.ldm.llm.client import LLMClient
 from bo.ldm.llm.openai_backend import OpenAIClient
 from bo.ldm.orchestrator.loop import Orchestrator, OrchestratorDecision
@@ -50,8 +44,4 @@ __all__ = [
     "OrchestratorDecision",
     "LLMClient",
     "OpenAIClient",
-    "build_status",
-    "apply_decision",
-    "sample_candidates",
-    "score_with_bias",
 ]

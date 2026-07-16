@@ -5,12 +5,20 @@ build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Virtual environments
 .venv
 worktrees/
 results/
 queue/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
 
 # Agent prompt files (generated per-session by launchers)
 CLAUDE.md
@@ -22,11 +30,18 @@ dev/
 # Results file
 results.tsv
 
-TTS/ablation_buffer
-TTS/ablation_runs
-TTS/runs
-TTS/docs
-TTS/__pycache__
+# Runtime outputs and generated artifacts
+**/TTS/ablation_buffer/
+**/TTS/ablation_runs/
+**/TTS/runs/
+**/TTS/docs/
+**/TTS/progress.png
+
+# Task-specific generated data
+/antibody/cache/
+/antibody/outputs/
+/antibody/temp/
+/small_molecule/output/
 
 .vscode
 .DS_Store

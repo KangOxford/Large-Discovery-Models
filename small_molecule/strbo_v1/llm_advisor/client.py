@@ -167,7 +167,8 @@ def _serialize_blocks(blocks: Sequence[LLMBlock]) -> str:
     """Render a list of blocks as a multi-block LLM response.
 
     Each block is wrapped in its own triple-backtick json fence. The
-    output is parseable by :func:`strbo_v1.llm_advisor.parser.parse_blocks`.
+    output uses the same fenced JSON block format consumed by the
+    LDM-TTS loop.
     """
     parts: List[str] = []
     for b in blocks:

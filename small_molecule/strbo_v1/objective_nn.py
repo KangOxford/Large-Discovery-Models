@@ -1,10 +1,10 @@
-"""NN-backed single-point Scorer for ``strbo_v1.bayesian_analog_search``.
+"""NN-backed single-point Scorer for the LDM-TTS small-molecule loop.
 
 This module wraps a trained regression model. The default committed artifact is
 ``activity_modeling/best_g12d_model.joblib`` for public KRAS G12D direct-assay
 IC50 records. The scorer is callable and
-mirrors :class:`VinaScorer`'s contract so the same BO / random-search
-loops work without modification::
+mirrors :class:`VinaScorer`'s contract so the same LDM-TTS loop can swap
+between mock, NN, and Vina objectives::
 
     scorer = NNScorer(NNScorerConfig(model_path="activity_modeling/best_g12d_model.joblib"))
     scores = scorer(smiles_list)    # list[float], i-th output is i-th SMILES

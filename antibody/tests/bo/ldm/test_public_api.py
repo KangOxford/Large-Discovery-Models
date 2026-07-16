@@ -18,10 +18,6 @@ def test_public_api_contains_only_expected_names():
         "OrchestratorDecision",
         "LLMClient",
         "OpenAIClient",
-        "build_status",
-        "apply_decision",
-        "sample_candidates",
-        "score_with_bias",
     }
     assert set(mod.__all__) == expected, (
         f"Public API mismatch. Got {sorted(mod.__all__)}, "
@@ -93,11 +89,12 @@ def test_bo_outside_does_not_import_internal_modules():
     import re
     from pathlib import Path
 
-    bo_root = Path(__file__).resolve().parents[2] / "bo"
+    bo_root = Path(__file__).resolve().parents[3] / "bo"
     forbidden = re.compile(r"^\s*from\s+bo\.ldm\.(dsl|orchestrator|llm|dsl\.search_space|dsl\.bias|dsl\.sandbox|dsl\.validator|dsl\.sampler)\b")
     violations = []
     for py_file in bo_root.glob("**/*.py"):
-        if "ldm" in py_file.relative_to(bo_root).parts:
+        rel_parts = py_file.relative_to(bo_root).parts
+        if rel_parts and rel_parts[0].startswith("ldm"):
             continue  # skip bo/ldm/* itself
         for line_no, line in enumerate(py_file.read_text().splitlines(), 1):
             if forbidden.match(line):

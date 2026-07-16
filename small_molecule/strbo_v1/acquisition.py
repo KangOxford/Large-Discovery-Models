@@ -2,8 +2,8 @@
 
 This module collects:
 
-* **Single-objective acquisition functions** (moved from
-  ``bayesian_analog_search.py``): :func:`expected_improvement`,
+* **Single-objective acquisition functions** used by the LDM-TTS loop:
+  :func:`expected_improvement`,
   :func:`probability_of_improvement`, :func:`confidence_bound`. All
   return "higher = better" so the BO loop's top-k selection is uniform.
 * **Hypervolume** (exact, no MC): :func:`hypervolume` dispatches to
@@ -28,10 +28,9 @@ The public entry points :func:`hypervolume` and
 :func:`expected_hypervolume_improvement` accept arbitrary
 ``n_obj`` but raise :class:`NotImplementedError` for the not-yet-
 implemented dimensionalities. The outer interface
-(``bayesian_analog_search`` / ``random_analog_search``) handles the
-dispatch: ``n_obj == 1`` uses EI / PI / UCB; ``n_obj == 2`` uses EHVI;
-``n_obj >= 3`` falls back to Chebyshev scalarization, which works
-in arbitrary dimensions.
+handles the dispatch: ``n_obj == 1`` uses EI / PI / UCB; ``n_obj == 2``
+uses EHVI; ``n_obj >= 3`` falls back to Chebyshev scalarization, which
+works in arbitrary dimensions.
 """
 
 from __future__ import annotations

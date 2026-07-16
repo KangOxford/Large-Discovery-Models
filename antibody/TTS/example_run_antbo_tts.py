@@ -12,14 +12,14 @@ control flow can be smoke-tested without Absolut or an LLM endpoint.
 
 Example dry run:
 
-    python TTS/scripts/example_run_antbo_tts.py \
+    python TTS/example_run_antbo_tts.py \
         --antigen 1ADQ_A \
         --budget 40 \
         --dry-run
 
 Use a GP confidence-bound acquisition after warmup:
 
-    python TTS/scripts/example_run_antbo_tts.py \
+    python TTS/example_run_antbo_tts.py \
         --antigen 1ADQ_A \
         --budget 200 \
         --acq lcb \
@@ -27,7 +27,7 @@ Use a GP confidence-bound acquisition after warmup:
 
 Example mock smoke run in the DGM environment:
 
-    python TTS/scripts/example_run_antbo_tts.py \
+    python TTS/example_run_antbo_tts.py \
         --mock \
         --antigen SMOKE_ANTIGEN \
         --budget 4 \
@@ -37,7 +37,7 @@ Example mock smoke run in the DGM environment:
 
 Example real run:
 
-    python TTS/scripts/example_run_antbo_tts.py \
+    python TTS/example_run_antbo_tts.py \
         --config bo/config.yaml \
         --antigens-file test_5_antigens.txt \
         --seed 42 \

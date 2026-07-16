@@ -28,7 +28,7 @@ from strbo_v1.rng import RNG  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
-# Single-objective acquisitions (moved from bayesian_analog_search.py)
+# Single-objective acquisitions used by the LDM-TTS loop
 # ---------------------------------------------------------------------------
 
 

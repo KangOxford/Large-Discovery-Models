@@ -105,40 +105,6 @@ class TestBudgetConfig:
         assert cfg.num_llm_review == 20
 
 
-class TestSessionBudgetPreCheck:
-    """Verify the session's pre-execution budget check logic."""
-
-    def test_budget_overflow_detection(self):
-        """Over-budget search_dsl is detected before execution."""
-        from bo.ldm.acquisition.session import AcquisitionSession
-        from bo.ldm.dsl.search_space import LocalSearch
-
-        overbudget = LocalSearch("ARDYGNYWYFD", restart=5, steps=200)
-        # budget = 5 * 201 = 1005 > remaining 200
-        cfg = DSLConfig(acq_search_budget=200, max_retries=2)
-        client = MockLLM([])
-        session = AcquisitionSession(client, config=cfg, acq_name="ei")
-
-        remaining = 200
-        proposed = overbudget.budget
-        assert proposed > remaining
-        assert proposed == 5 * 201  # 1005
-
-    def test_within_budget_passes(self):
-        from bo.ldm.acquisition.session import AcquisitionSession
-        from bo.ldm.dsl.search_space import LocalSearch
-
-        ok = LocalSearch("ARDYGNYWYFD", restart=2, steps=50)
-        cfg = DSLConfig(acq_search_budget=600, max_retries=2)
-        client = MockLLM([])
-        session = AcquisitionSession(client, config=cfg, acq_name="ei")
-
-        remaining = 600
-        proposed = ok.budget
-        assert proposed <= remaining
-        assert proposed == 2 * 51  # 102
-
-
 class TestFallbackDSL:
     """Test the adaptive fallback DSL when LLM doesn't provide one."""
 

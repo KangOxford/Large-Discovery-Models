@@ -1,9 +1,0 @@
-{
-  "compound_id": "7",
-  "canonical_smiles": "Cc1cc(N)nc(-c2cc3nc(OC[C@@H]4CCCN4C)nc4c3c(c2Cl)OC[C@@H]2CN(C(=O)[C@H](C)N(C)C)CCN42)c1C(F)(F)F",
-  "score": -10.16,
-  "pose_ref": "docking_work/poses/7_2dc0f8fabddb3843f786.pdbqt",
-  "status": "ok",
-  "cached": false,
-  "message": ""
-}
