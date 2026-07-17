@@ -9,11 +9,19 @@ args:
   seed: 42
   n-trials: 1
   budget: 200
+  batch-size: 1
   n-init: 20
   parallel-budget: 600
   acq: lcb
   acq-beta: 2.0
   llm-url: http://127.0.0.1:52313/v1
-  llm-model-name: Qwen3-Coder-30B-A3B-Instruct
+  llm-model-name: Qwen3.5-9B
   llm-temperature: 0.7
+  llm-max-tokens: 4096
+  disable-thinking: true
+  timeout-s: 120
+  max-retries: 3
+  history-top-k: 10
+  include-antigen-context: true
+  fallback-random: true
   out-dir: ldm_runs/antbo_real_lcb

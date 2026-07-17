@@ -6,6 +6,7 @@ Single concrete LLMClient implementation. Configuration via .env file
   LLM_API_KEY    : required
   LLM_BASE_URL   : required (endpoint)
   LLM_MODEL      : optional; defaults to ``OpenAIClient.MODEL`` below
+  LLM_MAX_TOKENS : optional; positive integer passed as ``max_tokens``
 
 The model name is intentionally hardcoded (per the convention note in
 ``.env``). Pass ``model=...`` to override per-instance.
@@ -37,13 +38,6 @@ class OpenAIClient(LLMClient):
             except ImportError:
                 pass  # dotenv is optional; rely on os.environ directly
 
-        try:
-            from openai import OpenAI
-        except ImportError as e:
-            raise RuntimeError(
-                "openai package is not installed; run `pip install openai`."
-            ) from e
-
         api_key = os.environ.get("LLM_API_KEY")
         base_url = os.environ.get("LLM_BASE_URL")
         if not api_key:
@@ -57,13 +51,35 @@ class OpenAIClient(LLMClient):
                 "or `export LLM_BASE_URL=...`."
             )
 
-        self._client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model or os.environ.get("LLM_MODEL") or self.MODEL
+        self.max_tokens = self._max_tokens_from_env()
+
+        try:
+            from openai import OpenAI
+        except ImportError as e:
+            raise RuntimeError(
+                "openai package is not installed; run `pip install openai`."
+            ) from e
+
+        self._client = OpenAI(api_key=api_key, base_url=base_url)
 
     @staticmethod
     def _disable_thinking_requested() -> bool:
         value = os.environ.get("LLM_DISABLE_THINKING", "").strip().lower()
         return value in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _max_tokens_from_env() -> int | None:
+        raw = os.environ.get("LLM_MAX_TOKENS") or os.environ.get("LDM_LLM_MAX_TOKENS")
+        if raw is None or not raw.strip():
+            return None
+        try:
+            value = int(raw)
+        except ValueError as exc:
+            raise ValueError("LLM_MAX_TOKENS must be a positive integer") from exc
+        if value <= 0:
+            raise ValueError("LLM_MAX_TOKENS must be a positive integer")
+        return value
 
     def make_chat_completion_kwargs(
         self,
@@ -78,6 +94,8 @@ class OpenAIClient(LLMClient):
             "temperature": temperature,
             "timeout": timeout_s,
         }
+        if self.max_tokens is not None:
+            kwargs["max_tokens"] = self.max_tokens
         if self._disable_thinking_requested():
             kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
         kwargs.update(overrides)

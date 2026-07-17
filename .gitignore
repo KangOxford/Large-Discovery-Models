@@ -43,3 +43,4 @@ results.tsv
 
 .vscode
 .DS_Store
+logs/

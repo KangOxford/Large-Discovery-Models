@@ -1,6 +1,8 @@
 """tests/bo/ldm/llm/test_openai_backend.py"""
 from __future__ import annotations
 
+import sys
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,6 +18,11 @@ DOTENV_LOAD_PATCH = "dotenv.load_dotenv"
 def _disable_dotenv(monkeypatch):
     """Prevent load_dotenv from re-loading the real .env in tests."""
     monkeypatch.setattr(DOTENV_LOAD_PATCH, lambda *a, **kw: None)
+    monkeypatch.delenv("LLM_MAX_TOKENS", raising=False)
+    monkeypatch.delenv("LDM_LLM_MAX_TOKENS", raising=False)
+    fake_openai = types.ModuleType("openai")
+    fake_openai.OpenAI = MagicMock()
+    monkeypatch.setitem(sys.modules, "openai", fake_openai)
 
 
 class TestOpenAIClientInit:
@@ -130,6 +137,35 @@ class TestOpenAIClientCall:
                 timeout=30,
                 extra_body={"chat_template_kwargs": {"enable_thinking": False}},
             )
+
+    def test_call_passes_env_max_tokens(self, monkeypatch):
+        monkeypatch.setenv("LLM_API_KEY", "k")
+        monkeypatch.setenv("LLM_BASE_URL", "https://e/v1")
+        monkeypatch.setenv("LLM_MAX_TOKENS", "1536")
+        from bo.ldm.llm.openai_backend import OpenAIClient
+        with patch(OPENAI_PATCH) as MockOpenAI:
+            mock_response = MagicMock()
+            mock_response.choices = [MagicMock(message=MagicMock(content="hello"))]
+            MockOpenAI.return_value.chat.completions.create.return_value = mock_response
+
+            c = OpenAIClient()
+            out = c.call("test prompt", 0.25, 30)
+            assert out == "hello"
+            MockOpenAI.return_value.chat.completions.create.assert_called_once_with(
+                model="DeepSeek-V4-Flash",
+                messages=[{"role": "user", "content": "test prompt"}],
+                temperature=0.25,
+                timeout=30,
+                max_tokens=1536,
+            )
+
+    def test_invalid_env_max_tokens_raises(self, monkeypatch):
+        monkeypatch.setenv("LLM_API_KEY", "k")
+        monkeypatch.setenv("LLM_BASE_URL", "https://e/v1")
+        monkeypatch.setenv("LLM_MAX_TOKENS", "0")
+        from bo.ldm.llm.openai_backend import OpenAIClient
+        with patch(OPENAI_PATCH), pytest.raises(ValueError, match="LLM_MAX_TOKENS"):
+            OpenAIClient()
 
     def test_call_returns_empty_string_on_none_content(self, monkeypatch):
         monkeypatch.setenv("LLM_API_KEY", "k")

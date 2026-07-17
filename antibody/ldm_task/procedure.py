@@ -54,8 +54,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -134,6 +136,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--llm-url", default=os.environ.get("LLM_BASE_URL", ""))
     parser.add_argument("--llm-model-name", default=os.environ.get("LLM_MODEL", ""))
     parser.add_argument("--api-key", default=os.environ.get("LLM_API_KEY", ""))
+    parser.add_argument("--llm-max-tokens", type=int, default=None)
     parser.add_argument("--timeout-s", type=int, default=120)
     parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument("--history-top-k", type=int, default=10)
@@ -170,11 +173,54 @@ def resolve_path(path: str) -> Path:
     return candidate if candidate.is_absolute() else REPO_ROOT / candidate
 
 
-def resolve_out_dir(args: argparse.Namespace) -> Path:
+def sanitize_run_tag_part(value: Any) -> str:
+    text = str(value).strip()
+    text = re.sub(r"[^A-Za-z0-9._=-]+", "-", text)
+    text = text.strip("-._")
+    return text or "unset"
+
+
+def default_out_dir_base(args: argparse.Namespace) -> Path:
     if args.out_dir:
         return resolve_path(args.out_dir)
     suffix = "mock" if args.mock else "real"
     return REPO_ROOT / "ldm_runs" / "antbo_tts" / f"{suffix}_seed={args.seed}"
+
+
+def make_run_tag(args: argparse.Namespace) -> str:
+    mode = "mock" if args.mock else "real"
+    if args.antigen:
+        antigen_part = f"antigen-{sanitize_run_tag_part(args.antigen)}"
+    elif args.antigens_file:
+        antigen_part = f"antigens-{sanitize_run_tag_part(Path(args.antigens_file).stem)}"
+    else:
+        antigen_part = "antigens-unset"
+    model_name = args.llm_model_name or os.getenv("LLM_MODEL", "env")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    parts = [
+        mode,
+        sanitize_run_tag_part(args.acq),
+        f"budget{args.n_evals}",
+        f"init{args.n_init}",
+        f"parallel{args.parallel_budget}",
+        f"batch{args.batch_size}",
+        f"seed{args.seed}",
+        f"trials{args.n_trials}",
+        antigen_part,
+        f"model-{sanitize_run_tag_part(model_name)}",
+        timestamp,
+    ]
+    return "_".join(parts)
+
+
+def resolve_out_dir(args: argparse.Namespace) -> Path:
+    resolved = getattr(args, "_resolved_out_dir", None)
+    if resolved:
+        return Path(resolved)
+    base = default_out_dir_base(args)
+    out_dir = base / make_run_tag(args)
+    args._resolved_out_dir = str(out_dir)
+    return out_dir
 
 
 def resolve_antigens(args: argparse.Namespace) -> list[str]:
@@ -205,6 +251,7 @@ def planned_config_json(args: argparse.Namespace, config: dict[str, Any], antige
         "parallel_budget": args.parallel_budget,
         "acq": args.acq,
         "acq_beta": args.acq_beta,
+        "out_dir_base": str(default_out_dir_base(args)),
         "out_dir": str(resolve_out_dir(args)),
         "mock": bool(args.mock),
         "bbox": bbox,
@@ -213,6 +260,7 @@ def planned_config_json(args: argparse.Namespace, config: dict[str, Any], antige
             "LLM_BASE_URL": args.llm_url or os.getenv("LLM_BASE_URL", ""),
             "LLM_MODEL": args.llm_model_name or os.getenv("LLM_MODEL", ""),
             "temperature": args.temperature,
+            "max_tokens": args.llm_max_tokens,
             "disable_thinking": args.disable_thinking,
         },
     }
@@ -229,6 +277,8 @@ def configure_llm_environment(args: argparse.Namespace) -> None:
         os.environ["LLM_API_KEY"] = args.api_key
     elif args.llm_url and not os.environ.get("LLM_API_KEY"):
         os.environ["LLM_API_KEY"] = "EMPTY"
+    if args.llm_max_tokens is not None:
+        os.environ["LLM_MAX_TOKENS"] = str(args.llm_max_tokens)
     if args.disable_thinking is True:
         os.environ["LLM_DISABLE_THINKING"] = "1"
     elif args.disable_thinking is False:
@@ -305,6 +355,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.acq_beta < 0:
         raise ValueError("--acq-beta must be non-negative")
+    if args.llm_max_tokens is not None and args.llm_max_tokens <= 0:
+        raise ValueError("--llm-max-tokens must be positive")
     run(args)
     return 0
 
