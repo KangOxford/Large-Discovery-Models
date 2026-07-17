@@ -1,22 +1,22 @@
-name: nanogpt_real_operation_tool_best_of_n
+name: nanogpt_real_operation_tool_fixed_best_of_n
 task: nanogpt
 algorithm: best_of_n
-mode: real
-description: nanoGPT operation-tool LDM-TTS run against an OpenAI-compatible endpoint.
+mode: real_fixed
+description: nanoGPT fixed-dimension operation-tool model-based run against an OpenAI-compatible endpoint.
 args:
   train-file: ldm_task/real_train.py
   operation-schema: ldm_task/operation_schema_real_train.json
   generator: operation_tool
   method: best_of_n
-  breadth: 1
-  depth: 1
+  breadth: 4
+  depth: 4
   iterations: 100
   warmup: 20
   seed-policy: best
-  buffer: ldm_runs/ablation_buffer/expanded_exp1/gp_warmup.jsonl
-  initial-operation-features: 5
+  buffer: ldm_runs/ablation_buffer/fixed_exp1/gp_warmup.jsonl
+  initial-operation-features: all
   max-active-operation-features: 0
-  disable-feature-expansion: false
+  disable-feature-expansion: true
   allow-new-feature-specs: false
   out-dir: ldm_runs
   run-name: "{name}"

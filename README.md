@@ -138,7 +138,7 @@ uv run prepare.py
 Fast local smoke run through the shared launcher:
 
 ```bash
-python scripts/run_ldm_tts.py config/nanogpt/mock_best_of_n.yaml
+uv run --project nanogpt python scripts/run_ldm_tts.py config/nanogpt/mock_best_of_n.yaml
 ```
 
 The mock config targets:
@@ -152,8 +152,20 @@ Real code-search runs usually target `nanogpt/ldm_task/real_train.py` or
 and evaluate candidates with:
 
 ```bash
---eval-command "uv run python {train_path}"
+--eval-command "uv run --project {repo_root}/nanogpt python {train_path}"
 ```
+
+The ready-to-run real configs are:
+
+```bash
+uv run --project nanogpt python scripts/run_ldm_tts.py config/nanogpt/real_operation_tool_best_of_n.yaml
+uv run --project nanogpt python scripts/run_ldm_tts.py config/nanogpt/real_operation_tool_fixed_best_of_n.yaml
+```
+
+Use `real_operation_tool_best_of_n.yaml` for dynamically expanded operation
+features, or `real_operation_tool_fixed_best_of_n.yaml` for the fixed full
+operation schema. Both keep the candidate evaluation command in config, so
+switching between run styles only requires choosing or editing YAML.
 
 For OpenAI-compatible LLM endpoints, configure `--llm-url`,
 `--llm-model-name`, and optionally `--api-key`.

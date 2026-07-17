@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 
-"""nanoGPT task workflow for the shared LDM-TTS config runner."""
+"""
+python TTS/run_expanded_search.py \
+    --train-file TTS/real_train.py \
+    --generator operation_tool \
+    --operation-schema TTS/operation_schema_real_train.json \
+    --method best_of_n \
+    --breadth 4 \
+    --depth 4 \
+    --iterations 100 \
+    --warmup 20  \
+    --seed-policy best  \
+    --buffer TTS/ablation_buffer/expanded_exp1/gp_warmup.jsonl  \
+    --out-dir TTS/runs/ablation_runs  \
+    --run-name expanded_ldm_bon_N4H4  \
+    --eval-command "uv run {train_path}"  \
+    --llm-url "http://127.0.0.1:52307/v1"  \
+    --llm-model-name "Qwen3-Coder-30B-A3B-Instruct"
+"""
 
 from __future__ import annotations
 
@@ -24,15 +41,8 @@ from typing import Any, Callable
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-_WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
-if str(_WORKSPACE_ROOT) not in sys.path:
-    sys.path.insert(0, str(_WORKSPACE_ROOT))
-
-from ldm_tts.scoring import as_float as shared_as_float
-from ldm_tts.scoring import is_finite_number
-
-from nanogpt.ldm_task.single_search import make_unique_run_dir, safe_path_tag
-from nanogpt.ldm_task.search_core import (
+from TTS.run_a_search_nanogpt import make_unique_run_dir, safe_path_tag
+from TTS.search_core import (
     DEFAULT_TASK_CONTEXT,
     ProgressBar,
     SearchConfig,
@@ -678,7 +688,7 @@ class OperationSearchEngine(SearchEngine):
                     for record in edit.get("applied_operations", [])
                     if isinstance(record, dict)
                 ]
-                state.status = "generated"
+            state.status = "generated"
         except Exception as exc:
             state.status = "generation_error"
             state.score = self.config.failure_score
@@ -728,7 +738,7 @@ class OperationSearchEngine(SearchEngine):
         if self.config.generator not in {"operation_tool", "operation_tool_plain_text"}:
             raise ValueError(f"OperationSearchEngine does not support generator {self.config.generator!r}.")
 
-        from nanogpt.ldm_task.api_generate import (
+        from TTS.api_generate import (
             add_usage,
             get_tool_call_arguments,
             get_tool_call_name,
@@ -846,8 +856,7 @@ class OperationSearchEngine(SearchEngine):
         raise ValueError(f"{last_error}\n{response[:2000]}")
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    argv = sys.argv[1:] if argv is None else argv
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Run iterative dynamically expanded model-based train.py search: start from "
@@ -950,7 +959,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--out-dir",
         type=Path,
         default=None,
-        help="Parent directory for model-based runs. Default: ldm_runs/model_based.",
+        help="Parent directory for model-based runs. Default: TTS/runs/model_based.",
     )
     parser.add_argument(
         "--resume-from",
@@ -1135,13 +1144,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--prior-score", type=float, default=1.0)
     parser.add_argument("--prior-std", type=float, default=0.15)
     parser.add_argument("--hash-dims", type=int, default=48)
-    args = parser.parse_args(argv)
-    args._explicit_options = explicit_options_from_argv(argv)
+    args = parser.parse_args()
+    args._explicit_options = explicit_options_from_argv(sys.argv[1:])
     return args
 
 
-async def async_main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
+async def async_main() -> int:
+    args = parse_args()
     project_root = args.project_root.resolve()
     resume_info = resolve_model_based_resume_info(args.resume_from, project_root) if args.resume_from is not None else None
     if resume_info is not None:
@@ -1161,7 +1170,7 @@ async def async_main(argv: list[str] | None = None) -> int:
     effective_method = resolve_search_method(args)
     args.effective_method = effective_method
     if resume_info is None:
-        out_parent_dir = project_root / "ldm_runs" / "model_based" if args.out_dir is None else args.out_dir
+        out_parent_dir = project_root / "TTS" / "runs" / "model_based" if args.out_dir is None else args.out_dir
         if not out_parent_dir.is_absolute():
             out_parent_dir = project_root / out_parent_dir
         run_name = safe_path_tag(args.run_name) if args.run_name.strip() else default_run_name(args, train_file)
@@ -1210,7 +1219,7 @@ async def async_main(argv: list[str] | None = None) -> int:
     if args.generator in OPERATION_GENERATORS and operation_schema is None:
         raise SystemExit(
             "--generator operation_tool/operation_tool_plain_text/operation_mock requires --operation-schema, "
-            "or a default ldm_task/operation_schema_real_train.json / ldm_task/operation_schema_mock_train.json."
+            "or a default TTS/operation_schema_real_train.json / TTS/operation_schema_mock_train.json."
         )
 
     generated_estimate = estimate_generated(args.breadth, args.depth, args.beam_width, effective_method)
@@ -4633,8 +4642,8 @@ def resolve_operation_schema(args: argparse.Namespace, project_root: Path) -> Op
         train_name = Path(args.train_file).name
         candidates = []
         if train_name == "mock_train.py":
-            candidates.append(project_root / "ldm_task" / "operation_schema_mock_train.json")
-        candidates.append(project_root / "ldm_task" / "operation_schema_real_train.json")
+            candidates.append(project_root / "TTS" / "operation_schema_mock_train.json")
+        candidates.append(project_root / "TTS" / "operation_schema_real_train.json")
         for candidate in candidates:
             if candidate.exists():
                 schema_path = candidate
@@ -5162,7 +5171,10 @@ def feature_dim(hash_dims: int) -> int:
 
 
 def finite_score(value: Any) -> bool:
-    return is_finite_number(value)
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
 
 
 def is_better(candidate: float | None, incumbent: float | None, *, minimize: bool) -> bool:
@@ -5174,7 +5186,11 @@ def is_better(candidate: float | None, incumbent: float | None, *, minimize: boo
 
 
 def as_float(value: Any) -> float | None:
-    return shared_as_float(value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
 
 
 def write_model_based_summary(
@@ -5218,8 +5234,8 @@ def write_model_based_summary(
     )
 
 
-def main(argv: list[str] | None = None) -> int:
-    return asyncio.run(async_main(argv))
+def main() -> int:
+    return asyncio.run(async_main())
 
 
 if __name__ == "__main__":

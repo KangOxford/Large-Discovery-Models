@@ -13,6 +13,11 @@ args:
   iterations: 2
   warmup: 1
   seed-policy: best
+  initial-operation-features: 5
+  max-active-operation-features: 0
+  disable-feature-expansion: false
+  allow-new-feature-specs: false
+  mock-expand-every: 0
   out-dir: ldm_runs
   run-name: "{name}"
   eval-command: "python {train_path}"

@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-
-"""nanoGPT task workflow for the shared LDM-TTS config runner."""
-
 from __future__ import annotations
 
 import argparse
@@ -19,20 +16,13 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-_WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
-if str(_WORKSPACE_ROOT) not in sys.path:
-    sys.path.insert(0, str(_WORKSPACE_ROOT))
-
-from ldm_tts.scoring import as_float as shared_as_float
-from ldm_tts.scoring import is_finite_number
-
-from nanogpt.ldm_task.single_search import make_unique_run_dir, safe_path_tag
-from nanogpt.ldm_task.search_core import (
+from TTS.run_a_search_nanogpt import make_unique_run_dir, safe_path_tag
+from TTS.search_core import (
     DEFAULT_TASK_CONTEXT,
     ProgressBar,
     SearchConfig,
@@ -52,10 +42,9 @@ GENERATORS = {
     "mock",
     "operation_mock",
     "operation_tool",
-    "operation_tool_plain_text",
     "tool_call",
 }
-OPERATION_GENERATORS = {"operation_mock", "operation_tool", "operation_tool_plain_text"}
+OPERATION_GENERATORS = {"operation_mock", "operation_tool"}
 SEARCH_METHOD_ALIASES = {
     "auto": "auto",
     "best_of_n": "best_of_n",
@@ -181,15 +170,6 @@ class ValidatedOperation:
 
 
 @dataclass
-class GeneratorAction:
-    kind: str
-    operations: list[ValidatedOperation] | None = None
-    feature: OperationParameter | None = None
-    rationale: str = ""
-    source: str = ""
-
-
-@dataclass
 class OperationApplyResult:
     text: str
     patch: str
@@ -208,37 +188,19 @@ class RunLogger:
 
 
 class ModelBasedProgress:
-    def __init__(
-        self,
-        *,
-        enabled: bool,
-        total: int,
-        width: int,
-        score_key: str,
-        minimize: bool,
-        feature_status: Callable[[], str] | None = None,
-    ):
+    def __init__(self, *, enabled: bool, total: int, width: int, score_key: str, minimize: bool):
         self.enabled = enabled and total > 0
         self.score_key = score_key
         self.minimize = minimize
-        self.feature_status = feature_status
         self.count = 0
         self.best_score: float | None = None
         self.bar = ProgressBar(total=total, label="model_based", width=width) if self.enabled else None
         if self.bar is not None:
-            self.bar.update(0, status=self._with_feature_status("starting"))
-
-    def _with_feature_status(self, message: str) -> str:
-        if self.feature_status is None:
-            return message
-        feature_text = self.feature_status().strip()
-        if not feature_text:
-            return message
-        return f"{message} {feature_text}" if message else feature_text
+            self.bar.update(0, status="starting")
 
     def status(self, message: str) -> None:
         if self.bar is not None:
-            self.bar.update(self.count, best_score=self.best_score, status=self._with_feature_status(message))
+            self.bar.update(self.count, best_score=self.best_score, status=message)
 
     def generated(self, state: SearchState) -> None:
         score = as_float(state.metrics.get("surrogate_score"))
@@ -258,11 +220,11 @@ class ModelBasedProgress:
         if self.bar is None:
             return
         self.count += 1
-        self.bar.update(self.count, best_score=self.best_score, status=self._with_feature_status(message))
+        self.bar.update(self.count, best_score=self.best_score, status=message)
 
     def finish(self, message: str = "done") -> None:
         if self.bar is not None:
-            self.bar.finish(self.count, best_score=self.best_score, status=self._with_feature_status(message))
+            self.bar.finish(self.count, best_score=self.best_score, status=message)
 
 
 class FeedbackMemory:
@@ -403,110 +365,10 @@ class FeedbackMemory:
 class OperationSearchEngine(SearchEngine):
     def __init__(self, config: SearchConfig, operation_schema: OperationSchema, args: argparse.Namespace):
         super().__init__(config)
-        self.args = args
-        self.full_operation_schema = operation_schema
-        self.operation_schema = initial_active_operation_schema(operation_schema, args)
+        self.operation_schema = operation_schema
         self.operation_retries = max(0, int(args.operation_retries))
         self.max_operations_per_step = max(1, int(args.max_operations_per_step))
-        self.allow_feature_expansion = bool(getattr(args, "allow_feature_expansion", True))
-        self.allow_new_feature_specs = bool(getattr(args, "allow_new_feature_specs", False))
-        requested_max_features = int(getattr(args, "max_active_operation_features", 0) or 0)
-        if requested_max_features <= 0:
-            self.max_active_operation_features = len(self.full_operation_schema.parameters)
-        else:
-            self.max_active_operation_features = max(1, requested_max_features)
-        if len(self.operation_schema.parameters) > self.max_active_operation_features:
-            raise ValueError(
-                f"Initial active feature count {len(self.operation_schema.parameters)} exceeds "
-                f"--max-active-operation-features={self.max_active_operation_features}."
-            )
-        self.expansion_history: list[dict[str, Any]] = []
-        self.current_iteration: int | None = None
         self._mock_counter = 0
-        self.args.operation_schema_object = self.operation_schema
-
-    def inactive_operation_schema(self) -> OperationSchema:
-        active = set(self.operation_schema.parameters)
-        inactive = {
-            name: parameter
-            for name, parameter in self.full_operation_schema.parameters.items()
-            if name not in active
-        }
-        return replace_operation_schema(
-            self.full_operation_schema,
-            inactive,
-            version_suffix="inactive",
-            description_prefix="Inactive operation-feature pool.",
-        )
-
-    def feature_expansion_available(self) -> bool:
-        if not self.allow_feature_expansion:
-            return False
-        if len(self.operation_schema.parameters) >= self.max_active_operation_features:
-            return False
-        return bool(self.inactive_operation_schema().parameters) or self.allow_new_feature_specs
-
-    def add_operation_feature(
-        self,
-        parameter: OperationParameter,
-        *,
-        source: str,
-        rationale: str = "",
-        iteration: int | None = None,
-        state_id: str | None = None,
-    ) -> bool:
-        name = canonical_name(parameter.name)
-        if name in self.operation_schema.parameters:
-            return False
-        if len(self.operation_schema.parameters) >= self.max_active_operation_features:
-            return False
-        parameter = normalize_operation_parameter(parameter)
-        parameters = dict(self.operation_schema.parameters)
-        parameters[name] = parameter
-        self.operation_schema = replace_operation_schema(
-            self.full_operation_schema,
-            parameters,
-            version_suffix="active",
-            description_prefix="Active dynamically expanded operation-feature subset.",
-        )
-        if name not in self.full_operation_schema.parameters:
-            full_parameters = dict(self.full_operation_schema.parameters)
-            full_parameters[name] = parameter
-            self.full_operation_schema = replace_operation_schema(
-                self.full_operation_schema,
-                full_parameters,
-                version_suffix="full",
-                description_prefix="Full operation-feature pool including proposed features.",
-            )
-        record = {
-            "name": name,
-            "kind": parameter.kind,
-            "source": source,
-            "rationale": rationale,
-            "iteration": iteration,
-            "state_id": state_id,
-            "active_feature_count": len(self.operation_schema.parameters),
-            "active_feature_names": list(self.operation_schema.parameters),
-            "feature_version": operation_feature_version(self.operation_schema),
-        }
-        self.expansion_history.append(record)
-        self.args.operation_schema_object = self.operation_schema
-        active_schema_path = self.config.out_dir / "active_operation_schema.json"
-        active_schema_path.write_text(
-            json.dumps(operation_schema_to_json(self.operation_schema), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        full_schema_path = self.config.out_dir / "operation_schema.json"
-        full_schema_path.write_text(
-            json.dumps(operation_schema_to_json(self.full_operation_schema), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        expansion_path = self.config.out_dir / "operation_feature_expansions.json"
-        expansion_path.write_text(
-            json.dumps(self.expansion_history, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        return True
 
     async def _generate_one(
         self,
@@ -538,7 +400,7 @@ class OperationSearchEngine(SearchEngine):
                     state.prompt_path = self._edit_artifact_path(state, "prompt", edit_index, num_edits, "md")
                     state.prompt_path.write_text(prompt, encoding="utf-8")
 
-                    action, response, token_usage, validation_log = await self._call_operation_generator(
+                    proposal, response, token_usage, validation_log = await self._call_operation_generator(
                         prompt,
                         current_text,
                     )
@@ -559,80 +421,34 @@ class OperationSearchEngine(SearchEngine):
                     state.response_path.write_text(response, encoding="utf-8")
                     state.llm_response, state.llm_response_truncated = self._inline_llm_response(response)
 
+                    apply_result = apply_operations_to_train_text(current_text, proposal, self.operation_schema)
                     operations_path = self._edit_artifact_path(state, "operations", edit_index, num_edits, "json")
-                    if action.kind == "feature":
-                        if action.feature is None:
-                            raise ValueError("feature action did not include a feature.")
-                        added = self.add_operation_feature(
-                            action.feature,
-                            source=action.source or self.config.generator,
-                            rationale=action.rationale,
-                            iteration=self.current_iteration,
-                            state_id=state.state_id,
-                        )
-                        if not added:
-                            raise ValueError(f"Operation feature {action.feature.name!r} could not be activated.")
-                        apply_result = OperationApplyResult(
-                            text=current_text,
-                            patch="",
-                            records=[
-                                {
-                                    "name": action.feature.name,
-                                    "op": "add_feature",
-                                    "old_value": None,
-                                    "new_value": operation_parameter_to_json(action.feature),
-                                    "rationale": action.rationale,
-                                    "line": None,
-                                }
-                            ],
-                        )
-                        operations_payload = {
-                            "summary": f"add operation feature {action.feature.name}",
-                            "schema_version": self.operation_schema.version,
-                            "active_feature_names": list(self.operation_schema.parameters),
-                            "full_schema_version": self.full_operation_schema.version,
-                            "max_operations_per_step": self.max_operations_per_step,
-                            "operations": [],
-                            "feature_action": operation_parameter_to_json(action.feature),
-                            "applied": apply_result.records,
-                            "validation_log": validation_log,
-                        }
-                        patch_text = (
-                            f"# operation feature activated: {action.feature.name}\n"
-                            f"# active_features: {', '.join(self.operation_schema.parameters)}\n"
-                        )
-                    else:
-                        proposal = action.operations or []
-                        apply_result = apply_operations_to_train_text(current_text, proposal, self.operation_schema)
-                        operations_payload = {
-                            "summary": operation_summary(proposal, apply_result.records),
-                            "schema_version": self.operation_schema.version,
-                            "active_feature_names": list(self.operation_schema.parameters),
-                            "full_schema_version": self.full_operation_schema.version,
-                            "max_operations_per_step": self.max_operations_per_step,
-                            "operations": [
-                                {
-                                    "name": op.name,
-                                    "op": op.op,
-                                    "value": op.value,
-                                    "rationale": op.rationale,
-                                }
-                                for op in proposal
-                            ],
-                            "applied": apply_result.records,
-                            "validation_log": validation_log,
-                        }
-                        patch_text = apply_result.patch
+                    operations_payload = {
+                        "summary": operation_summary(proposal, apply_result.records),
+                        "schema_version": self.operation_schema.version,
+                        "max_operations_per_step": self.max_operations_per_step,
+                        "operations": [
+                            {
+                                "name": op.name,
+                                "op": op.op,
+                                "value": op.value,
+                                "rationale": op.rationale,
+                            }
+                            for op in proposal
+                        ],
+                        "applied": apply_result.records,
+                        "validation_log": validation_log,
+                    }
                     operations_path.write_text(
                         json.dumps(operations_payload, indent=2, sort_keys=True) + "\n",
                         encoding="utf-8",
                     )
                     state.patch_path = self._edit_artifact_path(state, "patch", edit_index, num_edits, "diff")
-                    state.patch_path.write_text(patch_text, encoding="utf-8")
+                    state.patch_path.write_text(apply_result.patch, encoding="utf-8")
                     edit_record = {
                         "edit_index": edit_index,
                         "total_edits": num_edits,
-                        "description": operations_payload["summary"],
+                        "description": operation_summary(proposal, apply_result.records),
                         "prompt_path": str(state.prompt_path),
                         "response_path": str(state.response_path),
                         "patch_path": str(state.patch_path),
@@ -644,10 +460,8 @@ class OperationSearchEngine(SearchEngine):
                         "logprobs_path": None if logprobs_path is None else str(logprobs_path),
                         "logprob_summary": logprob_summary,
                         "edit_source": self.config.generator,
-                        "detected_edit_count": len(action.operations or []),
-                        "action_kind": action.kind,
+                        "detected_edit_count": len(proposal),
                         "operations": operations_payload["operations"],
-                        "feature_action": operations_payload.get("feature_action"),
                         "applied_operations": apply_result.records,
                         "status": "applied",
                     }
@@ -666,19 +480,13 @@ class OperationSearchEngine(SearchEngine):
                 )
                 state.description = state.description[:300]
                 state.metrics["operation_schema_version"] = self.operation_schema.version
-                state.metrics["operation_schema_feature_names"] = list(self.operation_schema.parameters)
-                state.metrics["operation_schema_feature_count"] = len(self.operation_schema.parameters)
-                state.metrics["operation_feature_expansions"] = list(self.expansion_history)
-                state.metrics["feature_only_action"] = bool(state.edits) and all(
-                    edit.get("action_kind") == "feature" for edit in state.edits
-                )
                 state.metrics["operations"] = [
                     record
                     for edit in state.edits
                     for record in edit.get("applied_operations", [])
                     if isinstance(record, dict)
                 ]
-                state.status = "generated"
+            state.status = "generated"
         except Exception as exc:
             state.status = "generation_error"
             state.score = self.config.failure_score
@@ -699,62 +507,43 @@ class OperationSearchEngine(SearchEngine):
         self,
         prompt: str,
         current_text: str,
-    ) -> tuple[GeneratorAction, str, Any, list[dict[str, Any]]]:
+    ) -> tuple[list[ValidatedOperation], str, Any, list[dict[str, Any]]]:
         if self.config.generator == "operation_mock":
-            action = make_mock_generator_action(current_text, self, self._mock_counter)
+            proposal = make_mock_operation_proposal(
+                current_text,
+                self.operation_schema,
+                self.max_operations_per_step,
+                self._mock_counter,
+            )
             self._mock_counter += 1
-            if action.kind == "feature" and action.feature is not None:
-                response_payload = {
-                    "summary": "mock dynamic feature proposal",
-                    "feature": operation_parameter_to_json(action.feature),
-                }
-            else:
-                response_payload = {
-                    "summary": "mock dynamic operation proposal",
-                    "operations": [
-                        {
-                            "name": op.name,
-                            "op": op.op,
-                            "value": op.value,
-                            "rationale": op.rationale,
-                        }
-                        for op in (action.operations or [])
-                    ],
-                }
+            response_payload = {
+                "summary": "mock fixed-dimension operation proposal",
+                "operations": [
+                    {
+                        "name": op.name,
+                        "op": op.op,
+                        "value": op.value,
+                        "rationale": op.rationale,
+                    }
+                    for op in proposal
+                ],
+            }
             response = json.dumps(response_payload, indent=2, sort_keys=True)
             validation_log = [{"attempt": 1, "status": "accepted", "source": "operation_mock"}]
-            return action, response, 0, validation_log
+            return proposal, response, 0, validation_log
 
-        if self.config.generator not in {"operation_tool", "operation_tool_plain_text"}:
+        if self.config.generator != "operation_tool":
             raise ValueError(f"OperationSearchEngine does not support generator {self.config.generator!r}.")
 
-        from nanogpt.ldm_task.api_generate import (
-            add_usage,
-            get_tool_call_arguments,
-            get_tool_call_name,
-            openai_compatible_chat_turn,
-            openai_compatible_generate,
-        )
-
-        plain_text_mode = self.config.generator == "operation_tool_plain_text"
-        plain_text_instruction = (
-            "\nIn this plain-text compatibility mode, native API tool calls may be unavailable. "
-            "If you cannot return a real tool call, output only one of these plain-text forms: "
-            "a raw JSON object with an operations array, or an <operation_tool_transcript> JSON "
-            "transcript containing one propose_train_operations/propose_operation_feature tool call."
-            if plain_text_mode
-            else ""
-        )
+        from TTS.api_generate import add_usage, get_tool_call_arguments, get_tool_call_name, openai_compatible_chat_turn
 
         messages = [
             {
                 "role": "system",
                 "content": (
-                    "You propose train.py search actions for a dynamically expanding "
-                    "operation-feature space. Call exactly one provided tool: either "
-                    "propose_train_operations to edit active features, or "
-                    "propose_operation_feature to activate a new feature."
-                    + plain_text_instruction
+                    "You propose fixed-dimension train.py operations. "
+                    "You must call the propose_train_operations tool. "
+                    "Do not propose arbitrary patches, new variables, or dimensions outside the schema."
                 ),
             },
             {"role": "user", "content": prompt},
@@ -765,62 +554,46 @@ class OperationSearchEngine(SearchEngine):
         last_error = "operation_tool did not return a valid proposal."
         attempts = 1 + self.operation_retries
         for attempt in range(1, attempts + 1):
-            if plain_text_mode:
-                content, usage = await openai_compatible_generate(
-                    messages,
-                    max_tokens=self.config.max_tokens,
-                    temperature=self.config.temperature,
-                    stop=self.config.stop,
-                    llm_url=self.config.llm_url,
-                    llm_model_name=self.config.llm_model_name,
-                    disable_thinking=self.config.disable_thinking,
-                    api_key=self.config.api_key,
-                    tools=None,
-                    tool_choice=None,
-                    logprobs=self.config.request_logprobs,
-                    top_logprobs=self.config.top_logprobs,
-                )
-                assistant_message = {"role": "assistant", "content": "" if content is None else str(content)}
-            else:
-                assistant_message, usage = await openai_compatible_chat_turn(
-                    messages,
-                    max_tokens=self.config.max_tokens,
-                    temperature=self.config.temperature,
-                    stop=self.config.stop,
-                    llm_url=self.config.llm_url,
-                    llm_model_name=self.config.llm_model_name,
-                    disable_thinking=self.config.disable_thinking,
-                    api_key=self.config.api_key,
-                    tools=make_dynamic_operation_tools(self),
-                    tool_choice="auto",
-                    logprobs=self.config.request_logprobs,
-                    top_logprobs=self.config.top_logprobs,
-                )
+            assistant_message, usage = await openai_compatible_chat_turn(
+                messages,
+                max_tokens=self.config.max_tokens,
+                temperature=self.config.temperature,
+                stop=self.config.stop,
+                llm_url=self.config.llm_url,
+                llm_model_name=self.config.llm_model_name,
+                disable_thinking=self.config.disable_thinking,
+                api_key=self.config.api_key,
+                tools=[make_operation_tool_schema(self.operation_schema, self.max_operations_per_step)],
+                tool_choice={"type": "function", "function": {"name": "propose_train_operations"}},
+                logprobs=self.config.request_logprobs,
+                top_logprobs=self.config.top_logprobs,
+            )
             total_usage = add_usage(total_usage, usage)
             messages.append(assistant_message)
             transcript.append(compact_operation_message_for_log(assistant_message))
             tool_calls = assistant_message.get("tool_calls") if isinstance(assistant_message, dict) else None
-            proposal_name = ""
             proposal_args: dict[str, Any] | None = None
             if isinstance(tool_calls, list):
                 for tool_call in tool_calls:
-                    tool_name = get_tool_call_name(tool_call)
-                    if tool_name in {"propose_train_operations", "propose_operation_feature"}:
-                        proposal_name = tool_name
+                    if get_tool_call_name(tool_call) == "propose_train_operations":
                         proposal_args = get_tool_call_arguments(tool_call)
                         break
             if proposal_args is None:
                 content = assistant_message.get("content") if isinstance(assistant_message, dict) else None
-                proposal_name, proposal_args = extract_dynamic_operation_json_from_text(content if isinstance(content, str) else "")
+                proposal_args = extract_operation_json_from_text(content if isinstance(content, str) else "")
             try:
-                action = validate_generator_action(proposal_name, proposal_args, self, current_text=current_text)
+                proposal = validate_operation_payload(
+                    proposal_args,
+                    self.operation_schema,
+                    max_operations=self.max_operations_per_step,
+                )
                 validation_log.append({"attempt": attempt, "status": "accepted"})
                 response = (
                     "<operation_tool_transcript>\n"
                     + json.dumps(transcript, indent=2, sort_keys=True)
                     + "\n</operation_tool_transcript>\n"
                 )
-                return action, response, total_usage, validation_log
+                return proposal, response, total_usage, validation_log
             except ValueError as exc:
                 last_error = str(exc)
                 validation_log.append({"attempt": attempt, "status": "rejected", "error": last_error})
@@ -831,10 +604,7 @@ class OperationSearchEngine(SearchEngine):
                             "content": (
                                 "The operation proposal was rejected: "
                                 f"{last_error}\n"
-                                "Call exactly one valid tool. Use propose_train_operations for active "
-                                "features or propose_operation_feature for one valid inactive feature. "
-                                "In plain-text mode, output only a raw JSON payload or a valid "
-                                "<operation_tool_transcript> block."
+                                "Call propose_train_operations again with only valid schema operations."
                             ),
                         }
                     )
@@ -846,14 +616,12 @@ class OperationSearchEngine(SearchEngine):
         raise ValueError(f"{last_error}\n{response[:2000]}")
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    argv = sys.argv[1:] if argv is None else argv
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run iterative dynamically expanded model-based train.py search: start from "
-            "a subset of operation features, let the LLM activate extra features during "
-            "search, score unevaluated states with a GP surrogate, evaluate selected "
-            "candidates, then add results to a reusable training buffer."
+            "Run iterative model-based train.py search: generate trees with LLM edits, "
+            "score unevaluated states with a GP surrogate, evaluate the selected final "
+            "candidate, then add the result to a reusable training buffer."
         ),
     )
     parser.add_argument(
@@ -950,7 +718,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--out-dir",
         type=Path,
         default=None,
-        help="Parent directory for model-based runs. Default: ldm_runs/model_based.",
+        help="Parent directory for model-based runs. Default: TTS/runs/model_based.",
     )
     parser.add_argument(
         "--resume-from",
@@ -1056,8 +824,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=None,
         help=(
-            "JSON schema containing the full operation-feature pool. Required for "
-            "--generator operation_tool, operation_tool_plain_text, or operation_mock."
+            "JSON schema for fixed-dimension operation search. Required for "
+            "--generator operation_tool or operation_mock."
         ),
     )
     parser.add_argument(
@@ -1075,42 +843,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--operation-features",
         action="store_true",
-        help="Use the active operation schema vector for GP features instead of generic code features.",
-    )
-    parser.add_argument(
-        "--initial-operation-features",
-        default="5",
-        help=(
-            "Initial active operation-feature subset. Use an integer count such as 5, "
-            "or comma-separated schema parameter names. Default: first 5 schema parameters."
-        ),
-    )
-    parser.add_argument(
-        "--max-active-operation-features",
-        type=int,
-        default=0,
-        help="Maximum active operation features after expansion. 0 means all features in the full schema.",
-    )
-    parser.add_argument(
-        "--disable-feature-expansion",
-        dest="allow_feature_expansion",
-        action="store_false",
-        help="Disable the propose_operation_feature action and keep the initial feature subset fixed.",
-    )
-    parser.set_defaults(allow_feature_expansion=True)
-    parser.add_argument(
-        "--allow-new-feature-specs",
-        action="store_true",
-        help=(
-            "Allow the LLM to propose a brand-new top-level assignment feature spec. "
-            "By default it may only activate inactive features already present in --operation-schema."
-        ),
-    )
-    parser.add_argument(
-        "--mock-expand-every",
-        type=int,
-        default=0,
-        help="For operation_mock tests, activate one inactive feature every N mock generations. 0 disables.",
+        help="Use the fixed operation schema vector for GP features instead of generic code features.",
     )
 
     parser.add_argument(
@@ -1135,13 +868,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--prior-score", type=float, default=1.0)
     parser.add_argument("--prior-std", type=float, default=0.15)
     parser.add_argument("--hash-dims", type=int, default=48)
-    args = parser.parse_args(argv)
-    args._explicit_options = explicit_options_from_argv(argv)
+    args = parser.parse_args()
+    args._explicit_options = explicit_options_from_argv(sys.argv[1:])
     return args
 
 
-async def async_main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
+async def async_main() -> int:
+    args = parse_args()
     project_root = args.project_root.resolve()
     resume_info = resolve_model_based_resume_info(args.resume_from, project_root) if args.resume_from is not None else None
     if resume_info is not None:
@@ -1151,17 +884,10 @@ async def async_main(argv: list[str] | None = None) -> int:
     if operation_schema is not None:
         args.operation_features = True
     args.operation_schema_object = operation_schema
-    if (
-        operation_schema is not None
-        and bool(getattr(args, "allow_feature_expansion", True))
-        and int(getattr(args, "concurrency", 1)) != 1
-    ):
-        print("warning: feature expansion uses global active schema; forcing --concurrency 1.", file=sys.stderr)
-        args.concurrency = 1
     effective_method = resolve_search_method(args)
     args.effective_method = effective_method
     if resume_info is None:
-        out_parent_dir = project_root / "ldm_runs" / "model_based" if args.out_dir is None else args.out_dir
+        out_parent_dir = project_root / "TTS" / "runs" / "model_based" if args.out_dir is None else args.out_dir
         if not out_parent_dir.is_absolute():
             out_parent_dir = project_root / out_parent_dir
         run_name = safe_path_tag(args.run_name) if args.run_name.strip() else default_run_name(args, train_file)
@@ -1197,7 +923,7 @@ async def async_main(argv: list[str] | None = None) -> int:
             encoding="utf-8",
         )
         logger.write(
-            f"operation_full_schema version={operation_schema.version} "
+            f"operation_schema version={operation_schema.version} "
             f"path={operation_schema.path} feature_dim={operation_feature_dim(operation_schema)}"
         )
     if resume_info is None or not buffer_snapshot_path.exists():
@@ -1209,8 +935,8 @@ async def async_main(argv: list[str] | None = None) -> int:
         logger.write(f"warning {warning}")
     if args.generator in OPERATION_GENERATORS and operation_schema is None:
         raise SystemExit(
-            "--generator operation_tool/operation_tool_plain_text/operation_mock requires --operation-schema, "
-            "or a default ldm_task/operation_schema_real_train.json / ldm_task/operation_schema_mock_train.json."
+            "--generator operation_tool/operation_mock requires --operation-schema, "
+            "or a default TTS/operation_schema_real_train.json / TTS/operation_schema_mock_train.json."
         )
 
     generated_estimate = estimate_generated(args.breadth, args.depth, args.beam_width, effective_method)
@@ -1256,20 +982,6 @@ async def async_main(argv: list[str] | None = None) -> int:
         engine: SearchEngine = OperationSearchEngine(config, operation_schema, args)
     else:
         engine = SearchEngine(config)
-    active_operation_schema = (
-        engine.operation_schema if isinstance(engine, OperationSearchEngine) else operation_schema
-    )
-    if isinstance(engine, OperationSearchEngine):
-        active_schema_out_path = out_dir / "active_operation_schema.json"
-        active_schema_out_path.write_text(
-            json.dumps(operation_schema_to_json(engine.operation_schema), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        logger.write(
-            f"operation_active_schema version={engine.operation_schema.version} "
-            f"features={list(engine.operation_schema.parameters)} "
-            f"feature_dim={operation_feature_dim(engine.operation_schema)}"
-        )
     feedback_path = resolve_feedback_path(args.feedback_tsv, project_root, out_dir)
     feedback_memory = FeedbackMemory(
         feedback_path,
@@ -1281,22 +993,20 @@ async def async_main(argv: list[str] | None = None) -> int:
         load_feedback_memory_rows(feedback_memory, feedback_path)
     engine.config.feedback_context = feedback_memory.prompt_context()
     logger.write(f"feedback path={feedback_path} max_rows={feedback_memory.max_rows}")
-    progress_feature_status: Callable[[], str] | None = None
-    if isinstance(engine, OperationSearchEngine):
-        def progress_feature_status() -> str:
-            schema = engine.operation_schema
-            return f"feature_dim={len(schema.parameters)} gp_dim={operation_feature_dim(schema)}"
-
     progress = ModelBasedProgress(
         enabled=not args.no_progress,
         total=total_progress,
         width=args.progress_width,
         score_key=args.score_key,
         minimize=not args.maximize,
-        feature_status=progress_feature_status,
     )
 
-    buffer_entries = load_projected_buffer(buffer_path, args, active_operation_schema)
+    buffer_entries = load_buffer(
+        buffer_path,
+        surrogate_feature_dim(args, operation_schema),
+        expected_feature_version=feature_version_for_args(args, operation_schema),
+        args=args,
+    )
     if resume_info is not None:
         load_existing_search_states(engine, out_dir)
         logger.write(f"loaded resume states={len(engine.states)} next_state_counter={engine._counter}")
@@ -1360,8 +1070,6 @@ async def async_main(argv: list[str] | None = None) -> int:
     for iteration in range(starting_iteration, starting_iteration + max(0, int(args.iterations))):
         if args.max_real_evaluations > 0 and real_evaluations >= args.max_real_evaluations:
             break
-        if isinstance(engine, OperationSearchEngine):
-            buffer_entries = project_buffer_entries(buffer_entries, engine.operation_schema, args)
         progress.status(
             f"iteration {iteration}/{starting_iteration + max(0, int(args.iterations)) - 1} "
             f"buffer={len(buffer_entries)} best={None if best_actual is None else best_actual.score}"
@@ -1410,16 +1118,10 @@ async def async_main(argv: list[str] | None = None) -> int:
     summary_args["resume_from"] = None if resume_info is None else str(resume_info["run_dir"])
     summary_args["continued_from_iteration"] = None if resume_info is None else starting_iteration - 1
     summary_args["additional_iterations_requested"] = max(0, int(args.iterations))
-    if isinstance(engine, OperationSearchEngine):
-        summary_args["operation_schema_version"] = engine.operation_schema.version
-        summary_args["operation_schema_path"] = None if engine.full_operation_schema.path is None else str(engine.full_operation_schema.path)
-        summary_args["operation_feature_version"] = operation_feature_version(engine.operation_schema)
-        summary_args["operation_full_schema_version"] = engine.full_operation_schema.version
-        summary_args["operation_schema_feature_names"] = list(engine.operation_schema.parameters)
-        summary_args["operation_schema_feature_count"] = len(engine.operation_schema.parameters)
-        summary_args["operation_schema_feature_dim"] = operation_feature_dim(engine.operation_schema)
-        summary_args["buffer_projection_mode"] = "reproject_jsonl_rows_to_active_operation_schema"
-        summary_args["operation_feature_expansions"] = list(engine.expansion_history)
+    if operation_schema is not None:
+        summary_args["operation_schema_version"] = operation_schema.version
+        summary_args["operation_schema_path"] = None if operation_schema.path is None else str(operation_schema.path)
+        summary_args["operation_feature_version"] = operation_feature_version(operation_schema)
     summary_args["run_name"] = run_name
     summary_args["run_parent_dir"] = str(out_parent_dir)
     summary_args["run_dir"] = str(out_dir)
@@ -1483,9 +1185,6 @@ async def run_iteration(
     previous_best_score: float | None,
     remaining_real_evaluations: int | None,
 ) -> dict[str, Any]:
-    if isinstance(engine, OperationSearchEngine):
-        engine.current_iteration = iteration
-        refresh_projected_buffer_entries(buffer_entries, engine.operation_schema, args)
     buffer_size_before = len(buffer_entries)
     surrogate = GPSurrogate(
         buffer_entries,
@@ -1566,25 +1265,13 @@ async def run_iteration(
         iteration=iteration,
         progress=progress,
     )
-    if isinstance(engine, OperationSearchEngine):
-        refresh_projected_buffer_entries(buffer_entries, engine.operation_schema, args)
     logger.write(
         f"iteration={iteration} generated={len(scored_states)} leaves={len(leaves)} "
         f"select_from={args.select_from}"
     )
 
     pool = leaves if args.select_from == "leaves" and leaves else scored_states
-    selectable = [
-        state
-        for state in pool
-        if state.metrics.get("surrogate_score") is not None and not state.metrics.get("feature_only_action")
-    ]
-    if not selectable and pool is not scored_states:
-        selectable = [
-            state
-            for state in scored_states
-            if state.metrics.get("surrogate_score") is not None and not state.metrics.get("feature_only_action")
-        ]
+    selectable = [state for state in pool if state.metrics.get("surrogate_score") is not None]
     selected = min(selectable, key=surrogate_sort_key) if selectable else None
     selected_surrogate_metrics = dict(selected.metrics) if selected is not None else {}
     if selected is not None:
@@ -1620,9 +1307,6 @@ async def run_iteration(
                         "feature_source_hash",
                         "extracted_params",
                         "operation_schema_version",
-                        "operation_schema_feature_names",
-                        "operation_schema_feature_count",
-                        "operation_feature_expansions",
                         "operations",
                     }
                 }
@@ -1695,8 +1379,6 @@ async def run_iteration(
         f"iteration {iteration} result {engine.config.score_key}={format_optional_float(selected_real_score)} "
         f"best={format_optional_float(best_after_iteration)} GP {format_gp_progress(gp_summary_after)}"
     )
-    if isinstance(engine, OperationSearchEngine):
-        engine.current_iteration = None
 
     return {
         "iteration": iteration,
@@ -2108,13 +1790,6 @@ async def expand_and_score(
     finally:
         engine.config.acquisition_context = previous_acquisition_context
     for child in children:
-        if isinstance(engine, OperationSearchEngine):
-            current_dim = operation_feature_dim(engine.operation_schema)
-            if len(surrogate.entries) > 0:
-                first_dim = len(surrogate.entries[0].feature_vector)
-                if first_dim != current_dim:
-                    surrogate.entries = project_buffer_entries(surrogate.entries, engine.operation_schema, args)
-                    surrogate._fit()
         score_with_surrogate(engine, child, surrogate, args, iteration=iteration)
         progress.generated(child)
     return children
@@ -2498,8 +2173,6 @@ def score_with_surrogate(
     )
     if operation_schema is not None:
         state.metrics["operation_schema_version"] = operation_schema.version
-        state.metrics["operation_schema_feature_names"] = list(operation_schema.parameters)
-        state.metrics["operation_schema_feature_count"] = len(operation_schema.parameters)
     state.status = "surrogate_scored"
     write_state_update(engine, state)
 
@@ -2569,147 +2242,6 @@ def load_operation_schema(path: Path, project_root: Path) -> OperationSchema:
 
 def operation_feature_version(schema: OperationSchema) -> str:
     return f"operation_schema:{schema.version}"
-
-
-def operation_schema_signature(schema: OperationSchema) -> str:
-    return hashlib.sha1(
-        json.dumps(operation_schema_to_json(schema), sort_keys=True).encode("utf-8")
-    ).hexdigest()[:12]
-
-
-def replace_operation_schema(
-    base: OperationSchema,
-    parameters: dict[str, OperationParameter],
-    *,
-    version_suffix: str,
-    description_prefix: str,
-) -> OperationSchema:
-    ordered = {canonical_name(name): normalize_operation_parameter(parameter) for name, parameter in parameters.items()}
-    payload = {
-        "base_version": base.version,
-        "parameter_order": list(ordered),
-        "parameters": {name: operation_parameter_to_json(parameter) for name, parameter in ordered.items()},
-    }
-    digest = hashlib.sha1(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:12]
-    description = f"{description_prefix} {base.description}".strip()
-    return OperationSchema(
-        version=f"{base.version}:{version_suffix}:{digest}",
-        description=description,
-        parameters=ordered,
-        path=base.path,
-    )
-
-
-def initial_active_operation_schema(full_schema: OperationSchema, args: argparse.Namespace) -> OperationSchema:
-    names = initial_operation_feature_names(full_schema, str(getattr(args, "initial_operation_features", "5") or "5"))
-    parameters = {name: full_schema.parameters[name] for name in names}
-    return replace_operation_schema(
-        full_schema,
-        parameters,
-        version_suffix="active",
-        description_prefix="Active dynamically expanded operation-feature subset.",
-    )
-
-
-def initial_operation_feature_names(full_schema: OperationSchema, spec: str) -> list[str]:
-    names = list(full_schema.parameters)
-    text = str(spec or "").strip()
-    if not text or text.lower() == "all":
-        return names
-    if re.fullmatch(r"\d+", text):
-        count = max(1, min(len(names), int(text)))
-        return names[:count]
-    selected: list[str] = []
-    for raw_name in text.split(","):
-        name = canonical_name(raw_name)
-        if not name:
-            continue
-        if name not in full_schema.parameters:
-            raise ValueError(f"Unknown initial operation feature {raw_name!r}.")
-        if name not in selected:
-            selected.append(name)
-    if not selected:
-        raise ValueError("--initial-operation-features did not select any schema parameters.")
-    return selected
-
-
-def normalize_operation_parameter(parameter: OperationParameter) -> OperationParameter:
-    name = canonical_name(parameter.name)
-    kind = str(parameter.kind).strip().lower()
-    if kind not in {"int", "float", "choice"}:
-        raise ValueError(f"Parameter {name} has unsupported type {kind!r}.")
-    choices = tuple(parameter.choices)
-    min_value = parameter.min_value
-    max_value = parameter.max_value
-    if kind == "choice":
-        if not choices:
-            raise ValueError(f"Choice parameter {name} must define choices.")
-        min_value = None
-        max_value = None
-    else:
-        min_value = as_float(min_value)
-        max_value = as_float(max_value)
-        if min_value is None or max_value is None or min_value > max_value:
-            raise ValueError(f"Numeric parameter {name} must define valid min/max values.")
-    scale = str(parameter.scale or "linear").strip().lower()
-    if scale not in {"linear", "log"}:
-        raise ValueError(f"Parameter {name} has unsupported scale {scale!r}.")
-    if scale == "log" and kind != "choice" and (
-        min_value is None or min_value <= 0 or max_value is None or max_value <= 0
-    ):
-        raise ValueError(f"Log-scaled parameter {name} must have positive min/max.")
-    return OperationParameter(
-        name=name,
-        kind=kind,
-        min_value=min_value,
-        max_value=max_value,
-        choices=choices,
-        scale=scale,
-    )
-
-
-def operation_parameter_to_json(parameter: OperationParameter) -> dict[str, Any]:
-    parameter = normalize_operation_parameter(parameter)
-    if parameter.kind == "choice":
-        return {
-            "name": parameter.name,
-            "type": "choice",
-            "choices": list(parameter.choices),
-        }
-    return {
-        "name": parameter.name,
-        "type": parameter.kind,
-        "min": parameter.min_value,
-        "max": parameter.max_value,
-        "scale": parameter.scale,
-    }
-
-
-def operation_parameter_from_payload(payload: Any) -> OperationParameter:
-    if not isinstance(payload, dict):
-        raise ValueError("feature payload must be an object.")
-    name = canonical_name(str(payload.get("name") or payload.get("parameter") or ""))
-    if not name:
-        raise ValueError("feature payload must include a non-empty name.")
-    kind = str(payload.get("type") or payload.get("kind") or "").strip().lower()
-    if kind == "numeric":
-        kind = "float"
-    if kind == "choice":
-        choices = payload.get("choices")
-        if not isinstance(choices, list) or not choices:
-            raise ValueError(f"Choice feature {name} must include non-empty choices.")
-        parameter = OperationParameter(name=name, kind="choice", choices=tuple(choices))
-    else:
-        if kind not in {"int", "float"}:
-            raise ValueError(f"Feature {name} has unsupported type {kind!r}.")
-        parameter = OperationParameter(
-            name=name,
-            kind=kind,
-            min_value=as_float(payload.get("min")),
-            max_value=as_float(payload.get("max")),
-            scale=str(payload.get("scale") or "linear"),
-        )
-    return normalize_operation_parameter(parameter)
 
 
 def operation_feature_dim(schema: OperationSchema) -> int:
@@ -2820,8 +2352,8 @@ def make_operation_tool_schema(schema: OperationSchema, max_operations: int) -> 
         "function": {
             "name": "propose_train_operations",
             "description": (
-                "Propose active-feature edits to train.py. Only use the allowed parameter names "
-                "and value ranges from the active schema. Do not propose arbitrary code patches."
+                "Propose fixed-dimension edits to train.py. Only use the allowed parameter names "
+                "and value ranges from the schema. Do not propose arbitrary code patches."
             ),
             "parameters": {
                 "type": "object",
@@ -2867,73 +2399,6 @@ def make_operation_tool_schema(schema: OperationSchema, max_operations: int) -> 
     }
 
 
-def make_dynamic_operation_tools(engine: OperationSearchEngine) -> list[dict[str, Any]]:
-    tools = [make_operation_tool_schema(engine.operation_schema, engine.max_operations_per_step)]
-    if not engine.feature_expansion_available():
-        return tools
-    inactive_schema = engine.inactive_operation_schema()
-    inactive_names = list(inactive_schema.parameters)
-    properties: dict[str, Any] = {
-        "name": {
-            "type": "string",
-            "description": "Inactive schema parameter name to activate as a new GP/search feature.",
-        },
-        "rationale": {
-            "type": "string",
-            "description": "Short reason this additional feature should now be searchable.",
-        },
-    }
-    if inactive_names:
-        properties["name"]["enum"] = inactive_names
-    if engine.allow_new_feature_specs:
-        properties.update(
-            {
-                "type": {
-                    "type": "string",
-                    "enum": ["int", "float", "choice"],
-                    "description": "Required only for brand-new feature specs not already in the inactive schema.",
-                },
-                "min": {
-                    "type": "number",
-                    "description": "Minimum for int/float brand-new features.",
-                },
-                "max": {
-                    "type": "number",
-                    "description": "Maximum for int/float brand-new features.",
-                },
-                "scale": {
-                    "type": "string",
-                    "enum": ["linear", "log"],
-                    "description": "Numeric scaling for brand-new features.",
-                },
-                "choices": {
-                    "type": "array",
-                    "description": "Allowed values for choice brand-new features.",
-                    "items": {},
-                },
-            }
-        )
-    tools.append(
-        {
-            "type": "function",
-            "function": {
-                "name": "propose_operation_feature",
-                "description": (
-                    "Activate one additional operation feature dimension for later GP scoring. "
-                    "Prefer inactive schema parameters. This action does not edit train.py by itself."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": properties,
-                    "required": ["name"],
-                    "additionalProperties": bool(engine.allow_new_feature_specs),
-                },
-            },
-        }
-    )
-    return tools
-
-
 def build_operation_prompt(
     engine: OperationSearchEngine,
     parent: SearchState,
@@ -2969,21 +2434,6 @@ def build_operation_prompt(
                 f"- {parameter.name}: {parameter.kind} in [{parameter.min_value}, {parameter.max_value}] "
                 f"scale={parameter.scale}; operation=set_numeric"
             )
-    inactive_schema = engine.inactive_operation_schema()
-    inactive_lines = []
-    for parameter in inactive_schema.parameters.values():
-        current_value = current_values.get(parameter.name, "<missing>")
-        if parameter.kind == "choice":
-            inactive_lines.append(
-                f"- {parameter.name}: choice in {list(parameter.choices)!r}; current={current_value!r}"
-            )
-        else:
-            inactive_lines.append(
-                f"- {parameter.name}: {parameter.kind} in [{parameter.min_value}, {parameter.max_value}] "
-                f"scale={parameter.scale}; current={current_value!r}"
-            )
-    if not inactive_lines:
-        inactive_lines.append("- No inactive schema features remain.")
     history_lines = []
     for state in engine.ranked_states()[:8]:
         direction = "lower is better" if engine.config.minimize else "higher is better"
@@ -3017,13 +2467,7 @@ def build_operation_prompt(
     )
     task_context = engine.config.task_context.strip()
     task_context_block = "\nProject and benchmark context:\n" + task_context + "\n" if task_context else ""
-    expansion_instruction = (
-        "- Or expand the feature space: call `propose_operation_feature` to activate one inactive feature dimension. "
-        "Use this when the current active feature set is too narrow for the next useful search move.\n"
-        if engine.feature_expansion_available()
-        else "- Feature expansion is unavailable; choose only active-operation edits.\n"
-    )
-    return f"""We are doing dynamically expanded model-based search over `train.py`.
+    return f"""We are doing fixed-dimension model-based search over `train.py`.
 
 Search state:
 - Parent state: {parent.state_id}
@@ -3037,22 +2481,17 @@ Search state:
 Objective:
 - Improve `{engine.config.score_key}` after executing the script.
 - The metric is lower-is-better unless the run says otherwise.
-- You may edit only active top-level assignments whose names appear in the active schema below.
-- Values must stay inside the active schema range or choice set.
-- The GP currently sees only active operation features. Activating an inactive feature expands the GP feature vector for later candidates.
+- You are not allowed to invent new dimensions, variables, files, imports, functions, or free-form patches.
+- You may only set existing top-level assignments whose names appear in the schema below.
+- Values must stay inside the schema range or choice set.
 
-Active operation schema version: {schema.version}
-Active feature count: {len(schema.parameters)}
-Active features: {", ".join(schema.parameters)}
+Operation schema version: {schema.version}
 {schema.description}
 
-Active edit operations:
+Allowed operations:
 {chr(10).join(schema_lines)}
 
-Inactive features available for expansion:
-{chr(10).join(inactive_lines)}
-
-Current active schema values:
+Current schema values:
 ```json
 {json.dumps(schema_values, indent=2, sort_keys=True)}
 ```
@@ -3068,9 +2507,8 @@ Recent real evaluated states:
 {acquisition_context}
 {extra_instruction}
 Return format:
-- Choose exactly one action: either stick with the current active feature space or expand it.
-- To stick with the current active feature space and edit train.py, call `propose_train_operations` with 1 to {engine.max_operations_per_step} operations.
-{expansion_instruction.rstrip()}
+- Call the `propose_train_operations` tool exactly once.
+- Include 1 to {engine.max_operations_per_step} operations.
 - Use `set_numeric` for int/float schema parameters and `set_choice` for choice parameters.
 - Do not output SEARCH/REPLACE blocks or unified diffs; the runner will apply valid operations deterministically.
 
@@ -3106,236 +2544,46 @@ def compact_operation_message_for_log(message: dict[str, Any]) -> dict[str, Any]
     return compact
 
 
-OPERATION_TOOL_NAMES = {"propose_train_operations", "propose_operation_feature"}
-
-
 def extract_operation_json_from_text(text: str) -> dict[str, Any] | None:
-    _tool_name, payload = extract_operation_tool_payload_from_text(text)
-    if isinstance(payload, dict):
-        return payload
-    return None
-
-
-def extract_dynamic_operation_json_from_text(text: str) -> tuple[str, dict[str, Any] | None]:
-    tool_name, payload = extract_operation_tool_payload_from_text(text)
-    if not isinstance(payload, dict):
-        return "", None
-    if tool_name in OPERATION_TOOL_NAMES:
-        return tool_name, payload
-    if "operations" in payload:
-        return "propose_train_operations", payload
-    if "feature" in payload or "name" in payload or "parameter" in payload:
-        return "propose_operation_feature", payload
-    return "", payload
-
-
-def extract_operation_tool_payload_from_text(text: str, *, _depth: int = 0) -> tuple[str, dict[str, Any] | None]:
-    if not isinstance(text, str) or not text.strip() or _depth > 6:
-        return "", None
-    for loaded in operation_json_candidates(text):
-        tool_name, payload = extract_operation_tool_payload_from_json(loaded, _depth=_depth + 1)
-        if isinstance(payload, dict):
-            return tool_name, payload
-    return "", None
-
-
-def operation_json_candidates(text: str) -> list[Any]:
-    candidates: list[str] = []
-    candidates.append(text.strip())
-    candidates.extend(candidate.strip() for candidate in re.findall(r"```(?:json)?\s*(.*?)```", text, flags=re.DOTALL | re.IGNORECASE))
-    for tag in ("tool_calls", "operation_tool_transcript"):
-        greedy = re.search(rf"<{tag}>\s*(.*)\s*</{tag}>", text, flags=re.DOTALL)
-        if greedy:
-            candidates.append(greedy.group(1).strip())
-        candidates.extend(
-            candidate.strip()
-            for candidate in re.findall(rf"<{tag}>\s*(.*?)\s*</{tag}>", text, flags=re.DOTALL)
-        )
-
-    loaded: list[Any] = []
-    seen_candidates: set[str] = set()
-    decoder = json.JSONDecoder()
+    if not text.strip():
+        return None
+    tool_call_match = re.search(r"<tool_calls>\s*(.*?)\s*</tool_calls>", text, flags=re.DOTALL)
+    if tool_call_match:
+        try:
+            tool_calls = json.loads(tool_call_match.group(1))
+        except json.JSONDecodeError:
+            tool_calls = None
+        if isinstance(tool_calls, list):
+            for tool_call in tool_calls:
+                if not isinstance(tool_call, dict):
+                    continue
+                name = tool_call.get("name")
+                function = tool_call.get("function")
+                if isinstance(function, dict):
+                    name = function.get("name") or name
+                    arguments = function.get("arguments")
+                else:
+                    arguments = tool_call.get("arguments")
+                if name != "propose_train_operations":
+                    continue
+                if isinstance(arguments, str):
+                    try:
+                        arguments = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        continue
+                if isinstance(arguments, dict):
+                    return arguments
+    candidates = [text.strip()]
+    fenced = re.findall(r"```(?:json)?\s*(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
+    candidates.extend(candidate.strip() for candidate in fenced)
     for candidate in candidates:
-        if not candidate or candidate in seen_candidates:
-            continue
-        seen_candidates.add(candidate)
         try:
-            loaded.append(json.loads(candidate))
-        except json.JSONDecodeError:
-            pass
-
-    # Last resort: scan embedded JSON values. This handles text wrappers such as
-    # <operation_tool_transcript>[...]</operation_tool_transcript> and partial prose.
-    seen_spans: set[tuple[int, int]] = set()
-    for match in re.finditer(r"[\[{]", text):
-        start = match.start()
-        try:
-            value, end = decoder.raw_decode(text[start:])
+            loaded = json.loads(candidate)
         except json.JSONDecodeError:
             continue
-        span = (start, start + end)
-        if span in seen_spans:
-            continue
-        seen_spans.add(span)
-        loaded.append(value)
-    return loaded
-
-
-def extract_operation_tool_payload_from_json(value: Any, *, _depth: int = 0) -> tuple[str, dict[str, Any] | None]:
-    if _depth > 6:
-        return "", None
-    if isinstance(value, list):
-        for item in value:
-            tool_name, payload = unpack_plain_operation_tool_call(item)
-            normalized_payload = normalize_operation_alias_payload(payload)
-            if tool_name in OPERATION_TOOL_NAMES and isinstance(normalized_payload, dict):
-                return tool_name, normalized_payload
-            if tool_name == "edit_train_py" and isinstance(normalized_payload, dict):
-                return "propose_train_operations", normalized_payload
-        for item in value:
-            tool_name, payload = extract_operation_tool_payload_from_json(item, _depth=_depth + 1)
-            if isinstance(payload, dict):
-                return tool_name, payload
-        return "", None
-    if not isinstance(value, dict):
-        return "", None
-
-    tool_name, payload = unpack_plain_operation_tool_call(value)
-    normalized_payload = normalize_operation_alias_payload(payload)
-    if tool_name in OPERATION_TOOL_NAMES and isinstance(normalized_payload, dict):
-        return tool_name, normalized_payload
-    if tool_name == "edit_train_py" and isinstance(normalized_payload, dict):
-        return "propose_train_operations", normalized_payload
-    normalized_value = normalize_operation_alias_payload(value)
-    if isinstance(normalized_value, dict):
-        return "propose_train_operations", normalized_value
-    if isinstance(value.get("tool_calls"), list):
-        tool_name, payload = extract_operation_tool_payload_from_json(value["tool_calls"], _depth=_depth + 1)
-        if isinstance(payload, dict):
-            return tool_name, payload
-
-    content = value.get("content")
-    if isinstance(content, str):
-        tool_name, payload = extract_operation_tool_payload_from_text(content, _depth=_depth + 1)
-        if isinstance(payload, dict):
-            return tool_name, payload
-    elif isinstance(content, list):
-        tool_name, payload = extract_operation_tool_payload_from_json(content, _depth=_depth + 1)
-        if isinstance(payload, dict):
-            return tool_name, payload
-
-    for key in ("message", "delta", "choices", "messages"):
-        if key in value:
-            tool_name, payload = extract_operation_tool_payload_from_json(value[key], _depth=_depth + 1)
-            if isinstance(payload, dict):
-                return tool_name, payload
-
-    if "feature" in value or "parameter" in value or (
-        "name" in value and "op" not in value and "role" not in value and "tool_calls" not in value
-    ):
-        return "", value
-    return "", None
-
-
-def normalize_operation_alias_payload(payload: Any) -> dict[str, Any] | None:
-    if not isinstance(payload, dict):
-        return None
-    if isinstance(payload.get("operations"), list):
-        return payload
-    edits = payload.get("edits")
-    if not isinstance(edits, list) or not edits:
-        return None
-    for edit in edits:
-        if not isinstance(edit, dict) or not {"name", "op", "value"}.issubset(edit):
-            return None
-    normalized = dict(payload)
-    normalized["operations"] = edits
-    return normalized
-
-
-def unpack_plain_operation_tool_call(tool_call: Any) -> tuple[str, dict[str, Any] | None]:
-    if not isinstance(tool_call, dict):
-        return "", None
-    function = tool_call.get("function")
-    name = tool_call.get("name")
-    arguments = tool_call.get("arguments")
-    if isinstance(function, dict):
-        name = function.get("name") or name
-        arguments = function.get("arguments") if function.get("arguments") is not None else arguments
-    if isinstance(arguments, str):
-        try:
-            arguments = json.loads(arguments)
-        except json.JSONDecodeError:
-            return str(name or ""), None
-    if isinstance(arguments, dict):
-        return str(name or ""), arguments
-    return str(name or ""), None
-
-
-def validate_generator_action(
-    tool_name: str,
-    payload: Any,
-    engine: OperationSearchEngine,
-    *,
-    current_text: str,
-) -> GeneratorAction:
-    if tool_name == "propose_operation_feature":
-        parameter, rationale = validate_feature_payload(payload, engine, current_text=current_text)
-        return GeneratorAction(
-            kind="feature",
-            feature=parameter,
-            rationale=rationale,
-            source="propose_operation_feature",
-        )
-    if tool_name in {"", "propose_train_operations"}:
-        proposal = validate_operation_payload(
-            payload,
-            engine.operation_schema,
-            max_operations=engine.max_operations_per_step,
-        )
-        return GeneratorAction(kind="operations", operations=proposal, source="propose_train_operations")
-    raise ValueError(f"unknown tool {tool_name!r}; expected propose_train_operations or propose_operation_feature.")
-
-
-def validate_feature_payload(
-    payload: Any,
-    engine: OperationSearchEngine,
-    *,
-    current_text: str,
-) -> tuple[OperationParameter, str]:
-    if not isinstance(payload, dict):
-        raise ValueError("feature payload must be an object.")
-    raw_feature = payload.get("feature") if isinstance(payload.get("feature"), dict) else payload
-    if not isinstance(raw_feature, dict):
-        raise ValueError("feature payload must include a feature object or fields.")
-    name = canonical_name(str(raw_feature.get("name") or raw_feature.get("parameter") or payload.get("name") or ""))
-    if not name:
-        raise ValueError("feature payload must include a non-empty name.")
-    if name in engine.operation_schema.parameters:
-        raise ValueError(f"feature {name} is already active.")
-    if len(engine.operation_schema.parameters) >= engine.max_active_operation_features:
-        raise ValueError("active feature limit has already been reached.")
-    inactive = engine.inactive_operation_schema().parameters
-    rationale = str(raw_feature.get("rationale") or payload.get("rationale") or "").strip()
-    if name in inactive:
-        return inactive[name], rationale
-    if not engine.allow_new_feature_specs:
-        raise ValueError(f"feature {name} is not in the inactive schema feature pool.")
-    parameter = operation_parameter_from_payload(raw_feature)
-    values = extract_top_level_assignment_values(current_text)
-    if parameter.name not in values:
-        raise ValueError(
-            f"new feature {parameter.name} is not a literal top-level assignment in current train.py."
-        )
-    current_value = values.get(parameter.name)
-    if parameter.kind == "choice":
-        validate_operation_value(current_value, parameter, index=1)
-    else:
-        value = as_float(current_value)
-        if value is None:
-            raise ValueError(f"new numeric feature {parameter.name} has no numeric current value.")
-        validate_operation_value(value, parameter, index=1)
-    return parameter, rationale
+        if isinstance(loaded, dict):
+            return loaded
+    return None
 
 
 def validate_operation_payload(
@@ -3618,35 +2866,6 @@ def make_mock_operation_proposal(
     raise ValueError("operation_mock could not find any valid operation to apply.")
 
 
-def make_mock_generator_action(
-    text: str,
-    engine: OperationSearchEngine,
-    counter: int,
-) -> GeneratorAction:
-    expand_every = max(0, int(getattr(engine.args, "mock_expand_every", 0) or 0))
-    if expand_every > 0 and counter > 0 and counter % expand_every == 0 and engine.feature_expansion_available():
-        inactive = list(engine.inactive_operation_schema().parameters.values())
-        if inactive:
-            parameter = inactive[(counter // expand_every - 1) % len(inactive)]
-            return GeneratorAction(
-                kind="feature",
-                feature=parameter,
-                rationale="Mock dynamic feature expansion.",
-                source="operation_mock",
-            )
-    operations = make_mock_operation_proposal(
-        text,
-        engine.operation_schema,
-        engine.max_operations_per_step,
-        counter,
-    )
-    return GeneratorAction(
-        kind="operations",
-        operations=operations,
-        source="operation_mock",
-    )
-
-
 def resolve_warmup_strategy(args: argparse.Namespace, engine: SearchEngine) -> str:
     strategy = str(args.warmup_strategy)
     if strategy == "auto":
@@ -3735,8 +2954,6 @@ def create_random_operation_warmup_state(
             "warmup_index": warmup_index,
             "warmup_strategy": "random_operation",
             "operation_schema_version": engine.operation_schema.version,
-            "operation_schema_feature_names": list(engine.operation_schema.parameters),
-            "operation_schema_feature_count": len(engine.operation_schema.parameters),
             "operations": apply_result.records,
         }
     )
@@ -3934,10 +3151,6 @@ class GPSurrogate:
 
     def _fit(self) -> None:
         np = require_numpy()
-        self.ready = False
-        self.fit_status = "prior" if not self.entries else "fallback"
-        self.fit_error = None
-        self.fit_metrics = {}
         if len(self.entries) < 2:
             scores = [entry.score for entry in self.entries]
             self.fit_metrics = {
@@ -4231,171 +3444,6 @@ def load_buffer(
     return entries
 
 
-def load_projected_buffer(
-    path: Path,
-    args: argparse.Namespace,
-    schema: OperationSchema | None,
-) -> list[BufferEntry]:
-    if not use_operation_features(args, schema):
-        return load_buffer(
-            path,
-            surrogate_feature_dim(args, schema),
-            expected_feature_version=feature_version_for_args(args, schema),
-            args=args,
-        )
-    assert schema is not None
-    raw_entries = load_raw_buffer(path, args=args)
-    return project_buffer_entries(raw_entries, schema, args)
-
-
-def load_raw_buffer(path: Path, *, args: argparse.Namespace | None = None) -> list[BufferEntry]:
-    if not path.exists():
-        return []
-    entries: list[BufferEntry] = []
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return []
-    for line in lines:
-        if not line.strip():
-            continue
-        try:
-            data = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        entry = parse_raw_buffer_entry(data, args=args)
-        if entry is not None:
-            entries.append(entry)
-    return entries
-
-
-def parse_raw_buffer_entry(data: Any, *, args: argparse.Namespace | None = None) -> BufferEntry | None:
-    if not isinstance(data, dict):
-        return None
-    score = as_float(data.get("score"))
-    metrics = data.get("metrics") if isinstance(data.get("metrics"), dict) else {}
-    if not should_use_score_for_gp(
-        score,
-        status=str(metrics.get("status") or data.get("status") or ""),
-        metrics=metrics,
-        args=args,
-    ):
-        return None
-    vector = data.get("feature_vector")
-    try:
-        feature_vector = [float(value) for value in vector] if isinstance(vector, list) else []
-    except (TypeError, ValueError):
-        feature_vector = []
-    assert score is not None
-    return BufferEntry(
-        score=score,
-        feature_vector=feature_vector,
-        feature_version=str(data.get("feature_version") or ""),
-        source_hash=str(data.get("source_hash") or ""),
-        params=data.get("params") if isinstance(data.get("params"), dict) else {},
-        metrics=metrics,
-        state_id=str(data.get("state_id") or ""),
-        iteration=int(data.get("iteration") or 0),
-        train_path=str(data.get("train_path") or ""),
-        run_name=str(data.get("run_name") or ""),
-    )
-
-
-def project_buffer_entries(
-    entries: list[BufferEntry],
-    schema: OperationSchema,
-    args: argparse.Namespace,
-) -> list[BufferEntry]:
-    projected: list[BufferEntry] = []
-    expected_dim = operation_feature_dim(schema)
-    expected_version = operation_feature_version(schema)
-    for entry in entries:
-        features = features_for_buffer_entry(entry, schema, args)
-        if features is None:
-            continue
-        if len(features.vector) != expected_dim:
-            continue
-        metrics = dict(entry.metrics)
-        metrics["feature_projected_from_version"] = entry.feature_version
-        metrics["feature_projected_to_version"] = expected_version
-        projected.append(
-            BufferEntry(
-                score=entry.score,
-                feature_vector=features.vector,
-                feature_version=expected_version,
-                source_hash=features.source_hash,
-                params=features.params,
-                metrics=metrics,
-                state_id=entry.state_id,
-                iteration=entry.iteration,
-                train_path=entry.train_path,
-                run_name=entry.run_name,
-            )
-        )
-    return projected
-
-
-def refresh_projected_buffer_entries(
-    entries: list[BufferEntry],
-    schema: OperationSchema,
-    args: argparse.Namespace,
-) -> None:
-    projected = project_buffer_entries(entries, schema, args)
-    entries[:] = projected
-
-
-def features_for_buffer_entry(
-    entry: BufferEntry,
-    schema: OperationSchema,
-    args: argparse.Namespace,
-) -> Features | None:
-    train_path = resolve_entry_train_path(entry.train_path, args)
-    if train_path is not None and train_path.exists():
-        try:
-            return featurize_operation_schema(train_path, schema)
-        except OSError:
-            pass
-    if isinstance(entry.params, dict) and entry.params:
-        return featurize_operation_params(entry.params, schema, source_hash=entry.source_hash)
-    expected_version = operation_feature_version(schema)
-    if entry.feature_version == expected_version and len(entry.feature_vector) == operation_feature_dim(schema):
-        return Features(vector=list(entry.feature_vector), params=dict(entry.params), source_hash=entry.source_hash)
-    return None
-
-
-def resolve_entry_train_path(train_path: str, args: argparse.Namespace) -> Path | None:
-    if not train_path:
-        return None
-    path = Path(train_path)
-    if path.is_absolute():
-        return path
-    project_root = Path(getattr(args, "project_root", Path.cwd())).resolve()
-    return project_root / path
-
-
-def featurize_operation_params(params: dict[str, Any], schema: OperationSchema, *, source_hash: str = "") -> Features:
-    values = {canonical_name(str(name)): value for name, value in params.items()}
-    vector: list[float] = []
-    projected_params: dict[str, Any] = {}
-    for parameter in schema.parameters.values():
-        present = parameter.name in values
-        raw_value = values.get(parameter.name)
-        if present:
-            projected_params[parameter.name] = raw_value
-        if parameter.kind == "choice":
-            vector.extend(1.0 if present and choice_values_equal(raw_value, choice) else 0.0 for choice in parameter.choices)
-            vector.append(1.0 if present else 0.0)
-            continue
-        value = as_float(raw_value)
-        if value is None:
-            vector.append(0.0)
-            vector.append(0.0)
-            continue
-        vector.append(normalize_operation_numeric(value, parameter))
-        vector.append(1.0)
-    return Features(vector=vector, params=projected_params, source_hash=source_hash)
-
-
 def parse_buffer_entry(
     data: Any,
     expected_dim: int,
@@ -4622,19 +3670,12 @@ def write_state_update(engine: SearchEngine, state: SearchState) -> None:
 
 def resolve_operation_schema(args: argparse.Namespace, project_root: Path) -> OperationSchema | None:
     schema_path = args.operation_schema
-    resume_path = getattr(args, "resume_from", None)
-    if schema_path is None and resume_path is not None:
-        path = resume_path if Path(resume_path).is_absolute() else project_root / resume_path
-        run_dir = path.parent if path.is_file() else path
-        candidate = run_dir / "operation_schema.json"
-        if candidate.exists():
-            schema_path = candidate
     if schema_path is None and args.generator in OPERATION_GENERATORS:
         train_name = Path(args.train_file).name
         candidates = []
         if train_name == "mock_train.py":
-            candidates.append(project_root / "ldm_task" / "operation_schema_mock_train.json")
-        candidates.append(project_root / "ldm_task" / "operation_schema_real_train.json")
+            candidates.append(project_root / "TTS" / "operation_schema_mock_train.json")
+        candidates.append(project_root / "TTS" / "operation_schema_real_train.json")
         for candidate in candidates:
             if candidate.exists():
                 schema_path = candidate
@@ -4825,11 +3866,6 @@ def apply_model_based_resume_defaults(args: argparse.Namespace, resume_info: dic
         "operation_retries": 2,
         "max_operations_per_step": 2,
         "operation_features": False,
-        "initial_operation_features": "5",
-        "max_active_operation_features": 0,
-        "allow_feature_expansion": True,
-        "allow_new_feature_specs": False,
-        "mock_expand_every": 0,
         "buffer": None,
         "surrogate_mode": "lcb",
         "gp_beta": 1.0,
@@ -4863,22 +3899,6 @@ def apply_model_based_resume_defaults(args: argparse.Namespace, resume_info: dic
         schema_value = summary_args.get("operation_schema") or summary_args.get("operation_schema_path")
         if isinstance(schema_value, str) and schema_value:
             args.operation_schema = Path(schema_value)
-    if "initial_operation_features" not in explicit:
-        active_names = summary_args.get("operation_schema_feature_names")
-        if isinstance(active_names, list) and active_names:
-            args.initial_operation_features = ",".join(str(name) for name in active_names)
-    if "max_active_operation_features" not in explicit:
-        max_active = summary_args.get("max_active_operation_features")
-        active_count = summary_args.get("operation_schema_feature_count")
-        full_json = resume_info.get("run_dir") / "operation_schema.json"
-        full_schema = load_json_file(full_json)
-        full_parameters = full_schema.get("parameters") if isinstance(full_schema, dict) else None
-        if isinstance(max_active, int):
-            args.max_active_operation_features = max_active
-        elif isinstance(full_parameters, dict):
-            args.max_active_operation_features = len(full_parameters)
-        elif isinstance(active_count, int):
-            args.max_active_operation_features = max(args.max_active_operation_features, active_count)
     if "buffer" not in explicit:
         run_buffer_value = summary_args.get("run_buffer") or resume_info.get("model_based_summary", {}).get("run_buffer")
         buffer_value = summary_args.get("buffer") or resume_info.get("model_based_summary", {}).get("buffer")
@@ -4929,11 +3949,6 @@ def explicit_options_from_argv(argv: list[str]) -> set[str]:
         "--operation-retries": "operation_retries",
         "--max-operations-per-step": "max_operations_per_step",
         "--operation-features": "operation_features",
-        "--initial-operation-features": "initial_operation_features",
-        "--max-active-operation-features": "max_active_operation_features",
-        "--disable-feature-expansion": "allow_feature_expansion",
-        "--allow-new-feature-specs": "allow_new_feature_specs",
-        "--mock-expand-every": "mock_expand_every",
         "--surrogate-mode": "surrogate_mode",
         "--gp-beta": "gp_beta",
         "--gp-xi": "gp_xi",
@@ -5162,7 +4177,10 @@ def feature_dim(hash_dims: int) -> int:
 
 
 def finite_score(value: Any) -> bool:
-    return is_finite_number(value)
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
 
 
 def is_better(candidate: float | None, incumbent: float | None, *, minimize: bool) -> bool:
@@ -5174,7 +4192,11 @@ def is_better(candidate: float | None, incumbent: float | None, *, minimize: boo
 
 
 def as_float(value: Any) -> float | None:
-    return shared_as_float(value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
 
 
 def write_model_based_summary(
@@ -5218,8 +4240,8 @@ def write_model_based_summary(
     )
 
 
-def main(argv: list[str] | None = None) -> int:
-    return asyncio.run(async_main(argv))
+def main() -> int:
+    return asyncio.run(async_main())
 
 
 if __name__ == "__main__":

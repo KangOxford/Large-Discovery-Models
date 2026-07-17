@@ -68,11 +68,15 @@ class SearchConfig:
     eval_each_num_steps: int = 1
     request_logprobs: bool = False
     top_logprobs: int | None = None
+    debug: bool = False
+    debug_log_path: Path | None = None
 
     def normalized(self) -> "SearchConfig":
         self.project_root = self.project_root.resolve()
         self.seed_train_path = self.seed_train_path.resolve()
         self.out_dir = self.out_dir.resolve()
+        if self.debug_log_path is not None:
+            self.debug_log_path = self.debug_log_path.resolve()
         self.num_edits_per_step = max(1, int(self.num_edits_per_step))
         self.eval_each_num_steps = max(1, int(self.eval_each_num_steps))
         if self.top_logprobs is not None:
@@ -129,6 +133,14 @@ class SearchEngine:
         )
         self._progress: ProgressBar | None = None
         self._progress_count = 0
+        self._debug_started_at = time.time()
+        if self.config.debug:
+            self.debug_event(
+                "engine_init",
+                out_dir=self.config.out_dir,
+                project_root=self.config.project_root,
+                generator=self.config.generator,
+            )
 
     def start_progress(self, total: int, *, label: str = "search") -> None:
         if not self.config.show_progress or total <= 0:
@@ -205,12 +217,14 @@ class SearchEngine:
 
     def evaluate_state(self, state: SearchState) -> None:
         if state.status == "generation_error":
+            self.debug_event("evaluation_skip_generation_error", state_id=state.state_id, error=state.error)
             self._write_state_meta(state)
             self._record_manifest(state)
             self._advance_progress(state)
             return
 
         if not self.config.run_evaluation:
+            self.debug_event("evaluation_skip_disabled", state_id=state.state_id)
             state.status = "evaluation_skipped"
             state.score = None
             state.error = "Evaluation skipped by --skip-eval."
@@ -234,6 +248,16 @@ class SearchEngine:
 
         command = self._format_eval_command(state, diagnostics_path)
         start = time.time()
+        self.debug_event(
+            "evaluation_start",
+            state_id=state.state_id,
+            command=command,
+            cwd=self.config.project_root,
+            timeout_seconds=self.config.timeout_seconds,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            diagnostics_path=diagnostics_path,
+        )
         try:
             with stdout_path.open("w", encoding="utf-8") as stdout_file, stderr_path.open(
                 "w", encoding="utf-8"
@@ -264,16 +288,38 @@ class SearchEngine:
                 state.error = f"Missing numeric score key {self.config.score_key!r}."
             if completed.returncode != 0 and state.error is None:
                 state.error = f"Evaluation command exited with code {completed.returncode}."
+            self.debug_event(
+                "evaluation_complete",
+                state_id=state.state_id,
+                returncode=completed.returncode,
+                elapsed_seconds=state.elapsed_seconds,
+                status=state.status,
+                score=state.score,
+                error=state.error,
+                metric_keys=sorted(metrics),
+            )
         except subprocess.TimeoutExpired:
             state.elapsed_seconds = time.time() - start
             state.score = self.config.failure_score
             state.status = "timeout"
             state.error = f"Evaluation exceeded {self.config.timeout_seconds}s."
+            self.debug_event(
+                "evaluation_timeout",
+                state_id=state.state_id,
+                elapsed_seconds=state.elapsed_seconds,
+                timeout_seconds=self.config.timeout_seconds,
+            )
         except Exception as exc:
             state.elapsed_seconds = time.time() - start
             state.score = self.config.failure_score
             state.status = "evaluation_error"
             state.error = repr(exc)
+            self.debug_event(
+                "evaluation_error",
+                state_id=state.state_id,
+                elapsed_seconds=state.elapsed_seconds,
+                error=repr(exc),
+            )
 
         self._write_state_meta(state)
         self._record_manifest(state)
@@ -763,6 +809,7 @@ Current parent `train.py`:
         )
 
     def _progress_status(self, status: str) -> None:
+        self.debug_event("progress_status", status=status)
         if self._progress is not None:
             best = self.best_state()
             self._progress.update(
@@ -770,6 +817,25 @@ Current parent `train.py`:
                 best_score=None if best is None else best.score,
                 status=status,
             )
+
+    def debug_event(self, event: str, **payload: Any) -> None:
+        if not self.config.debug:
+            return
+        path = self.config.debug_log_path or (self.config.out_dir / "debug.jsonl")
+        record = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "elapsed_seconds": round(time.time() - self._debug_started_at, 6),
+            "event": event,
+            **{key: jsonable(value) for key, value in payload.items()},
+        }
+        line = json.dumps(record, sort_keys=True) + "\n"
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as file:
+                file.write(line)
+        except OSError:
+            pass
+        print(f"[nanogpt-debug] {line.rstrip()}", file=sys.stderr, flush=True)
 
 
 class ProgressBar:
