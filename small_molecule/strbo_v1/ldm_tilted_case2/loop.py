@@ -7,7 +7,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 import numpy as np
 
@@ -174,6 +174,12 @@ def _run_tilted_round(
         build_result.metadata.get("selection_evaluation_attempts", len(selected)),
         time.monotonic() - select_t0,
     )
+    if not selected and build_result.metadata.get("selection_failed_evaluations"):
+        LOGGER.warning(
+            "round=%d selection: all scoring attempts failed; first_failures=%s",
+            round_idx,
+            _compact_failed_for_log(build_result.metadata["selection_failed_evaluations"]),
+        )
     history_delta = [
         (candidate.canonical_smiles or candidate.raw_smiles, tuple(candidate.true_scores))
         for candidate in selected
@@ -297,7 +303,22 @@ def _failed_selected_rows(selected):
 
 
 def _failed_metadata(failed):
-    return [{"smiles": smiles, "scores": list(scores)} for smiles, scores in failed]
+    rows = []
+    for item in failed:
+        diagnostics = None
+        if isinstance(item, dict):
+            smiles = item.get("smiles")
+            scores = item.get("scores", [])
+            diagnostics = item.get("score_diagnostics")
+        elif len(item) >= 3:
+            smiles, scores, diagnostics = item[0], item[1], item[2]
+        else:
+            smiles, scores = item
+        row = {"smiles": smiles, "scores": list(scores)}
+        if diagnostics:
+            row["score_diagnostics"] = diagnostics
+        rows.append(row)
+    return rows
 
 
 def _has_nonfinite_scores(selected) -> bool:
@@ -362,11 +383,11 @@ def _select_until_finite_scores(candidates, prob, scorers, cfg, rng):
         indices = _sample_available_indices(prob, needed, excluded_indices, rng)
         if not indices:
             break
-        scores = _score_smiles(
-            [candidates[idx].canonical_smiles or candidates[idx].raw_smiles for idx in indices],
-            scorers,
-        )
-        for idx, score_pair in zip(indices, scores):
+        smiles_batch = [
+            candidates[idx].canonical_smiles or candidates[idx].raw_smiles for idx in indices
+        ]
+        scores, diagnostics = _score_smiles_with_diagnostics(smiles_batch, scorers)
+        for local_idx, (idx, score_pair) in enumerate(zip(indices, scores)):
             candidate = candidates[idx]
             excluded_indices.add(idx)
             candidate.true_scores = list(score_pair)
@@ -375,13 +396,19 @@ def _select_until_finite_scores(candidates, prob, scorers, cfg, rng):
                 selected.append(candidate)
                 continue
             candidate.selected = False
+            score_diagnostics = _meaningful_score_diagnostics(
+                diagnostics[local_idx] if local_idx < len(diagnostics) else {}
+            )
             failed.append(
                 (
                     candidate.canonical_smiles or candidate.raw_smiles,
                     tuple(candidate.true_scores),
+                    score_diagnostics,
                 )
             )
             candidate.metadata["selection_failure_scores"] = candidate.true_scores
+            if score_diagnostics:
+                candidate.metadata["selection_failure_diagnostics"] = score_diagnostics
             candidate.true_scores = None
     return selected, failed
 
@@ -425,15 +452,45 @@ def _write_selection_fields(candidates, logits, prob, z) -> None:
 
 
 def _score_smiles(smiles_list, scorers):
+    scores, _diagnostics = _score_smiles_with_diagnostics(smiles_list, scorers)
+    return scores
+
+
+def _score_smiles_with_diagnostics(smiles_list, scorers):
+    smiles_list = list(smiles_list)
     per_obj = []
+    per_obj_diagnostics = []
     for scorer in scorers:
-        values = _score_with_retries(smiles_list, scorer)
+        values, diagnostics = _score_with_retries_with_diagnostics(smiles_list, scorer)
         per_obj.append([finite_or_none(value) for value in values])
-    return [tuple(values[i] for values in per_obj) for i in range(len(smiles_list))]
+        per_obj_diagnostics.append(diagnostics)
+    scores = [tuple(values[i] for values in per_obj) for i in range(len(smiles_list))]
+    diagnostics = [
+        {
+            "smiles": smiles,
+            "objectives": [
+                obj_diagnostics[i]
+                for obj_diagnostics in per_obj_diagnostics
+                if i < len(obj_diagnostics)
+            ],
+        }
+        for i, smiles in enumerate(smiles_list)
+    ]
+    return scores, diagnostics
 
 
 def _score_with_retries(smiles_list, scorer):
-    values = _call_scorer(smiles_list, scorer)
+    values, _diagnostics = _score_with_retries_with_diagnostics(smiles_list, scorer)
+    return values
+
+
+def _score_with_retries_with_diagnostics(smiles_list, scorer):
+    smiles_list = list(smiles_list)
+    values, call_info = _call_scorer_with_info(smiles_list, scorer)
+    diagnostics = [
+        _score_diagnostic(value, _attempt_diagnostic(value, call_info, idx))
+        for idx, value in enumerate(values)
+    ]
     for _attempt in range(1, MAX_SCORE_ATTEMPTS):
         bad_indices = [
             idx for idx, value in enumerate(values) if not is_finite_number(value)
@@ -441,24 +498,152 @@ def _score_with_retries(smiles_list, scorer):
         if not bad_indices:
             break
         for idx in bad_indices:
-            retry_values = _call_scorer([smiles_list[idx]], scorer)
+            retry_values, retry_info = _call_scorer_with_info([smiles_list[idx]], scorer)
+            diagnostics[idx]["attempts"].append(
+                _attempt_diagnostic(
+                    retry_values[0] if retry_values else float("nan"),
+                    retry_info,
+                    0,
+                )
+            )
             if retry_values and is_finite_number(retry_values[0]):
                 values[idx] = retry_values[0]
-    return values
+            diagnostics[idx]["final_value"] = finite_or_none(values[idx])
+            diagnostics[idx]["final_finite"] = is_finite_number(values[idx])
+    return values, diagnostics
 
 
 def _call_scorer(smiles_list, scorer):
+    values, _call_info = _call_scorer_with_info(smiles_list, scorer)
+    return values
+
+
+def _call_scorer_with_info(smiles_list, scorer):
+    smiles_list = list(smiles_list)
     try:
         values = list(scorer(smiles_list))
-    except Exception:
-        return [float("nan")] * len(smiles_list)
+    except Exception as exc:
+        raise RuntimeError(
+            f"{_scorer_name(scorer)} failed while scoring {len(smiles_list)} "
+            f"SMILES; sample={_sample_smiles_for_error(smiles_list)}: {exc}"
+        ) from exc
+    details = _scorer_last_results(scorer)
     if len(values) != len(smiles_list):
-        return [float("nan")] * len(smiles_list)
-    return values
+        raise RuntimeError(
+            f"{_scorer_name(scorer)} returned {len(values)} values for "
+            f"{len(smiles_list)} SMILES; sample={_sample_smiles_for_error(smiles_list)}"
+        )
+    return values, {"error": None, "details": details}
+
+
+def _scorer_name(scorer) -> str:
+    if hasattr(scorer, "__class__"):
+        class_name = scorer.__class__.__name__
+        if class_name and class_name != "function":
+            return class_name
+    return getattr(scorer, "__name__", type(scorer).__name__)
+
+
+def _sample_smiles_for_error(smiles_list: Sequence[str], limit: int = 3) -> list[str]:
+    return [_short_smiles(smiles) for smiles in smiles_list[:limit]]
+
+
+def _scorer_last_results(scorer) -> list[Any]:
+    details = getattr(scorer, "last_results", None)
+    if not isinstance(details, list):
+        return []
+    return _json_safe(details)
+
+
+def _score_diagnostic(value, first_attempt: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "final_value": finite_or_none(value),
+        "final_finite": is_finite_number(value),
+        "attempts": [first_attempt],
+    }
+
+
+def _attempt_diagnostic(value, call_info: dict[str, Any], idx: int) -> dict[str, Any]:
+    attempt = {
+        "value": finite_or_none(value),
+        "finite": is_finite_number(value),
+    }
+    if call_info.get("error"):
+        attempt["error"] = call_info["error"]
+    detail = _detail_at(call_info.get("details"), idx)
+    if detail is not None:
+        attempt["detail"] = detail
+    return attempt
+
+
+def _detail_at(details, idx: int):
+    if not isinstance(details, list) or idx >= len(details):
+        return None
+    return details[idx]
+
+
+def _meaningful_score_diagnostics(diagnostics: dict[str, Any]) -> dict[str, Any] | None:
+    objectives = []
+    for obj_idx, objective in enumerate(diagnostics.get("objectives", [])):
+        attempts = objective.get("attempts", [])
+        has_detail = any("detail" in attempt or "error" in attempt for attempt in attempts)
+        if has_detail or not objective.get("final_finite", False):
+            row = dict(objective)
+            row["objective_index"] = obj_idx
+            objectives.append(row)
+    if not objectives:
+        return None
+    return {"objectives": objectives}
+
+
+def _json_safe(value):
+    try:
+        return json.loads(json.dumps(value, default=str))
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def _compact_counts(counts: dict) -> dict:
     return {str(key): int(value) for key, value in counts.items() if int(value) != 0}
+
+
+def _compact_failed_for_log(rows: Sequence[dict[str, Any]], limit: int = 3) -> list[dict[str, Any]]:
+    compact = []
+    for row in rows[:limit]:
+        item = {
+            "smiles": _short_smiles(row.get("smiles")),
+            "scores": row.get("scores"),
+        }
+        reasons = _diagnostic_reasons(row.get("score_diagnostics"))
+        if reasons:
+            item["reasons"] = reasons
+        compact.append(item)
+    return compact
+
+
+def _diagnostic_reasons(diagnostics: Any) -> list[str]:
+    reasons = []
+    if not isinstance(diagnostics, dict):
+        return reasons
+    for objective in diagnostics.get("objectives", []):
+        obj_idx = objective.get("objective_index")
+        for attempt in objective.get("attempts", []):
+            if attempt.get("error"):
+                reasons.append(f"obj{obj_idx}: {attempt['error']}")
+                continue
+            detail = attempt.get("detail")
+            if isinstance(detail, dict):
+                status = detail.get("status")
+                message = detail.get("message")
+                if status or message:
+                    text = f"obj{obj_idx}: {status or 'failed'}"
+                    if message:
+                        text += f" ({str(message)[:160]})"
+                    reasons.append(text)
+                    continue
+            if not attempt.get("finite", False):
+                reasons.append(f"obj{obj_idx}: nonfinite")
+    return reasons[:4]
 
 
 def _selected_smiles(selected) -> list[str]:
@@ -520,6 +705,12 @@ def _selection_results(candidates, build_result) -> dict:
         ],
         "selected_ehvi": [candidate.ehvi for candidate in selected],
         "ehvi_fallback_reason": build_result.metadata.get("ehvi_fallback_reason"),
+        "selection_evaluation_attempts": build_result.metadata.get(
+            "selection_evaluation_attempts"
+        ),
+        "failed_evaluations": build_result.metadata.get(
+            "selection_failed_evaluations", []
+        ),
     }
 
 

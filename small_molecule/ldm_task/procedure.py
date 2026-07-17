@@ -1,27 +1,23 @@
 #!/usr/bin/env python3
-"""Run test-time search with the case2 acquisition-tilted LDM loop.
+"""Small-molecule task workflow for the shared LDM-TTS config runner.
 
-This is a small TTS-facing wrapper around
-``strbo_v1.ldm_tilted_case2.loop.run_tilted_case2_search``.  It is meant
-to play the same practical role as ``TTS/example_run_expanded_search.py``
-does for code search: provide one command that wires together
+This module wires ``strbo_v1.ldm_tilted_case2.loop.run_tilted_case2_search``
+into the common experiment launcher:
 
     LLM proposal reservoir -> BO/EHVI tilted selection -> environment scoring
 
-for the molecule task.
-
 Example smoke run without external services:
 
-    python TTS/run_tilted_case2_tts.py \
+    python -m small_molecule.ldm_task.procedure \
         --mock \
         --method m1_stratified_direct_llm_oversample_sir \
         --budget 8 \
         --m1-k-direct-llm 16 \
-        --trajectory-dir TTS/runs/case2_mock
+        --trajectory-dir ldm_runs/case2_mock
 
 Example real run:
 
-    python TTS/run_tilted_case2_tts.py \
+    python -m small_molecule.ldm_task.procedure \
         --method m1_stratified_direct_llm_oversample_sir \
         --init-strategy llm_cold_start \
         --budget 80 \
@@ -34,12 +30,12 @@ Example real run:
         --llm-max-retries 20 \
         --llm-retry-wait-seconds 10 \
         --vina-bin /path/to/vina \
-        --trajectory-dir TTS/runs/case2_real
+        --trajectory-dir ldm_runs/case2_real
 
 Resume an interrupted run:
 
-    python TTS/run_tilted_case2_tts.py \
-        --resume-from TTS/runs/case2_real \
+    python -m small_molecule.ldm_task.procedure \
+        --resume-from ldm_runs/case2_real \
         --budget 160
 """
 
@@ -61,6 +57,7 @@ if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
 DEFAULT_NN_MODEL_PATH = "activity_modeling/best_g12d_model.joblib"
+REPO_RELATIVE_PREFIXES = ("small_molecule", "nanogpt", "antibody", "config", "ldm_tts", "scripts")
 QWEN35_DEFAULT_SAMPLING = {
     "top_p": 0.95,
     "top_k": 20,
@@ -282,8 +279,32 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--vina-bin", default=os.environ.get("VINA_BIN", ""))
+    parser.add_argument("--vina-cache-dir", default="")
+    parser.add_argument("--vina-pdb-id", default="8UN5")
+    parser.add_argument("--vina-chain-id", default="A")
+    parser.add_argument("--vina-ligand-resname", default="")
+    parser.add_argument("--vina-exhaustiveness", type=int, default=4)
+    parser.add_argument("--vina-n-poses", type=int, default=3)
+    parser.add_argument("--vina-seed", type=int, default=42)
+    parser.add_argument("--vina-max-workers", type=int, default=1)
+    parser.add_argument(
+        "--vina-no-cache",
+        action="store_true",
+        help="Disable reuse of cached docking results inside the Vina cache directory.",
+    )
+    parser.add_argument(
+        "--vina-allow-zero-charge-fallback",
+        action="store_true",
+        help="Allow debug receptor preparation when Meeko assigns zero receptor charges.",
+    )
+    parser.add_argument(
+        "--vina-allow-debug-receptor",
+        action="store_true",
+        help="Allow docking against a receptor marked as debug/non-production.",
+    )
     parser.add_argument("--nn-model-path", default=DEFAULT_NN_MODEL_PATH)
     parser.add_argument("--reasyn-repo", default=os.environ.get("REASYN_HOME", os.environ.get("REASYN_REPO", "")))
+    parser.add_argument("--reasyn-python", default=os.environ.get("REASYN_PYTHON", os.environ.get("REASYN_BIN", "")))
     parser.add_argument("--reasyn-model-path", default=os.environ.get("REASYN_MODEL_PATH", ""))
     parser.add_argument("--reasyn-devices", default="0")
     parser.add_argument("--reasyn-time-limit", type=int, default=1800)
@@ -367,7 +388,7 @@ def resolve_output_dir(args: argparse.Namespace) -> Path:
         path = Path(raw)
     else:
         suffix = "mock" if args.mock else "real"
-        path = Path("TTS") / "runs" / "tilted_case2" / f"{args.method}_{suffix}_seed={args.seed}"
+        path = Path("ldm_runs") / "tilted_case2" / f"{args.method}_{suffix}_seed={args.seed}"
     return path if path.is_absolute() else REPO_ROOT / path
 
 
@@ -524,15 +545,38 @@ def build_real_scorers(args: argparse.Namespace, output_dir: Path):
     from strbo_v1.objective_nn import NNScorer, NNScorerConfig
     from strbo_v1.objective_vina import VinaScorer, VinaScorerConfig
 
+    vina_cache_dir = resolve_optional_path(args.vina_cache_dir) or (output_dir / "vina_cache")
     vina_cfg = VinaScorerConfig(
+        pdb_id=args.vina_pdb_id,
+        chain_id=args.vina_chain_id or None,
+        ligand_resname=args.vina_ligand_resname or None,
+        cache_dir=vina_cache_dir,
+        allow_zero_charge_fallback=bool(args.vina_allow_zero_charge_fallback),
+        allow_debug_receptor=bool(args.vina_allow_debug_receptor),
         vina_bin=args.vina_bin or None,
-        cache_dir=output_dir / "vina_cache",
+        exhaustiveness=args.vina_exhaustiveness,
+        n_poses=args.vina_n_poses,
+        seed=args.vina_seed,
+        max_workers=args.vina_max_workers,
+        use_cache=not bool(args.vina_no_cache),
     )
     nn_cfg = NNScorerConfig(
         model_path=args.nn_model_path,
         on_error="all_nan",
     )
     return VinaScorer(vina_cfg), NNScorer(nn_cfg)
+
+
+def resolve_optional_path(raw: str | None) -> Path | None:
+    if raw is None or not str(raw).strip():
+        return None
+    path = Path(str(raw)).expanduser()
+    if path.is_absolute():
+        return path
+    normalized = str(path).replace("\\", "/")
+    if any(normalized == prefix or normalized.startswith(prefix + "/") for prefix in REPO_RELATIVE_PREFIXES):
+        return WORKSPACE_ROOT / path
+    return REPO_ROOT / path
 
 
 def build_real_analog_fn(args: argparse.Namespace, output_dir: Path):
@@ -550,6 +594,7 @@ def build_real_analog_fn(args: argparse.Namespace, output_dir: Path):
     config = ReasynConfig(
         model_path=model_path,
         reasyn_repo=args.reasyn_repo or None,
+        python_bin=args.reasyn_python or None,
         devices=devices or [0],
         time_limit=args.reasyn_time_limit,
         temp_dir=output_dir / "reasyn_tmp",
@@ -642,6 +687,17 @@ def planned_config_json(args: argparse.Namespace, output_dir: Path) -> dict[str,
         "resume_from_trajectory": bool(args.resume),
         "seed": args.seed,
         "verbose": bool(args.verbose),
+        "vina_cache_dir": args.vina_cache_dir or None,
+        "vina_pdb_id": args.vina_pdb_id,
+        "vina_chain_id": args.vina_chain_id,
+        "vina_ligand_resname": args.vina_ligand_resname or None,
+        "vina_exhaustiveness": args.vina_exhaustiveness,
+        "vina_n_poses": args.vina_n_poses,
+        "vina_seed": args.vina_seed,
+        "vina_max_workers": args.vina_max_workers,
+        "vina_use_cache": not bool(args.vina_no_cache),
+        "vina_allow_zero_charge_fallback": bool(args.vina_allow_zero_charge_fallback),
+        "vina_allow_debug_receptor": bool(args.vina_allow_debug_receptor),
     }
 
 

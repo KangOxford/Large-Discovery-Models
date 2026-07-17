@@ -170,6 +170,7 @@ class NNScorer:
         self.config = config
         self._model = self._load_model(config.model_path)
         self.metadata: dict[str, Any] = self._load_metadata(config)
+        self.last_results: list[dict[str, Any]] = []
 
     # -- public API ----------------------------------------------------------
 
@@ -177,9 +178,19 @@ class NNScorer:
         smiles_list = list(smiles_list)
         n = len(smiles_list)
         if n == 0:
+            self.last_results = []
             return []
 
         out: list[float] = [float("nan")] * n
+        self.last_results = [
+            {
+                "input_smiles": smi,
+                "canonical_smiles": "",
+                "status": "invalid_smiles",
+                "score": None,
+            }
+            for smi in smiles_list
+        ]
         canonical_smis: list[str] = []
         valid_indices: list[int] = []
 
@@ -188,6 +199,12 @@ class NNScorer:
             if canon:
                 canonical_smis.append(canon)
                 valid_indices.append(i)
+                self.last_results[i] = {
+                    "input_smiles": smi,
+                    "canonical_smiles": canon,
+                    "status": "pending",
+                    "score": None,
+                }
 
         if not canonical_smis:
             return out
@@ -195,6 +212,9 @@ class NNScorer:
         try:
             preds = self._predict(canonical_smis)
         except Exception as exc:
+            for idx in valid_indices:
+                self.last_results[idx]["status"] = "inference_failed"
+                self.last_results[idx]["message"] = str(exc)
             if self.config.on_error == "all_nan":
                 return [float("nan")] * n
             raise RuntimeError(
@@ -204,6 +224,8 @@ class NNScorer:
 
         for j, idx in enumerate(valid_indices):
             out[idx] = self._to_native_float(preds[j])
+            self.last_results[idx]["score"] = out[idx] if math.isfinite(out[idx]) else None
+            self.last_results[idx]["status"] = "ok" if math.isfinite(out[idx]) else "nonfinite_prediction"
         return out
 
     # -- internals -----------------------------------------------------------

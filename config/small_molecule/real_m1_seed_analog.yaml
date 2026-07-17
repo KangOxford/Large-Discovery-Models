@@ -1,0 +1,83 @@
+name: small_molecule_real_m1_direct_llm
+task: small_molecule
+algorithm: m1_stratified_direct_llm_oversample_sir
+mode: real
+description: Small-molecule LDM-TTS run with stratified direct-LLM proposal and Vina+NN scoring.
+env:
+  LLM_BASE_URL: http://127.0.0.1:52308/v1
+  LLM_API_KEY: EMPTY
+  VINA: /mnt/data0/dock-project/bin/vina
+  VINA_BIN: /mnt/data0/dock-project/bin/vina
+  G12D: small_molecule/activity_modeling/best_g12d_model.joblib
+  REASYN: /mnt/data0/dock-project/ReaSyn
+  REASYN_HOME: /mnt/data0/dock-project/ReaSyn
+  REASYN_REPO: /mnt/data0/dock-project/ReaSyn
+  REASYN_PYTHON: /mnt/data0/dock-project/ReaSyn/.venv/bin
+args:
+  mock: false
+  method: m1_stratified_direct_llm_oversample_sir
+  seed: 0
+  seed-smiles: CCO,CCN,CCC,CCCN,CCCC
+  init-strategy: llm_cold_start
+  init-size: 5
+  budget: 80
+  batch-size: 1
+  smiles-max-len: 80
+  # Direct-LLM methods use this knob. It is kept explicit here so method
+  # swaps can be made by changing only `method` and this value.
+  m1-k-direct-llm: 64
+  m1-q0-smoothing: 0.5
+  m1-analog-n-llm-seeds: 8
+  m1-analog-k-total: 1024
+  max-candidates-per-round: 64
+  max-empty-reservoir-rounds: 10
+  allow-early-stop: false
+  kernel: sk
+  gp-device: cpu
+  gp-fit-itersteps: 20
+  gp-fp-n-bits: 2048
+  ehvi-n-samples: 128
+  alpha: 1.0
+  eta: 3.0
+  llm-url: http://127.0.0.1:52308/v1
+  llm-model-name: Qwen3.5-9B
+  api-key: "EMPTY"
+  llm-timeout: 120.0
+  llm-temperature: 0.7
+  llm-max-tokens: 4096
+  llm-top-p: null
+  llm-top-k: null
+  llm-min-p: null
+  llm-presence-penalty: null
+  llm-repetition-penalty: null
+  qwen35-sampling-defaults: true
+  disable-thinking: true
+  llm-extra-body-json: null
+  llm-max-retries: 10
+  llm-retry-wait-seconds: 10
+  trajectory-dir: runs/small_molecule/case2_qwen3_9B_proposer64_bon64_run7
+  output-dir: null
+  resume: false
+  resume-from: null
+  dry-run: false
+  log-level: INFO
+  debug-llm-chunks: false
+  verbose: false
+  vina-bin: ${VINA_BIN}
+  vina-cache-dir: null
+  vina-pdb-id: 8UN5
+  vina-chain-id: A
+  vina-ligand-resname: null
+  vina-exhaustiveness: 4
+  vina-n-poses: 3
+  vina-seed: 42
+  vina-max-workers: 1
+  vina-no-cache: false
+  vina-allow-zero-charge-fallback: false
+  vina-allow-debug-receptor: false
+  nn-model-path: ${G12D}
+  reasyn-repo: ${REASYN_REPO}
+  reasyn-python: ${REASYN_PYTHON}
+  reasyn-model-path: null
+  reasyn-devices: "0"
+  reasyn-time-limit: 1800

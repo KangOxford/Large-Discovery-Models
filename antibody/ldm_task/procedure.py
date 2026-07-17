@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Run AntBO-style test-time search for CDRH3 sequences.
+"""Antibody task workflow for the shared LDM-TTS config runner.
 
-This is a TTS-facing wrapper around the native AntBO LDM acquisition loop in
+This module wires the native AntBO LDM acquisition loop in
 ``bo.ldm_light.ldm_acq``:
 
     LLM warmup / strategy proposal -> GP acquisition candidate search -> Absolut scoring
@@ -12,14 +12,14 @@ control flow can be smoke-tested without Absolut or an LLM endpoint.
 
 Example dry run:
 
-    python TTS/example_run_antbo_tts.py \
+    python -m antibody.ldm_task.procedure \
         --antigen 1ADQ_A \
         --budget 40 \
         --dry-run
 
 Use a GP confidence-bound acquisition after warmup:
 
-    python TTS/example_run_antbo_tts.py \
+    python -m antibody.ldm_task.procedure \
         --antigen 1ADQ_A \
         --budget 200 \
         --acq lcb \
@@ -27,17 +27,17 @@ Use a GP confidence-bound acquisition after warmup:
 
 Example mock smoke run in the DGM environment:
 
-    python TTS/example_run_antbo_tts.py \
+    python -m antibody.ldm_task.procedure \
         --mock \
         --antigen SMOKE_ANTIGEN \
         --budget 4 \
         --n-init 3 \
         --parallel-budget 8 \
-        --out-dir TTS/runs/antbo_tts_mock
+        --out-dir ldm_runs/antbo_tts_mock
 
 Example real run:
 
-    python TTS/example_run_antbo_tts.py \
+    python -m antibody.ldm_task.procedure \
         --config bo/config.yaml \
         --antigens-file test_5_antigens.txt \
         --seed 42 \
@@ -174,7 +174,7 @@ def resolve_out_dir(args: argparse.Namespace) -> Path:
     if args.out_dir:
         return resolve_path(args.out_dir)
     suffix = "mock" if args.mock else "real"
-    return REPO_ROOT / "TTS" / "runs" / "antbo_tts" / f"{suffix}_seed={args.seed}"
+    return REPO_ROOT / "ldm_runs" / "antbo_tts" / f"{suffix}_seed={args.seed}"
 
 
 def resolve_antigens(args: argparse.Namespace) -> list[str]:

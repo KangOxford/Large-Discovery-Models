@@ -1,6 +1,6 @@
 {
   "version": "real_train_knobs_v1",
-  "description": "Fixed operation space for constrained model-based search over TTS/real_train.py top-level hyperparameter assignments.",
+  "description": "Fixed operation space for constrained model-based search over ldm_task/real_train.py top-level hyperparameter assignments.",
   "parameters": {
     "ASPECT_RATIO": {
       "type": "int",

@@ -27,6 +27,7 @@ class TiltedTraceRecorder:
             trajectory_dir,
             config_snapshot=_config_dict(cfg),
             existing_rounds=existing_rounds,
+            reset_rounds_file=existing_rounds is None,
         )
         self.trajectory_dir = self._recorder.trajectory_dir
         self.rounds = self._recorder.rounds

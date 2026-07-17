@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from TTS.search_core import SearchEngine, SearchState
+from nanogpt.ldm_task.search_core import SearchEngine, SearchState
 
 
 @dataclass

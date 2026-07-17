@@ -18,11 +18,13 @@ Contract details (enforced by the BO / random-search loops via
 - Lower scores are not assumed to be better universally; the LDM-TTS
   loop takes a ``minimize`` flag (default ``True`` for Vina) and the BO
   acquisition functions are written uniformly as "higher = better".
-- Failed evaluations are signalled with ``float("nan")``. The loops
-  convert non-finite floats to ``None`` internally and exclude them
-  from the GP fit; the SMILES is still recorded in the history log.
-- A scorer that raises an exception is treated as "all-failed" by
-  ``_safe_score`` (every SMILES in the batch gets ``None``).
+- Failed per-molecule evaluations are signalled with ``float("nan")``. The
+  loops convert non-finite floats to ``None`` internally and exclude them from
+  the GP fit; the SMILES is still recorded in the history log.
+- Infrastructure failures should raise exceptions. The LDM-TTS loop treats
+  scorer exceptions as hard run failures so missing docking dependencies,
+  broken receptor preparation, or malformed scorer outputs do not masquerade as
+  ordinary low-quality candidates.
 
 The concrete implementations live in ``strbo_v1.objective_vina``
 (:class:`VinaScorer`, AutoDock Vina with disk cache) and

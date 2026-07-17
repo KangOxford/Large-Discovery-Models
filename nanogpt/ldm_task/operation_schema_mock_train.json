@@ -1,6 +1,6 @@
 {
   "version": "mock_train_knobs_v1",
-  "description": "Fixed operation space for constrained model-based search tests over TTS/mock_train.py top-level mock hyperparameter assignments.",
+  "description": "Fixed operation space for constrained model-based search tests over ldm_task/mock_train.py top-level mock hyperparameter assignments.",
   "parameters": {
     "DEPTH": {
       "type": "int",

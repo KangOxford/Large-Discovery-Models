@@ -31,17 +31,15 @@ dev/
 results.tsv
 
 # Runtime outputs and generated artifacts
-**/TTS/ablation_buffer/
-**/TTS/ablation_runs/
-**/TTS/runs/
-**/TTS/docs/
-**/TTS/progress.png
+**/ldm_runs/
+**/ldm_docs/
 
 # Task-specific generated data
 /antibody/cache/
 /antibody/outputs/
 /antibody/temp/
 /small_molecule/output/
+/small_molecule/runs/
 
 .vscode
 .DS_Store

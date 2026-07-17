@@ -222,6 +222,20 @@ def test_resume_from_rounds_jsonl_continues_partial_cold_start(tmp_path):
     assert summary["llm_call_count"] == 4
 
 
+def test_fresh_run_resets_existing_rounds_jsonl(tmp_path):
+    (tmp_path / "rounds.jsonl").write_text(
+        json.dumps({"round_idx": 999, "stale": True}) + "\n",
+        encoding="utf-8",
+    )
+
+    _history, _summary = run_method("m1_direct_llm_sir", m1_llm(), tmp_path)
+
+    rounds = [json.loads(line) for line in (tmp_path / "rounds.jsonl").read_text().splitlines()]
+    assert rounds
+    assert all(not record.get("stale") for record in rounds)
+    assert rounds[0]["round_idx"] == 0
+
+
 def test_loop_retries_transient_empty_reservoir(tmp_path):
     llm = MockLLMClient(scripted_responses=[
         json.dumps({"direct_smiles": []}),
@@ -334,6 +348,14 @@ def test_score_smiles_retries_transient_nonfinite_values():
 
     assert scores == [(-3.7, 5.1), (-4.2, 5.2)]
     assert vina.calls == [["CCO", "CCN"], ["CCO"]]
+
+
+def test_score_smiles_raises_scorer_exceptions():
+    def broken_scorer(_smiles_list):
+        raise RuntimeError("receptor prep failed")
+
+    with pytest.raises(RuntimeError, match="broken_scorer failed.*receptor prep failed"):
+        _score_smiles(["CCO"], (broken_scorer, lambda smiles_list: [5.1]))
 
 
 def test_one_step_retries_when_selected_candidate_cannot_be_scored(tmp_path):

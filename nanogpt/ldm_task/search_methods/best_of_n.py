@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from TTS.search_core import SearchEngine, SearchState
+from nanogpt.ldm_task.search_core import SearchEngine, SearchState
 
 
 async def run(

@@ -19,16 +19,16 @@ _WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
 
-from TTS.search_core import DEFAULT_TASK_CONTEXT, SearchConfig, SearchEngine
+from nanogpt.ldm_task.search_core import DEFAULT_TASK_CONTEXT, SearchConfig, SearchEngine
 
 
 METHODS = {
-    "best_of_n": "TTS.search_methods.best_of_n",
-    "beam": "TTS.search_methods.beam_search",
-    "beam_search": "TTS.search_methods.beam_search",
-    "mcts": "TTS.search_methods.mcts",
-    "tree": "TTS.search_methods.tree_search",
-    "tree_search": "TTS.search_methods.tree_search",
+    "best_of_n": "nanogpt.ldm_task.search_methods.best_of_n",
+    "beam": "nanogpt.ldm_task.search_methods.beam_search",
+    "beam_search": "nanogpt.ldm_task.search_methods.beam_search",
+    "mcts": "nanogpt.ldm_task.search_methods.mcts",
+    "tree": "nanogpt.ldm_task.search_methods.tree_search",
+    "tree_search": "nanogpt.ldm_task.search_methods.tree_search",
 }
 
 
@@ -62,7 +62,7 @@ def default_run_name(args: argparse.Namespace, train_file: Path) -> str:
     return "_".join(parts)
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run test-time search over train.py states using LLM-generated code edits.",
     )
@@ -82,7 +82,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "Parent directory for search runs. A fresh timestamped run folder is "
-            "created inside it. Default: TTS/runs."
+            "created inside it. Default: ldm_runs."
         ),
     )
     parser.add_argument(
@@ -167,16 +167,16 @@ def parse_args() -> argparse.Namespace:
         default=20_000,
         help="Max raw LLM response chars embedded in manifest/summary/meta JSON. Negative means unlimited.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-async def async_main() -> int:
-    args = parse_args()
+async def async_main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     project_root = args.project_root.resolve()
     train_file = args.train_file
     if not train_file.is_absolute():
         train_file = project_root / train_file
-    out_parent_dir = project_root / "TTS" / "runs" if args.out_dir is None else args.out_dir
+    out_parent_dir = project_root / "ldm_runs" if args.out_dir is None else args.out_dir
     if not out_parent_dir.is_absolute():
         out_parent_dir = project_root / out_parent_dir
     run_name = safe_path_tag(args.run_name) if args.run_name.strip() else default_run_name(args, train_file)
@@ -260,8 +260,8 @@ async def async_main() -> int:
     return 0
 
 
-def main() -> int:
-    return asyncio.run(async_main())
+def main(argv: list[str] | None = None) -> int:
+    return asyncio.run(async_main(argv))
 
 
 if __name__ == "__main__":

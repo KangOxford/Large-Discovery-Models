@@ -141,21 +141,52 @@ def _resolve_python_bin(explicit: Optional[str], reasyn_repo: Path) -> Optional[
     leaves the subprocess Python without the venv's ``site-packages``.
     """
     if explicit:
-        path = Path(explicit).expanduser()
-        if not path.exists():
-            raise RuntimeError(f"python_bin not found: {path}")
-        return str(path.absolute())
+        return _normalize_python_bin(Path(explicit).expanduser(), "python_bin")
     for env_name in ("REASYN_PYTHON", "REASYN_BIN"):
         env_val = os.environ.get(env_name)
         if env_val:
-            path = Path(env_val).expanduser()
-            if not path.exists():
-                raise RuntimeError(f"{env_name}={env_val} does not exist")
-            return str(path.absolute())
-    venv_py = reasyn_repo / ".venv" / "bin" / "python"
-    if venv_py.exists():
-        return str(venv_py.absolute())
+            return _normalize_python_bin(Path(env_val).expanduser(), env_name)
+    venv_bin = reasyn_repo / ".venv" / "bin"
+    if venv_bin.exists():
+        return _normalize_python_bin(venv_bin, "repo .venv/bin")
     return None
+
+
+def _normalize_python_bin(path: Path, label: str) -> str:
+    """Accept a Python executable, or a venv ``bin`` directory containing one."""
+    if not path.exists():
+        if path.name == "python":
+            fallback = _first_existing_python(path.parent)
+            if fallback is not None:
+                return str(fallback.absolute())
+        if path.is_symlink():
+            raise RuntimeError(
+                f"{label} is a broken symlink: {path} -> {os.readlink(path)}. "
+                f"Use an existing Python executable such as {path.parent / 'python3'}."
+            )
+        raise RuntimeError(f"{label} not found: {path}")
+    if path.is_dir():
+        candidate = _first_existing_python(path)
+        if candidate is not None:
+            return str(candidate.absolute())
+        raise RuntimeError(
+            f"{label} points to a directory, not a Python executable: {path}. "
+            "Expected one of python, python3, or python3.* inside it."
+        )
+    return str(path.absolute())
+
+
+def _first_existing_python(bin_dir: Path) -> Path | None:
+    for name in ("python", "python3"):
+        candidate = bin_dir / name
+        if candidate.exists():
+            return candidate
+    versioned = sorted(
+        candidate
+        for candidate in bin_dir.glob("python3.*")
+        if candidate.exists() and not candidate.is_dir()
+    )
+    return versioned[0] if versioned else None
 
 
 def _query_visible_gpu_ids() -> set[int]:

@@ -1,0 +1,59 @@
+name: small_molecule_mock_m1_stratified_oversample
+task: small_molecule
+algorithm: m1_stratified_direct_llm_oversample_sir
+mode: mock
+description: Safe small-molecule LDM-TTS smoke run with mock LLM, scorer, and analog generator.
+args:
+  mock: true
+  method: m1_stratified_direct_llm_oversample_sir
+  seed: 0
+  seed-smiles: CCO,CCN,CCC,CCCN,CCCC
+  init-strategy: llm_cold_start
+  init-size: 5
+  budget: 8
+  batch-size: 1
+  smiles-max-len: 80
+  m1-k-direct-llm: 16
+  m1-q0-smoothing: 0.5
+  m1-analog-n-llm-seeds: 8
+  m1-analog-k-total: 1024
+  max-candidates-per-round: 64
+  max-empty-reservoir-rounds: 10
+  allow-early-stop: true
+  kernel: sk
+  gp-device: cpu
+  gp-fit-itersteps: 20
+  gp-fp-n-bits: 2048
+  ehvi-n-samples: 128
+  alpha: 1.0
+  eta: 3.0
+  llm-url: null
+  llm-model-name: DeepSeek-V4-Flash
+  api-key: null
+  llm-timeout: 120.0
+  llm-temperature: 0.2
+  llm-max-tokens: 4096
+  llm-top-p: null
+  llm-top-k: null
+  llm-min-p: null
+  llm-presence-penalty: null
+  llm-repetition-penalty: null
+  qwen35-sampling-defaults: true
+  disable-thinking: false
+  llm-extra-body-json: null
+  llm-max-retries: 2
+  llm-retry-wait-seconds: 0.0
+  trajectory-dir: ldm_runs/case2_mock_m1
+  output-dir: null
+  resume: false
+  resume-from: null
+  dry-run: false
+  log-level: INFO
+  debug-llm-chunks: false
+  verbose: false
+  vina-bin: null
+  nn-model-path: activity_modeling/best_g12d_model.joblib
+  reasyn-repo: null
+  reasyn-model-path: null
+  reasyn-devices: "0"
+  reasyn-time-limit: 1800

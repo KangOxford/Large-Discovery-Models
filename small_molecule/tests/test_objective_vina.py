@@ -526,6 +526,8 @@ class VinaScorerCallTests(unittest.TestCase):
         self.assertEqual(out[0], -7.0)
         self.assertTrue(np.isnan(out[1]))
         self.assertEqual(out[2], -6.0)
+        self.assertEqual(self.scorer.last_results[1]["input_smiles"], "CCN")
+        self.assertEqual(self.scorer.last_results[1]["status"], "dock_failed")
 
     def test_call_returns_nan_for_prep_failed(self) -> None:
         def fake_batch(compounds, receptor, *, vina_bin, **kwargs):

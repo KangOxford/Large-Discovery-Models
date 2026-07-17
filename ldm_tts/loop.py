@@ -89,8 +89,11 @@ def run_budgeted_search(
             continue
 
         if not result.history_delta:
-            early_stop_reason = "empty_selection"
-            break
+            if allow_early_stop:
+                early_stop_reason = "empty_selection"
+                break
+            round_idx += 1
+            continue
 
         current_history.extend(result.history_delta)
         empty_reservoir_rounds = 0

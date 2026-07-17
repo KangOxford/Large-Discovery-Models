@@ -513,7 +513,7 @@ class SearchEngine:
             {"role": "user", "content": prompt},
         ]
         if self.config.generator == "closed_loop":
-            from TTS.api_generate import openai_compatible_generate
+            from nanogpt.ldm_task.api_generate import openai_compatible_generate
 
             return await openai_compatible_generate(
                 messages,
@@ -529,7 +529,7 @@ class SearchEngine:
                 top_logprobs=self.config.top_logprobs,
             )
         if self.config.generator == "tool_call":
-            from TTS.api_generate import tool_call_generate
+            from nanogpt.ldm_task.api_generate import tool_call_generate
 
             return await tool_call_generate(
                 messages,
@@ -544,7 +544,7 @@ class SearchEngine:
                 top_logprobs=self.config.top_logprobs,
             )
         if self.config.generator == "harness":
-            from TTS.api_generate import harness_generate
+            from nanogpt.ldm_task.api_generate import harness_generate
 
             return await harness_generate(
                 prompt,
@@ -562,7 +562,7 @@ class SearchEngine:
         if self.config.generator != "api":
             raise ValueError(f"Unknown generator {self.config.generator!r}.")
 
-        from TTS.api_generate import vllm_generate
+        from nanogpt.ldm_task.api_generate import vllm_generate
 
         return await vllm_generate(
             messages,

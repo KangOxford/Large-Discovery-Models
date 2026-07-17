@@ -526,6 +526,7 @@ class VinaScorer:
         for subdir in ("receptors", "ligands", "cache", "poses"):
             (self.cache_dir / subdir).mkdir(exist_ok=True)
         self._receptor: Optional[ReceptorConfig] = None
+        self.last_results: list[dict[str, Any]] = []
         # Resolve the explicit path once; None means "defer to env / PATH
         # at use time" (preserves the default behavior for callers that
         # do not configure a Vina path).
@@ -654,8 +655,28 @@ class VinaScorer:
         """
         smiles_list = list(smiles_list)
         if not smiles_list:
+            self.last_results = []
             return []
-        results = self._dock_smiles(smiles_list)
+        try:
+            results = self._dock_smiles(smiles_list)
+        except Exception as exc:
+            self.last_results = [
+                {
+                    "input_smiles": smiles,
+                    "status": "scorer_exception",
+                    "score": None,
+                    "message": str(exc),
+                }
+                for smiles in smiles_list
+            ]
+            raise
+        self.last_results = [
+            {
+                **model_to_plain_dict(result),
+                "input_smiles": smiles,
+            }
+            for smiles, result in zip(smiles_list, results)
+        ]
         out: list[float] = []
         for r in results:
             if (

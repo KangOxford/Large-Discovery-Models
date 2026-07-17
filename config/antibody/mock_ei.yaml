@@ -1,0 +1,15 @@
+name: antibody_mock_ei
+task: antibody
+algorithm: ei
+mode: mock
+description: Safe AntBO-style LDM-TTS smoke run using the random mock evaluator.
+args:
+  mock: true
+  config: bo/config.yaml
+  antigen: SMOKE_ANTIGEN
+  seed: 42
+  budget: 4
+  n-init: 3
+  parallel-budget: 8
+  acq: ei
+  out-dir: ldm_runs/antbo_mock_ei

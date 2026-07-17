@@ -297,6 +297,30 @@ class ResolvePythonBinTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             _resolve_python_bin("/nonexistent/python_xyz", self.tmp_repo)
 
+    def test_explicit_arg_accepts_venv_bin_directory(self) -> None:
+        self.assertEqual(
+            _resolve_python_bin(str(self.venv_python.parent), self.tmp_repo),
+            str(self.venv_python.absolute()),
+        )
+
+    def test_venv_bin_directory_falls_back_to_python3(self) -> None:
+        self.venv_python.unlink()
+        python3 = self.venv_python.parent / "python3"
+        python3.write_text("")
+        self.assertEqual(
+            _resolve_python_bin(str(self.venv_python.parent), self.tmp_repo),
+            str(python3.absolute()),
+        )
+
+    def test_missing_python_path_falls_back_to_versioned_python(self) -> None:
+        self.venv_python.unlink()
+        python310 = self.venv_python.parent / "python3.10"
+        python310.write_text("")
+        self.assertEqual(
+            _resolve_python_bin(str(self.venv_python), self.tmp_repo),
+            str(python310.absolute()),
+        )
+
     def test_uses_reasyn_python_env(self) -> None:
         os.environ["REASYN_PYTHON"] = sys.executable
         self.assertEqual(
@@ -311,10 +335,24 @@ class ResolvePythonBinTests(unittest.TestCase):
             str(Path(sys.executable).expanduser().absolute()),
         )
 
+    def test_reasyn_bin_env_accepts_venv_bin_directory(self) -> None:
+        os.environ["REASYN_BIN"] = str(self.venv_python.parent)
+        self.assertEqual(
+            _resolve_python_bin(None, self.tmp_repo),
+            str(self.venv_python.absolute()),
+        )
+
+    def test_directory_without_python_raises_clear_error(self) -> None:
+        empty_bin = Path(tempfile.mkdtemp(prefix="empty_bin_"))
+        with self.assertRaises(RuntimeError) as ctx:
+            _resolve_python_bin(str(empty_bin), self.tmp_repo)
+        self.assertIn("points to a directory", str(ctx.exception))
+        self.assertIn("python3.*", str(ctx.exception))
+
     def test_falls_back_to_repo_venv_python(self) -> None:
         # No env vars, but a .venv/bin/python exists under repo.
         self.assertEqual(
-            _resolve_python_bin(None, self.tmp_repo), str(self.venv_python.resolve())
+            _resolve_python_bin(None, self.tmp_repo), str(self.venv_python.absolute())
         )
 
     def test_returns_none_when_nothing_available(self) -> None:
