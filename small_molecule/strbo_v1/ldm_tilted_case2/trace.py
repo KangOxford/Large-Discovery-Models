@@ -11,6 +11,7 @@ if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
 
 from ldm_tts.trajectory import JsonlTrajectoryRecorder
+from ldm_tts.data_collection import DataCollectionSink, smallmol_irs_from_round_record
 from ldm_tts.spaces import (
     AcquisitionSpec,
     CandidateSpaceSpec,
@@ -39,10 +40,27 @@ class TiltedTraceRecorder:
         self.trajectory_dir = self._recorder.trajectory_dir
         self.rounds = self._recorder.rounds
         self.llm_call_count = sum(len(record.get("llm_attempts", [])) for record in self.rounds)
+        default_collection_dir = (
+            self.trajectory_dir / "ldm_data" if self.trajectory_dir is not None else None
+        )
+        self._data_sink = DataCollectionSink.from_env(default_root=default_collection_dir)
 
     def record_round(self, record: dict[str, Any]) -> None:
         self.llm_call_count += len(record.get("llm_attempts", []))
         self._recorder.append_round(record)
+        if self._data_sink.enabled:
+            provenance = {
+                "task": "small_molecule",
+                "method": self.cfg.method,
+                "round_idx": record.get("round_idx"),
+                "trajectory_dir": None if self.trajectory_dir is None else str(self.trajectory_dir),
+            }
+            outcome = {
+                "selection_results": record.get("selection_results", {}),
+                "drop_counts": record.get("drop_counts", {}),
+            }
+            for ir in smallmol_irs_from_round_record(record):
+                self._data_sink.append(ir, provenance=provenance, outcome=outcome)
 
     def finalize(
         self,

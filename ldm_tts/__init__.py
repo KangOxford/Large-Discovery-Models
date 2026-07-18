@@ -6,6 +6,20 @@ budgeted search-loop control, JSON trajectory writing, and score utilities.
 """
 
 from ldm_tts.bo import BOObservation, BOPrediction, BOSelectionResult, FeatureVector
+from ldm_tts.data_collection import (
+    DataCollectionPaths,
+    DataCollectionSink,
+    LDMDataCollectionError,
+    dataset_info_payload,
+    make_complete_design_ir,
+    make_parameter_edit_ir,
+    normalize_task_id,
+    render_prose,
+    render_record,
+    smallmol_ir_from_prompt_response,
+    smallmol_irs_from_round_record,
+    validate_ir_record,
+)
 from ldm_tts.loop import LDMSearchLoopResult, LDMSearchRoundResult, run_budgeted_search
 from ldm_tts.parameter_space import (
     OperationParameter,
@@ -64,8 +78,11 @@ __all__ = [
     "BOSelectionResult",
     "CandidateTraceRecord",
     "CandidateSpaceSpec",
+    "DataCollectionPaths",
+    "DataCollectionSink",
     "FeatureVector",
     "JsonlTrajectoryRecorder",
+    "LDMDataCollectionError",
     "LDMRoundTrace",
     "LDMSearchLoopResult",
     "LDMSearchRoundResult",
@@ -79,6 +96,7 @@ __all__ = [
     "best_item",
     "canonical_name",
     "choice_values_equal",
+    "dataset_info_payload",
     "extract_json_object_text",
     "finite_or_none",
     "initial_active_operation_schema",
@@ -87,6 +105,9 @@ __all__ = [
     "load_json_object",
     "load_jsonl",
     "load_operation_schema",
+    "make_complete_design_ir",
+    "make_parameter_edit_ir",
+    "normalize_task_id",
     "normalize_operation_numeric",
     "normalize_operation_parameter",
     "operation_feature_dim",
@@ -97,6 +118,10 @@ __all__ = [
     "operation_schema_to_json",
     "ranked_items",
     "reject_keys",
+    "render_prose",
+    "render_record",
+    "smallmol_ir_from_prompt_response",
+    "smallmol_irs_from_round_record",
     "replace_operation_schema",
     "require_allowed_keys",
     "require_list",
@@ -105,6 +130,7 @@ __all__ = [
     "require_str",
     "run_budgeted_search",
     "strip_json_fence",
+    "validate_ir_record",
     "validate_operation_payload",
     "validate_operation_value",
 ]

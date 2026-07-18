@@ -1,0 +1,12 @@
+{
+  "ldm_bo_sft": {
+    "file_name": "sft_sample.jsonl",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  }
+}
