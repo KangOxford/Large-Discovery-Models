@@ -3,6 +3,10 @@ task: nanogpt
 algorithm: best_of_n
 mode: real
 description: nanoGPT operation-tool LDM-TTS run against an OpenAI-compatible endpoint.
+env:
+  TTS_LLM_URL: http://127.0.0.1:52312/v1
+  TTS_LLM_MODEL: Qwen3-Coder-30B-A3B-Instruct
+  TTS_LLM_API_KEY: EMPTY
 args:
   train-file: ldm_task/real_train.py
   operation-schema: ldm_task/operation_schema_real_train.json
@@ -21,6 +25,7 @@ args:
   out-dir: ldm_runs
   run-name: "{name}"
   eval-command: "uv run --project {repo_root}/nanogpt python {train_path}"
-  llm-url: http://127.0.0.1:52312/v1
-  llm-model-name: Qwen3-Coder-30B-A3B-Instruct
+  llm-url: ${TTS_LLM_URL}
+  llm-model-name: ${TTS_LLM_MODEL}
+  api-key: ${TTS_LLM_API_KEY}
   temperature: 0.7

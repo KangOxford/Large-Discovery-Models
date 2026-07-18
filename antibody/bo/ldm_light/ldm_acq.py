@@ -38,6 +38,14 @@ if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
 from ldm_tts.trajectory import JsonlTrajectoryRecorder
+from ldm_tts.spaces import (
+    AcquisitionSpec,
+    CandidateSpaceSpec,
+    LDMTaskSpec,
+    ObjectiveSpec,
+    ResponseSpaceSpec,
+)
+from ldm_tts.response import load_json_object
 
 AA = "ACDEFGHIKLMNPQRSTVWY"
 AA_TO_IDX = {aa: i for i, aa in enumerate(AA)}
@@ -173,16 +181,12 @@ def passes_developability(seq: str) -> bool:
 
 
 def extract_json(raw: str) -> dict[str, Any]:
-    text = raw.strip()
-    fenced = re.search(r"```(?:json)?\s*(.*?)```", text, flags=re.I | re.S)
-    if fenced:
-        text = fenced.group(1).strip()
-    if not text.startswith("{"):
-        start, end = text.find("{"), text.rfind("}")
-        if start < 0 or end <= start:
-            raise ValueError("No JSON object found in LLM response")
-        text = text[start:end + 1]
-    return json.loads(text)
+    try:
+        return load_json_object(raw)
+    except ValueError as exc:
+        if str(exc) == "no JSON object found":
+            raise ValueError("No JSON object found in LLM response") from exc
+        raise
 
 
 def best_history(rows: list[dict[str, Any]], top_k: int) -> list[dict[str, Any]]:
@@ -730,6 +734,72 @@ def make_evaluator(config: dict[str, Any], antigen: str, run_id: str):
     return AbsolutEvaluator(bbox, run_id), bbox
 
 
+def describe_ldm_task(
+    args: argparse.Namespace,
+    config: dict[str, Any],
+    antigen: str,
+) -> LDMTaskSpec:
+    seq_len = int(config.get("seq_len", 11))
+    acq_name = str(getattr(args, "acq", ACQ_NAME)).lower()
+    return LDMTaskSpec(
+        task="antibody",
+        candidate_space=CandidateSpaceSpec(
+            name="cdrh3_sequence",
+            kind="categorical_sequence",
+            dimension=seq_len,
+            representation="fixed-length amino-acid sequence encoded as categorical indices",
+            constraints={
+                "alphabet": AA,
+                "alphabet_size": len(AA),
+                "max_cysteine": 1,
+                "max_hydrophobic_run": 4,
+                "max_aromatic_FWY": 2,
+                "net_charge_range": [-1.0, 2.0],
+                "forbid_n_glycosylation_NXS_or_NXT": True,
+            },
+            metadata={
+                "antigen": antigen,
+                "n_init": int(args.n_init),
+                "parallel_budget": int(args.parallel_budget),
+            },
+        ),
+        objectives=(
+            ObjectiveSpec(
+                name="absolut_energy",
+                direction="minimize",
+                description="Absolut binding energy; lower is better.",
+            ),
+        ),
+        response_spaces=(
+            ResponseSpaceSpec(
+                name="candidate_pool_selection",
+                output_kind="json",
+                parser="bo.ldm_light.ldm_acq.parse_selected",
+                description="Warmup LLM selects sequence ids from a supplied candidate pool.",
+            ),
+            ResponseSpaceSpec(
+                name="dsl_update",
+                output_kind="json",
+                parser="bo.ldm.llm.response_parser.parse_response",
+                description="Post-warmup LLM updates search-space and optional bias DSL atoms.",
+            ),
+        ),
+        acquisition=AcquisitionSpec(
+            name=acq_name,
+            objective_names=("absolut_energy",),
+            score_direction="maximize",
+            selection_rule="maximize GP acquisition over DSL-expanded candidate pool",
+            parameters={
+                "beta": float(getattr(args, "acq_beta", 1.0)),
+                "n_init": int(args.n_init),
+                "parallel_budget": int(args.parallel_budget),
+                "batch_size": int(args.batch_size),
+            },
+        ),
+        metadata={"seed": int(args.seed), "n_evals": int(args.n_evals)},
+    )
+
+
 def append_results(
     rows: list[dict[str, Any]],
     values: np.ndarray,
@@ -797,6 +867,7 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
             "parallel_budget": int(args.parallel_budget),
             "acquisition": acq_name,
             "acq_beta": acq_beta,
+            "ldm_task_spec": describe_ldm_task(args, config, antigen).to_dict(),
         },
         rounds_filename="llm_acq_decisions.jsonl",
         reset_rounds_file=True,

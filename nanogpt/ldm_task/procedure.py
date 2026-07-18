@@ -30,6 +30,32 @@ if str(_WORKSPACE_ROOT) not in sys.path:
 
 from ldm_tts.scoring import as_float as shared_as_float
 from ldm_tts.scoring import is_finite_number
+from ldm_tts.parameter_space import (
+    OperationParameter,
+    OperationSchema,
+    ValidatedOperation,
+    canonical_name,
+    choice_values_equal,
+    initial_active_operation_schema,
+    load_operation_schema,
+    normalize_operation_numeric,
+    normalize_operation_parameter,
+    operation_feature_dim,
+    operation_feature_version,
+    operation_parameter_from_payload,
+    operation_parameter_to_json,
+    operation_schema_to_json,
+    replace_operation_schema,
+    validate_operation_payload,
+    validate_operation_value,
+)
+from ldm_tts.spaces import (
+    AcquisitionSpec,
+    CandidateSpaceSpec,
+    LDMTaskSpec,
+    ObjectiveSpec,
+    ResponseSpaceSpec,
+)
 
 from nanogpt.ldm_task.single_search import make_unique_run_dir, safe_path_tag
 from nanogpt.ldm_task.search_core import (
@@ -152,32 +178,6 @@ class Prediction:
     ei: float
     lcb: float
     selection_score: float
-
-
-@dataclass(frozen=True)
-class OperationParameter:
-    name: str
-    kind: str
-    min_value: float | None = None
-    max_value: float | None = None
-    choices: tuple[Any, ...] = ()
-    scale: str = "linear"
-
-
-@dataclass(frozen=True)
-class OperationSchema:
-    version: str
-    description: str
-    parameters: dict[str, OperationParameter]
-    path: Path | None = None
-
-
-@dataclass
-class ValidatedOperation:
-    name: str
-    op: str
-    value: Any
-    rationale: str = ""
 
 
 @dataclass
@@ -1270,6 +1270,23 @@ async def async_main(argv: list[str] | None = None) -> int:
             f"features={list(engine.operation_schema.parameters)} "
             f"feature_dim={operation_feature_dim(engine.operation_schema)}"
         )
+    ldm_task_spec = describe_ldm_task(
+        args,
+        operation_schema,
+        active_operation_schema,
+        effective_method=effective_method,
+    )
+    ldm_task_spec_dict = ldm_task_spec.to_dict()
+    (out_dir / "ldm_task_spec.json").write_text(
+        json.dumps(ldm_task_spec_dict, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    logger.write(
+        "ldm_task_spec "
+        f"candidate_space={ldm_task_spec.candidate_space.name} "
+        f"dimension={ldm_task_spec.candidate_space.dimension} "
+        f"acquisition={ldm_task_spec.acquisition.name}"
+    )
     feedback_path = resolve_feedback_path(args.feedback_tsv, project_root, out_dir)
     feedback_memory = FeedbackMemory(
         feedback_path,
@@ -1427,6 +1444,7 @@ async def async_main(argv: list[str] | None = None) -> int:
     summary_args["run_buffer"] = str(buffer_snapshot_path)
     summary_args["log"] = str(log_path)
     summary_args["feedback_tsv"] = str(feedback_path)
+    summary_args["ldm_task_spec"] = ldm_task_spec_dict
     summary_path = engine.write_summary(method=f"model_based_{effective_method}", args=summary_args, best=best_actual)
     sync_run_buffer(buffer_path, buffer_snapshot_path)
     write_model_based_summary(
@@ -1439,6 +1457,7 @@ async def async_main(argv: list[str] | None = None) -> int:
         warmup_record,
         all_iteration_records,
         best_actual,
+        ldm_task_spec=ldm_task_spec_dict,
     )
     logger.write(
         "finish "
@@ -2504,222 +2523,6 @@ def score_with_surrogate(
     write_state_update(engine, state)
 
 
-def load_operation_schema(path: Path, project_root: Path) -> OperationSchema:
-    schema_path = path if path.is_absolute() else project_root / path
-    data = json.loads(schema_path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
-        raise ValueError(f"Operation schema {schema_path} must be a JSON object.")
-    version = str(data.get("version") or "").strip()
-    if not version:
-        raise ValueError(f"Operation schema {schema_path} is missing a non-empty version.")
-    raw_parameters = data.get("parameters")
-    if not isinstance(raw_parameters, dict) or not raw_parameters:
-        raise ValueError(f"Operation schema {schema_path} must define parameters.")
-    parameters: dict[str, OperationParameter] = {}
-    raw_order = data.get("parameter_order")
-    if isinstance(raw_order, list) and raw_order:
-        ordered_names = [str(name) for name in raw_order]
-    else:
-        ordered_names = [str(name) for name in raw_parameters]
-    raw_parameter_by_canonical = {canonical_name(str(name)): (name, spec) for name, spec in raw_parameters.items()}
-    for raw_name in ordered_names:
-        canonical_raw_name = canonical_name(str(raw_name))
-        if canonical_raw_name not in raw_parameter_by_canonical:
-            raise ValueError(f"Parameter order references unknown parameter {raw_name!r}.")
-        original_name, raw_spec = raw_parameter_by_canonical[canonical_raw_name]
-        if not isinstance(raw_spec, dict):
-            raise ValueError(f"Parameter {original_name!r} spec must be an object.")
-        name = canonical_name(str(original_name))
-        kind = str(raw_spec.get("type") or "").strip().lower()
-        if kind not in {"int", "float", "choice"}:
-            raise ValueError(f"Parameter {name} has unsupported type {kind!r}.")
-        choices: tuple[Any, ...] = ()
-        min_value = None
-        max_value = None
-        if kind == "choice":
-            raw_choices = raw_spec.get("choices")
-            if not isinstance(raw_choices, list) or not raw_choices:
-                raise ValueError(f"Choice parameter {name} must define a non-empty choices list.")
-            choices = tuple(raw_choices)
-        else:
-            min_value = as_float(raw_spec.get("min"))
-            max_value = as_float(raw_spec.get("max"))
-            if min_value is None or max_value is None or min_value > max_value:
-                raise ValueError(f"Numeric parameter {name} must define valid min/max values.")
-        scale = str(raw_spec.get("scale") or "linear").strip().lower()
-        if scale not in {"linear", "log"}:
-            raise ValueError(f"Parameter {name} has unsupported scale {scale!r}.")
-        if scale == "log" and (min_value is None or min_value <= 0 or max_value is None or max_value <= 0):
-            raise ValueError(f"Log-scaled parameter {name} must have positive min/max.")
-        parameters[name] = OperationParameter(
-            name=name,
-            kind=kind,
-            min_value=min_value,
-            max_value=max_value,
-            choices=choices,
-            scale=scale,
-        )
-    return OperationSchema(
-        version=version,
-        description=str(data.get("description") or ""),
-        parameters=parameters,
-        path=schema_path,
-    )
-
-
-def operation_feature_version(schema: OperationSchema) -> str:
-    return f"operation_schema:{schema.version}"
-
-
-def operation_schema_signature(schema: OperationSchema) -> str:
-    return hashlib.sha1(
-        json.dumps(operation_schema_to_json(schema), sort_keys=True).encode("utf-8")
-    ).hexdigest()[:12]
-
-
-def replace_operation_schema(
-    base: OperationSchema,
-    parameters: dict[str, OperationParameter],
-    *,
-    version_suffix: str,
-    description_prefix: str,
-) -> OperationSchema:
-    ordered = {canonical_name(name): normalize_operation_parameter(parameter) for name, parameter in parameters.items()}
-    payload = {
-        "base_version": base.version,
-        "parameter_order": list(ordered),
-        "parameters": {name: operation_parameter_to_json(parameter) for name, parameter in ordered.items()},
-    }
-    digest = hashlib.sha1(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:12]
-    description = f"{description_prefix} {base.description}".strip()
-    return OperationSchema(
-        version=f"{base.version}:{version_suffix}:{digest}",
-        description=description,
-        parameters=ordered,
-        path=base.path,
-    )
-
-
-def initial_active_operation_schema(full_schema: OperationSchema, args: argparse.Namespace) -> OperationSchema:
-    names = initial_operation_feature_names(full_schema, str(getattr(args, "initial_operation_features", "5") or "5"))
-    parameters = {name: full_schema.parameters[name] for name in names}
-    return replace_operation_schema(
-        full_schema,
-        parameters,
-        version_suffix="active",
-        description_prefix="Active dynamically expanded operation-feature subset.",
-    )
-
-
-def initial_operation_feature_names(full_schema: OperationSchema, spec: str) -> list[str]:
-    names = list(full_schema.parameters)
-    text = str(spec or "").strip()
-    if not text or text.lower() == "all":
-        return names
-    if re.fullmatch(r"\d+", text):
-        count = max(1, min(len(names), int(text)))
-        return names[:count]
-    selected: list[str] = []
-    for raw_name in text.split(","):
-        name = canonical_name(raw_name)
-        if not name:
-            continue
-        if name not in full_schema.parameters:
-            raise ValueError(f"Unknown initial operation feature {raw_name!r}.")
-        if name not in selected:
-            selected.append(name)
-    if not selected:
-        raise ValueError("--initial-operation-features did not select any schema parameters.")
-    return selected
-
-
-def normalize_operation_parameter(parameter: OperationParameter) -> OperationParameter:
-    name = canonical_name(parameter.name)
-    kind = str(parameter.kind).strip().lower()
-    if kind not in {"int", "float", "choice"}:
-        raise ValueError(f"Parameter {name} has unsupported type {kind!r}.")
-    choices = tuple(parameter.choices)
-    min_value = parameter.min_value
-    max_value = parameter.max_value
-    if kind == "choice":
-        if not choices:
-            raise ValueError(f"Choice parameter {name} must define choices.")
-        min_value = None
-        max_value = None
-    else:
-        min_value = as_float(min_value)
-        max_value = as_float(max_value)
-        if min_value is None or max_value is None or min_value > max_value:
-            raise ValueError(f"Numeric parameter {name} must define valid min/max values.")
-    scale = str(parameter.scale or "linear").strip().lower()
-    if scale not in {"linear", "log"}:
-        raise ValueError(f"Parameter {name} has unsupported scale {scale!r}.")
-    if scale == "log" and kind != "choice" and (
-        min_value is None or min_value <= 0 or max_value is None or max_value <= 0
-    ):
-        raise ValueError(f"Log-scaled parameter {name} must have positive min/max.")
-    return OperationParameter(
-        name=name,
-        kind=kind,
-        min_value=min_value,
-        max_value=max_value,
-        choices=choices,
-        scale=scale,
-    )
-
-
-def operation_parameter_to_json(parameter: OperationParameter) -> dict[str, Any]:
-    parameter = normalize_operation_parameter(parameter)
-    if parameter.kind == "choice":
-        return {
-            "name": parameter.name,
-            "type": "choice",
-            "choices": list(parameter.choices),
-        }
-    return {
-        "name": parameter.name,
-        "type": parameter.kind,
-        "min": parameter.min_value,
-        "max": parameter.max_value,
-        "scale": parameter.scale,
-    }
-
-
-def operation_parameter_from_payload(payload: Any) -> OperationParameter:
-    if not isinstance(payload, dict):
-        raise ValueError("feature payload must be an object.")
-    name = canonical_name(str(payload.get("name") or payload.get("parameter") or ""))
-    if not name:
-        raise ValueError("feature payload must include a non-empty name.")
-    kind = str(payload.get("type") or payload.get("kind") or "").strip().lower()
-    if kind == "numeric":
-        kind = "float"
-    if kind == "choice":
-        choices = payload.get("choices")
-        if not isinstance(choices, list) or not choices:
-            raise ValueError(f"Choice feature {name} must include non-empty choices.")
-        parameter = OperationParameter(name=name, kind="choice", choices=tuple(choices))
-    else:
-        if kind not in {"int", "float"}:
-            raise ValueError(f"Feature {name} has unsupported type {kind!r}.")
-        parameter = OperationParameter(
-            name=name,
-            kind=kind,
-            min_value=as_float(payload.get("min")),
-            max_value=as_float(payload.get("max")),
-            scale=str(payload.get("scale") or "linear"),
-        )
-    return normalize_operation_parameter(parameter)
-
-
-def operation_feature_dim(schema: OperationSchema) -> int:
-    total = 0
-    for parameter in schema.parameters.values():
-        total += len(parameter.choices) if parameter.kind == "choice" else 1
-        total += 1
-    return total
-
-
 def surrogate_feature_dim(args: argparse.Namespace, schema: OperationSchema | None) -> int:
     if use_operation_features(args, schema):
         assert schema is not None
@@ -2800,17 +2603,6 @@ def literal_assignment_value(node: ast.AST | None) -> Any:
         if abs(number - round(number)) <= 1e-9:
             return int(round(number))
         return float(number)
-
-
-def normalize_operation_numeric(value: float, parameter: OperationParameter) -> float:
-    lo = float(parameter.min_value)
-    hi = float(parameter.max_value)
-    value = min(max(float(value), lo), hi)
-    if hi == lo:
-        return 0.0
-    if parameter.scale == "log":
-        return (math.log(value) - math.log(lo)) / (math.log(hi) - math.log(lo))
-    return (value - lo) / (hi - lo)
 
 
 def make_operation_tool_schema(schema: OperationSchema, max_operations: int) -> dict[str, Any]:
@@ -2932,6 +2724,151 @@ def make_dynamic_operation_tools(engine: OperationSearchEngine) -> list[dict[str
         }
     )
     return tools
+
+
+def describe_ldm_task(
+    args: argparse.Namespace,
+    full_schema: OperationSchema | None,
+    active_schema: OperationSchema | None,
+    *,
+    effective_method: str | None = None,
+) -> LDMTaskSpec:
+    if use_operation_features(args, active_schema):
+        assert active_schema is not None
+        max_active = int(getattr(args, "max_active_operation_features", 0) or 0)
+        if full_schema is not None and max_active <= 0:
+            max_active = len(full_schema.parameters)
+        full_dimension = None if full_schema is None else operation_feature_dim(full_schema)
+        candidate_space = CandidateSpaceSpec(
+            name="operation_feature_vector",
+            kind="mixed_parameter_vector",
+            dimension=operation_feature_dim(active_schema),
+            representation="active train.py operation schema encoded as normalized numeric and one-hot choice features",
+            constraints={
+                "active_feature_count": len(active_schema.parameters),
+                "max_active_operation_features": max_active,
+            },
+            metadata={
+                "active_feature_names": list(active_schema.parameters),
+                "active_schema_version": active_schema.version,
+                "full_feature_count": None if full_schema is None else len(full_schema.parameters),
+                "full_feature_dimension": full_dimension,
+                "full_schema_version": None if full_schema is None else full_schema.version,
+            },
+        )
+    else:
+        candidate_space = CandidateSpaceSpec(
+            name="code_numeric_hash_vector",
+            kind="dense_numeric_vector",
+            dimension=feature_dim(int(args.hash_dims)),
+            representation="numeric assignment features plus hashed train.py token features",
+            constraints={"hash_dims": int(args.hash_dims)},
+            metadata={"feature_version": FEATURE_VERSION},
+        )
+
+    response_spaces: list[ResponseSpaceSpec] = []
+    if active_schema is not None and args.generator in OPERATION_GENERATORS:
+        response_spaces.append(
+            ResponseSpaceSpec(
+                name="train_operations",
+                output_kind="tool_call_or_json",
+                parser="nanogpt.ldm_task.procedure.validate_generator_action",
+                description="LLM edits active train.py operation features with deterministic application.",
+                schema=make_operation_tool_schema(
+                    active_schema,
+                    int(getattr(args, "max_operations_per_step", 1)),
+                )["function"]["parameters"],
+                metadata={
+                    "tool_name": "propose_train_operations",
+                    "active_feature_names": list(active_schema.parameters),
+                },
+            )
+        )
+        feature_expansion_allowed = bool(getattr(args, "allow_feature_expansion", True))
+        max_active = int(getattr(args, "max_active_operation_features", 0) or 0)
+        if full_schema is not None and max_active <= 0:
+            max_active = len(full_schema.parameters)
+        inactive_names = (
+            []
+            if full_schema is None
+            else [name for name in full_schema.parameters if name not in active_schema.parameters]
+        )
+        expansion_available = (
+            feature_expansion_allowed
+            and (max_active <= 0 or len(active_schema.parameters) < max_active)
+            and (bool(inactive_names) or bool(getattr(args, "allow_new_feature_specs", False)))
+        )
+        if expansion_available:
+            response_spaces.append(
+                ResponseSpaceSpec(
+                    name="operation_feature_activation",
+                    output_kind="tool_call_or_json",
+                    parser="nanogpt.ldm_task.procedure.validate_feature_payload",
+                    description="LLM activates one inactive operation feature dimension for later GP scoring.",
+                    schema={
+                        "type": "object",
+                        "required": ["name"],
+                        "properties": {
+                            "name": {"type": "string", "enum": inactive_names} if inactive_names else {"type": "string"},
+                            "rationale": {"type": "string"},
+                        },
+                    },
+                    metadata={
+                        "tool_name": "propose_operation_feature",
+                        "inactive_feature_names": inactive_names,
+                        "allow_new_feature_specs": bool(getattr(args, "allow_new_feature_specs", False)),
+                    },
+                )
+            )
+    else:
+        response_spaces.append(
+            ResponseSpaceSpec(
+                name="code_edit",
+                output_kind="text",
+                parser="nanogpt.ldm_task.search_core.SearchEngine",
+                description="Task-local generator proposes code edits that are applied to train.py.",
+                metadata={"generator": args.generator},
+            )
+        )
+
+    method = effective_method or str(getattr(args, "effective_method", args.method))
+    return LDMTaskSpec(
+        task="nanogpt",
+        candidate_space=candidate_space,
+        objectives=(
+            ObjectiveSpec(
+                name=str(args.score_key),
+                direction="maximize" if bool(args.maximize) else "minimize",
+                description="Metric extracted from train.py evaluation output.",
+            ),
+        ),
+        response_spaces=tuple(response_spaces),
+        acquisition=AcquisitionSpec(
+            name=str(args.surrogate_mode),
+            objective_names=(str(args.score_key),),
+            score_direction="minimize",
+            selection_rule=(
+                f"inner {method} surrogate-scored search; select from {args.select_from}; "
+                "lower selection_score is preferred"
+            ),
+            parameters={
+                "gp_beta": float(args.gp_beta),
+                "gp_xi": float(args.gp_xi),
+                "gp_lengthscale": float(args.gp_lengthscale),
+                "gp_noise": float(args.gp_noise),
+                "breadth": int(args.breadth),
+                "depth": int(args.depth),
+                "beam_width": int(args.beam_width),
+            },
+        ),
+        metadata={
+            "generator": args.generator,
+            "method": method,
+            "iterations": int(args.iterations),
+            "warmup": int(args.warmup),
+            "seed_policy": args.seed_policy,
+        },
+    )
 
 
 def build_operation_prompt(
@@ -3336,78 +3273,6 @@ def validate_feature_payload(
             raise ValueError(f"new numeric feature {parameter.name} has no numeric current value.")
         validate_operation_value(value, parameter, index=1)
     return parameter, rationale
-
-
-def validate_operation_payload(
-    payload: Any,
-    schema: OperationSchema,
-    *,
-    max_operations: int,
-) -> list[ValidatedOperation]:
-    if not isinstance(payload, dict):
-        raise ValueError("payload must be an object containing operations.")
-    raw_operations = payload.get("operations")
-    if not isinstance(raw_operations, list) or not raw_operations:
-        raise ValueError("payload.operations must be a non-empty list.")
-    if len(raw_operations) > max(1, int(max_operations)):
-        raise ValueError(f"too many operations: {len(raw_operations)} > {max_operations}.")
-    seen: set[str] = set()
-    validated: list[ValidatedOperation] = []
-    for index, raw in enumerate(raw_operations, start=1):
-        if not isinstance(raw, dict):
-            raise ValueError(f"operation {index} must be an object.")
-        name = canonical_name(str(raw.get("name") or ""))
-        if name not in schema.parameters:
-            raise ValueError(f"operation {index} uses unknown parameter {name!r}.")
-        if name in seen:
-            raise ValueError(f"operation {index} repeats parameter {name}.")
-        seen.add(name)
-        parameter = schema.parameters[name]
-        op = str(raw.get("op") or "").strip()
-        expected_op = "set_choice" if parameter.kind == "choice" else "set_numeric"
-        if op != expected_op:
-            raise ValueError(f"operation {index} for {name} must use op={expected_op!r}, got {op!r}.")
-        value = validate_operation_value(raw.get("value"), parameter, index=index)
-        rationale = str(raw.get("rationale") or "").strip()
-        validated.append(ValidatedOperation(name=name, op=op, value=value, rationale=rationale))
-    return validated
-
-
-def validate_operation_value(value: Any, parameter: OperationParameter, *, index: int) -> Any:
-    if parameter.kind == "choice":
-        for choice in parameter.choices:
-            if choice_values_equal(value, choice):
-                return choice
-        raise ValueError(f"operation {index} value {value!r} is not in choices for {parameter.name}.")
-    if isinstance(value, bool):
-        raise ValueError(f"operation {index} value for {parameter.name} must not be boolean.")
-    number = as_float(value)
-    if number is None:
-        raise ValueError(f"operation {index} value for {parameter.name} must be numeric.")
-    if number < float(parameter.min_value) or number > float(parameter.max_value):
-        raise ValueError(
-            f"operation {index} value for {parameter.name}={number} outside "
-            f"[{parameter.min_value}, {parameter.max_value}]."
-        )
-    if parameter.kind == "int":
-        if abs(number - round(number)) > 1e-9:
-            raise ValueError(f"operation {index} value for {parameter.name} must be an integer.")
-        return int(round(number))
-    return float(number)
-
-
-def choice_values_equal(left: Any, right: Any) -> bool:
-    if isinstance(right, str):
-        return str(left) == right
-    if isinstance(right, bool):
-        return bool(left) is right
-    if isinstance(right, int) and not isinstance(right, bool):
-        number = as_float(left)
-        return number is not None and abs(number - int(right)) <= 1e-9
-    if isinstance(right, float):
-        number = as_float(left)
-        return number is not None and abs(number - float(right)) <= 1e-9
-    return left == right
 
 
 def apply_operations_to_train_text(
@@ -4157,10 +4022,6 @@ def assignment_name(node: ast.AST) -> str | None:
     return None
 
 
-def canonical_name(name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_").upper()
-
-
 def numeric_stats(values: list[float]) -> list[float]:
     if not values:
         return [0.0] * 6
@@ -4642,30 +4503,6 @@ def resolve_operation_schema(args: argparse.Namespace, project_root: Path) -> Op
     if schema_path is None:
         return None
     return load_operation_schema(schema_path, project_root)
-
-
-def operation_schema_to_json(schema: OperationSchema) -> dict[str, Any]:
-    parameters: dict[str, Any] = {}
-    for parameter in schema.parameters.values():
-        if parameter.kind == "choice":
-            parameters[parameter.name] = {
-                "type": "choice",
-                "choices": list(parameter.choices),
-            }
-        else:
-            parameters[parameter.name] = {
-                "type": parameter.kind,
-                "min": parameter.min_value,
-                "max": parameter.max_value,
-                "scale": parameter.scale,
-            }
-    return {
-        "version": schema.version,
-        "description": schema.description,
-        "source_path": None if schema.path is None else str(schema.path),
-        "parameter_order": list(schema.parameters),
-        "parameters": parameters,
-    }
 
 
 def resolve_buffer_path(buffer_arg: Path | None, project_root: Path, run_buffer_path: Path) -> Path:
@@ -5187,6 +5024,8 @@ def write_model_based_summary(
     warmup_record: dict[str, Any],
     iteration_records: list[dict[str, Any]],
     best_actual: SearchState | None,
+    *,
+    ldm_task_spec: dict[str, Any] | None = None,
 ) -> None:
     serializable_records = []
     for record in iteration_records:
@@ -5212,6 +5051,8 @@ def write_model_based_summary(
         "warmup": serializable_warmup,
         "iterations": serializable_records,
     }
+    if ldm_task_spec is not None:
+        payload["ldm_task_spec"] = ldm_task_spec
     (out_dir / "model_based_summary.json").write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

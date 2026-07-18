@@ -3,6 +3,10 @@ task: antibody
 algorithm: lcb
 mode: real
 description: AntBO-style LDM-TTS run using a GP lower-confidence-bound acquisition.
+env:
+  LLM_BASE_URL: http://127.0.0.1:52313/v1
+  LLM_API_KEY: EMPTY
+  LLM_MODEL_NAME: Qwen3.5-9B
 args:
   config: bo/config.yaml
   antigens-file: test_5_antigens.txt
@@ -14,8 +18,9 @@ args:
   parallel-budget: 600
   acq: lcb
   acq-beta: 2.0
-  llm-url: http://127.0.0.1:52313/v1
-  llm-model-name: Qwen3.5-9B
+  llm-url: ${LLM_BASE_URL}
+  llm-model-name: ${LLM_MODEL_NAME}
+  api-key: ${LLM_API_KEY}
   llm-temperature: 0.7
   llm-max-tokens: 4096
   disable-thinking: true

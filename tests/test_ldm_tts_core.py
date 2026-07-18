@@ -3,18 +3,33 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from argparse import Namespace
 from pathlib import Path
 
 from ldm_tts import (
+    BOObservation,
+    BOPrediction,
+    BOSelectionResult,
+    CandidateTraceRecord,
+    FeatureVector,
     JsonlTrajectoryRecorder,
+    LDMRoundTrace,
     LDMSearchRoundResult,
     best_item,
     finite_or_none,
+    initial_active_operation_schema,
     is_finite_number,
+    load_json_object,
     load_jsonl,
+    load_operation_schema,
+    operation_feature_dim,
     ranked_items,
+    reject_keys,
     run_budgeted_search,
+    validate_operation_payload,
 )
+from ldm_tts.dependency_checks import check_plan, cli_args_to_map, has_failures
+from ldm_tts.runner import build_plan
 
 
 class LDMScoringTests(unittest.TestCase):
@@ -78,6 +93,43 @@ class LDMSearchLoopTests(unittest.TestCase):
         self.assertEqual(result.rounds_run, 2)
         self.assertEqual(empty_counts, [(0, 1), (1, 2)])
 
+    def test_budgeted_loop_stops_on_empty_selection_by_default(self) -> None:
+        history: list[int] = []
+
+        result = run_budgeted_search(
+            history,
+            budget=1,
+            build_round=lambda round_idx, _history: LDMSearchRoundResult(
+                record={"round_idx": round_idx},
+            ),
+        )
+
+        self.assertEqual(history, [])
+        self.assertEqual(result.early_stop_reason, "empty_selection")
+        self.assertEqual(result.rounds_run, 1)
+
+    def test_budgeted_loop_retries_empty_selection_when_early_stop_disabled(self) -> None:
+        history: list[int] = []
+
+        def build_round(round_idx: int, _history: list[int]) -> LDMSearchRoundResult[int]:
+            if round_idx < 2:
+                return LDMSearchRoundResult(record={"round_idx": round_idx})
+            return LDMSearchRoundResult(
+                history_delta=[round_idx],
+                record={"round_idx": round_idx},
+            )
+
+        result = run_budgeted_search(
+            history,
+            budget=1,
+            build_round=build_round,
+            allow_early_stop=False,
+        )
+
+        self.assertEqual(history, [2])
+        self.assertIsNone(result.early_stop_reason)
+        self.assertEqual(result.rounds_run, 3)
+
 
 class LDMTrajectoryTests(unittest.TestCase):
     def test_jsonl_recorder_writes_config_and_rounds(self) -> None:
@@ -95,6 +147,281 @@ class LDMTrajectoryTests(unittest.TestCase):
             self.assertEqual(json.loads((run_dir / "config.json").read_text()), {"task": "smoke"})
             self.assertEqual(load_jsonl(run_dir / "events.jsonl"), [{"a": 1, "b": 2}])
             self.assertEqual(json.loads((run_dir / "summary.json").read_text()), {"ok": True})
+
+
+class LDMRunnerConfigTests(unittest.TestCase):
+    def test_args_can_reference_config_env_values(self) -> None:
+        config = {
+            "name": "small_molecule_env_refs",
+            "task": "small_molecule",
+            "env": {
+                "G12D": "small_molecule/activity_modeling/best_g12d_model.joblib",
+                "VINA_BIN": "/opt/vina/bin/vina",
+            },
+            "args": {
+                "nn-model-path": "${G12D}",
+                "vina-bin": "${VINA_BIN}",
+            },
+        }
+
+        plan = build_plan(config, Path("config/small_molecule/test.yaml"))
+
+        self.assertIn("--nn-model-path", plan["argv"])
+        nn_path_index = plan["argv"].index("--nn-model-path") + 1
+        self.assertTrue(plan["argv"][nn_path_index].endswith("small_molecule/activity_modeling/best_g12d_model.joblib"))
+        self.assertIn("--vina-bin", plan["argv"])
+        self.assertEqual(plan["argv"][plan["argv"].index("--vina-bin") + 1], "/opt/vina/bin/vina")
+
+    def test_negatable_boolean_false_emits_no_flag(self) -> None:
+        config = {
+            "name": "small_molecule_boolean_flags",
+            "task": "small_molecule",
+            "args": {
+                "allow-early-stop": False,
+                "mock": False,
+            },
+        }
+
+        plan = build_plan(config, Path("config/small_molecule/test.yaml"))
+
+        self.assertIn("--no-allow-early-stop", plan["argv"])
+        self.assertNotIn("--mock", plan["argv"])
+        self.assertNotIn("--no-mock", plan["argv"])
+
+
+class LDMDependencyCheckTests(unittest.TestCase):
+    def test_cli_args_to_map_handles_flags_values_and_negation(self) -> None:
+        parsed = cli_args_to_map([
+            "--mock",
+            "--budget",
+            "8",
+            "--no-allow-early-stop",
+            "--seed",
+            "-1",
+        ])
+
+        self.assertTrue(parsed["mock"])
+        self.assertEqual(parsed["budget"], "8")
+        self.assertFalse(parsed["allow-early-stop"])
+        self.assertEqual(parsed["seed"], "-1")
+
+    def test_mock_small_molecule_dependency_check_skips_external_tools(self) -> None:
+        config = {
+            "name": "small_molecule_mock_deps",
+            "task": "small_molecule",
+            "mode": "mock",
+            "args": {
+                "mock": True,
+                "gp-device": "cpu",
+                "llm-model-name": "mock-model",
+            },
+        }
+        checks = check_plan(build_plan(config, Path("config/small_molecule/test.yaml")))
+        by_name = {check.name: check for check in checks}
+
+        self.assertFalse(has_failures(checks))
+        self.assertEqual(by_name["Vina"].status, "skip")
+        self.assertEqual(by_name["G12D activity model"].status, "skip")
+        self.assertEqual(by_name["ReaSyn"].status, "skip")
+
+    def test_real_small_molecule_dependency_check_reports_missing_external_tools(self) -> None:
+        config = {
+            "name": "small_molecule_real_deps",
+            "task": "small_molecule",
+            "mode": "real",
+            "args": {
+                "method": "m1_stratified_direct_llm_oversample_sir",
+                "gp-device": "cpu",
+                "llm-url": "http://127.0.0.1:52308/v1",
+                "llm-model-name": "mock-model",
+                "api-key": "EMPTY",
+                "vina-bin": "/definitely/missing/vina",
+                "nn-model-path": "missing_activity_model.joblib",
+            },
+        }
+        checks = check_plan(
+            build_plan(config, Path("config/small_molecule/test.yaml")),
+            include_optional=False,
+        )
+        failed = {check.name for check in checks if check.status == "fail"}
+
+        self.assertIn("Vina", failed)
+        self.assertIn("G12D activity model", failed)
+
+
+class LDMResponseContractTests(unittest.TestCase):
+    def test_json_object_loader_accepts_markdown_fenced_objects(self) -> None:
+        self.assertEqual(load_json_object('```json\n{"a": 1}\n```'), {"a": 1})
+
+    def test_nested_banned_keys_are_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "score"):
+            reject_keys({"items": [{"score": 1.0}]}, {"score"})
+
+
+class LDMOperationSpaceTests(unittest.TestCase):
+    def test_shared_operation_schema_reports_full_and_active_dimensions(self) -> None:
+        project_root = Path(__file__).resolve().parents[1] / "nanogpt"
+        schema = load_operation_schema(
+            Path("ldm_task/operation_schema_mock_train.json"),
+            project_root,
+        )
+        active_schema = initial_active_operation_schema(
+            schema,
+            Namespace(initial_operation_features="5"),
+        )
+
+        self.assertEqual(operation_feature_dim(schema), 27)
+        self.assertEqual(operation_feature_dim(active_schema), 16)
+        self.assertEqual(list(active_schema.parameters), [
+            "DEPTH",
+            "WIDTH",
+            "MATRIX_LR",
+            "EMBEDDING_LR",
+            "WEIGHT_DECAY",
+        ])
+
+    def test_shared_operation_payload_validation_canonicalizes_values(self) -> None:
+        project_root = Path(__file__).resolve().parents[1] / "nanogpt"
+        schema = load_operation_schema(
+            Path("ldm_task/operation_schema_mock_train.json"),
+            project_root,
+        )
+
+        operations = validate_operation_payload(
+            {
+                "operations": [
+                    {"name": "depth", "op": "set_numeric", "value": 4.0},
+                    {"name": "width", "op": "set_choice", "value": "512"},
+                ],
+            },
+            schema,
+            max_operations=2,
+        )
+
+        self.assertEqual([(op.name, op.op, op.value) for op in operations], [
+            ("DEPTH", "set_numeric", 4),
+            ("WIDTH", "set_choice", 512),
+        ])
+
+
+class LDMBOTraceContractTests(unittest.TestCase):
+    def test_bo_records_serialize_nested_feature_vectors(self) -> None:
+        feature = FeatureVector(
+            values=(0.1, 0.9),
+            version="mock:v1",
+            source_id="candidate-1",
+            metadata={"space": "toy"},
+        )
+        observation = BOObservation(
+            candidate_id="candidate-1",
+            objectives=(-1.0,),
+            feature=feature,
+        )
+        prediction = BOPrediction(
+            candidate_id="candidate-1",
+            mean=(-1.2,),
+            std=(0.3,),
+            acquisition_score=0.42,
+        )
+        selection = BOSelectionResult(
+            selected_candidate_ids=("candidate-1",),
+            predictions=(prediction,),
+        )
+
+        self.assertEqual(feature.to_dict()["values"], (0.1, 0.9))
+        self.assertEqual(observation.to_dict()["feature"]["source_id"], "candidate-1")
+        self.assertEqual(selection.to_dict()["predictions"][0]["candidate_id"], "candidate-1")
+        json.dumps(selection.to_dict())
+
+    def test_round_trace_serializes_candidate_rows(self) -> None:
+        trace = LDMRoundTrace(
+            round_idx=2,
+            task="mock_task",
+            history_size_before=3,
+            history_size_after=4,
+            response_space="direct_candidates",
+            acquisition="gp_ucb",
+            candidates=(
+                CandidateTraceRecord(
+                    candidate_id="candidate-1",
+                    payload={"x": 1},
+                    prediction={"acquisition_score": 0.5},
+                    true_scores=(-1.0,),
+                    selected=True,
+                ),
+            ),
+            selected_candidate_ids=("candidate-1",),
+        )
+
+        payload = trace.to_dict()
+
+        self.assertEqual(payload["candidates"][0]["payload"], {"x": 1})
+        self.assertTrue(payload["candidates"][0]["selected"])
+        json.dumps(payload)
+
+
+class LDMTaskSpecTests(unittest.TestCase):
+    def test_nanogpt_operation_spec_reports_active_and_full_dimensions(self) -> None:
+        from nanogpt.ldm_task import procedure as nanogpt_procedure
+
+        project_root = Path(__file__).resolve().parents[1] / "nanogpt"
+        args = nanogpt_procedure.parse_args([
+            "--generator",
+            "operation_mock",
+            "--operation-schema",
+            "ldm_task/operation_schema_mock_train.json",
+            "--train-file",
+            "ldm_task/mock_train.py",
+            "--method",
+            "best_of_n",
+        ])
+        args.project_root = project_root
+        schema = nanogpt_procedure.load_operation_schema(
+            Path("ldm_task/operation_schema_mock_train.json"),
+            project_root,
+        )
+        active_schema = nanogpt_procedure.initial_active_operation_schema(schema, args)
+
+        spec = nanogpt_procedure.describe_ldm_task(
+            args,
+            schema,
+            active_schema,
+            effective_method="best_of_n",
+        )
+
+        self.assertEqual(spec.task, "nanogpt")
+        self.assertEqual(spec.candidate_space.dimension, 16)
+        self.assertEqual(spec.candidate_space.metadata["full_feature_dimension"], 27)
+        self.assertIn(
+            "train_operations",
+            {response_space.name for response_space in spec.response_spaces},
+        )
+
+    def test_small_molecule_spec_reports_two_objective_space(self) -> None:
+        from small_molecule.ldm_task import procedure as molecule_procedure
+
+        args = molecule_procedure.parse_args(["--mock"])
+
+        spec = molecule_procedure.describe_ldm_task(args)
+
+        self.assertEqual(spec.task, "small_molecule")
+        self.assertEqual(
+            [(objective.name, objective.direction) for objective in spec.objectives],
+            [("vina", "minimize"), ("activity", "maximize")],
+        )
+        self.assertEqual(spec.candidate_space.constraints["max_smiles_len"], 80)
+
+    def test_antibody_spec_reports_categorical_sequence_space(self) -> None:
+        from antibody.ldm_task import procedure as antibody_procedure
+
+        args = antibody_procedure.parse_args(["--mock", "--antigen", "SMOKE_ANTIGEN"])
+
+        spec = antibody_procedure.describe_ldm_task(args, {"seq_len": 11}, ["SMOKE_ANTIGEN"])
+
+        self.assertEqual(spec.task, "antibody")
+        self.assertEqual(spec.candidate_space.dimension, 11)
+        self.assertEqual(spec.candidate_space.constraints["alphabet_size"], 20)
+        self.assertEqual(spec.objectives[0].direction, "minimize")
 
 
 if __name__ == "__main__":

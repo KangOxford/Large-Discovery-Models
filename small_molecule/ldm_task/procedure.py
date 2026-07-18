@@ -56,6 +56,15 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
+from ldm_tts.spaces import (
+    AcquisitionSpec,
+    CandidateSpaceSpec,
+    LDMTaskSpec,
+    ObjectiveSpec,
+    ResponseSpaceSpec,
+)
+from ldm_tts.dependency_checks import check_small_molecule, format_checks, has_failures
+
 DEFAULT_NN_MODEL_PATH = "activity_modeling/best_g12d_model.joblib"
 REPO_RELATIVE_PREFIXES = ("small_molecule", "nanogpt", "antibody", "config", "ldm_tts", "scripts")
 QWEN35_DEFAULT_SAMPLING = {
@@ -123,10 +132,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         print(json.dumps({
             "config": planned_config_json(args, output_dir),
+            "ldm_task_spec": describe_ldm_task(args).to_dict(),
             "output_dir": str(output_dir),
             "mock": bool(args.mock),
         }, indent=2, sort_keys=True))
         return 0
+
+    if not args.mock:
+        preflight_real_dependencies(args)
 
     try:
         cfg = build_config(args, output_dir)
@@ -311,6 +324,23 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def preflight_real_dependencies(args: argparse.Namespace) -> None:
+    dep_args = {key.replace("_", "-"): value for key, value in vars(args).items()}
+    checks = check_small_molecule(
+        dep_args,
+        os.environ.copy(),
+        REPO_ROOT,
+        mode="real",
+        include_optional="analog" in str(args.method),
+    )
+    if has_failures(checks):
+        raise SystemExit(
+            "Small-molecule dependency preflight failed. Fix the failed items "
+            "or run `python scripts/check_task_dependencies.py <config>` for "
+            "the full config-aware report.\n" + format_checks(checks)
+        )
+
+
 def configure_logging(args: argparse.Namespace) -> None:
     root_level = getattr(logging, args.log_level)
     logging.basicConfig(
@@ -364,6 +394,125 @@ def build_config(args: argparse.Namespace, output_dir: Path) -> TiltedLDMCase2Co
         resume_from_trajectory=bool(args.resume),
         seed=args.seed,
         verbose=bool(args.verbose),
+    )
+
+
+def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
+    kernel_impl = "smiles-strkernel" if args.kernel == "sk" else "fingerprint+tanimoto"
+    gp_feature_dimension = None if args.kernel == "sk" else int(args.gp_fp_n_bits)
+    if args.method in {"m1_stratified_direct_llm_only", "m1_llm_one_step"}:
+        acquisition = AcquisitionSpec(
+            name="llm_order",
+            objective_names=("vina", "activity"),
+            score_direction="rank",
+            selection_rule="evaluate candidates in LLM/reservoir order",
+            parameters={"batch_size": int(args.batch_size)},
+        )
+    else:
+        acquisition = AcquisitionSpec(
+            name="ehvi_tilted_sir",
+            objective_names=("vina", "activity"),
+            score_direction="sample",
+            selection_rule="sample candidates from q0 base mass tilted by robust-z EHVI",
+            parameters={
+                "alpha_base_measure": float(args.alpha),
+                "eta_ehvi_tilt": float(args.eta),
+                "ehvi_n_samples": int(args.ehvi_n_samples),
+                "batch_size": int(args.batch_size),
+            },
+        )
+    return LDMTaskSpec(
+        task="small_molecule",
+        candidate_space=CandidateSpaceSpec(
+            name="smiles",
+            kind="string",
+            dimension=None,
+            representation="canonical SMILES string",
+            constraints={"max_smiles_len": int(args.smiles_max_len)},
+            metadata={
+                "gp_kernel": kernel_impl,
+                "gp_feature_dimension": gp_feature_dimension,
+                "max_candidates_per_round": int(args.max_candidates_per_round),
+            },
+        ),
+        objectives=(
+            ObjectiveSpec(
+                name="vina",
+                direction="minimize",
+                description="AutoDock Vina binding score; lower is better.",
+            ),
+            ObjectiveSpec(
+                name="activity",
+                direction="maximize",
+                description="KRAS G12D activity model score; higher is better.",
+            ),
+        ),
+        response_spaces=(
+            ResponseSpaceSpec(
+                name="direct_smiles",
+                output_kind="json",
+                parser="strbo_v1.ldm_tilted_case2.schemas.parse_m1_direct_smiles",
+                description="LLM emits direct candidate SMILES without objective scores.",
+                schema={
+                    "type": "object",
+                    "required": ["direct_smiles"],
+                    "properties": {
+                        "direct_smiles": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["smiles"],
+                                "properties": {
+                                    "smiles": {"type": "string"},
+                                    "rationale": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                },
+                metadata={
+                    "banned_score_keys": [
+                        "score",
+                        "objective_score",
+                        "constraint_score",
+                        "acquisition_score",
+                        "uncertainty",
+                        "proxy_value",
+                    ]
+                },
+            ),
+            ResponseSpaceSpec(
+                name="seed_plan",
+                output_kind="json",
+                parser="strbo_v1.ldm_tilted_case2.schemas.parse_seed_plan",
+                description="LLM emits seed SMILES and per-seed analogue budgets.",
+                schema={
+                    "type": "object",
+                    "required": ["seeds"],
+                    "properties": {
+                        "seeds": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["smiles", "budget"],
+                                "properties": {
+                                    "smiles": {"type": "string"},
+                                    "budget": {"type": "integer", "minimum": 0},
+                                    "intent": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                },
+            ),
+        ),
+        acquisition=acquisition,
+        metadata={
+            "method": args.method,
+            "init_strategy": args.init_strategy,
+            "budget": int(args.budget),
+            "init_size": int(args.init_size),
+        },
     )
 
 

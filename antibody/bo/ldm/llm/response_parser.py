@@ -11,8 +11,9 @@ All keys are optional; missing key = keep current value.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
+
+from ldm_tts.response import load_json_object, require_allowed_keys
 
 
 @dataclass
@@ -35,28 +36,10 @@ def parse_response(raw: str) -> ParsedUpdate:
     if not raw or not raw.strip():
         raise ValueError("LLM response is empty")
 
-    raw = raw.strip()
-    # Strip optional ```json ... ``` fences
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].startswith("```"):
-            lines = lines[:-1]
-        raw = "\n".join(lines).strip()
-
-    try:
-        obj = json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"invalid JSON: {e}") from e
-
-    if not isinstance(obj, dict):
-        raise ValueError(f"response must be a JSON object, got {type(obj).__name__}")
+    obj = load_json_object(raw)
 
     allowed = {"update_trust_region", "update_bias", "rationale"}
-    unknown = set(obj) - allowed
-    if unknown:
-        raise ValueError(f"unknown top-level keys: {sorted(unknown)}")
+    require_allowed_keys(obj, allowed)
 
     return ParsedUpdate(
         update_trust_region=obj.get("update_trust_region"),

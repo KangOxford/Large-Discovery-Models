@@ -11,6 +11,13 @@ if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
 
 from ldm_tts.trajectory import JsonlTrajectoryRecorder
+from ldm_tts.spaces import (
+    AcquisitionSpec,
+    CandidateSpaceSpec,
+    LDMTaskSpec,
+    ObjectiveSpec,
+    ResponseSpaceSpec,
+)
 from strbo_v1.acquisition import hypervolume
 from strbo_v1.ldm_tilted_case2.config import TiltedLDMCase2Config
 
@@ -84,4 +91,83 @@ def _last_metric(rounds: list[dict[str, Any]], key: str) -> Any:
 def _config_dict(cfg: TiltedLDMCase2Config) -> dict[str, Any]:
     out = dict(cfg.__dict__)
     out["gp_config"] = dict(cfg.gp_config.__dict__)
+    out["ldm_task_spec"] = _ldm_task_spec(cfg).to_dict()
     return out
+
+
+def _ldm_task_spec(cfg: TiltedLDMCase2Config) -> LDMTaskSpec:
+    gp_impl = str(getattr(cfg.gp_config, "impl", ""))
+    gp_feature_dimension = (
+        int(getattr(cfg.gp_config, "fp_n_bits", 0) or 0)
+        if gp_impl == "fingerprint+tanimoto"
+        else None
+    )
+    if cfg.method in {"m1_stratified_direct_llm_only", "m1_llm_one_step"}:
+        acquisition = AcquisitionSpec(
+            name="llm_order",
+            objective_names=("vina", "activity"),
+            score_direction="rank",
+            selection_rule="evaluate candidates in LLM/reservoir order",
+            parameters={"batch_size": int(cfg.batch_size)},
+        )
+    else:
+        acquisition = AcquisitionSpec(
+            name="ehvi_tilted_sir",
+            objective_names=("vina", "activity"),
+            score_direction="sample",
+            selection_rule="sample candidates from q0 base mass tilted by robust-z EHVI",
+            parameters={
+                "alpha_base_measure": float(cfg.alpha_base_measure),
+                "eta_ehvi_tilt": float(cfg.eta_ehvi_tilt),
+                "ehvi_n_samples": int(cfg.ehvi_n_samples),
+                "batch_size": int(cfg.batch_size),
+            },
+        )
+    return LDMTaskSpec(
+        task="small_molecule",
+        candidate_space=CandidateSpaceSpec(
+            name="smiles",
+            kind="string",
+            dimension=None,
+            representation="canonical SMILES string",
+            constraints={"max_smiles_len": int(cfg.smiles_max_len)},
+            metadata={
+                "gp_kernel": gp_impl,
+                "gp_feature_dimension": gp_feature_dimension,
+                "max_candidates_per_round": int(cfg.max_candidates_per_round),
+            },
+        ),
+        objectives=(
+            ObjectiveSpec(
+                name="vina",
+                direction="minimize",
+                description="AutoDock Vina binding score; lower is better.",
+            ),
+            ObjectiveSpec(
+                name="activity",
+                direction="maximize",
+                description="KRAS G12D activity model score; higher is better.",
+            ),
+        ),
+        response_spaces=(
+            ResponseSpaceSpec(
+                name="direct_smiles",
+                output_kind="json",
+                parser="strbo_v1.ldm_tilted_case2.schemas.parse_m1_direct_smiles",
+                description="LLM emits direct candidate SMILES without objective scores.",
+            ),
+            ResponseSpaceSpec(
+                name="seed_plan",
+                output_kind="json",
+                parser="strbo_v1.ldm_tilted_case2.schemas.parse_seed_plan",
+                description="LLM emits seed SMILES and per-seed analogue budgets.",
+            ),
+        ),
+        acquisition=acquisition,
+        metadata={
+            "method": cfg.method,
+            "init_strategy": cfg.init_strategy,
+            "budget": int(cfg.budget),
+            "init_size": int(cfg.init_size),
+        },
+    )

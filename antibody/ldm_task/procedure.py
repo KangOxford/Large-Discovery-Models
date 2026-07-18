@@ -76,6 +76,14 @@ WORKSPACE_ROOT = REPO_ROOT.parent
 if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
+from ldm_tts.spaces import (
+    AcquisitionSpec,
+    CandidateSpaceSpec,
+    LDMTaskSpec,
+    ObjectiveSpec,
+    ResponseSpaceSpec,
+)
+
 
 class DeterministicAntBOTTSLLM:
     """Fake LLM for local TTS control-flow checks."""
@@ -263,7 +271,105 @@ def planned_config_json(args: argparse.Namespace, config: dict[str, Any], antige
             "max_tokens": args.llm_max_tokens,
             "disable_thinking": args.disable_thinking,
         },
+        "ldm_task_spec": describe_ldm_task(args, config, antigens).to_dict(),
     }
+
+
+def describe_ldm_task(
+    args: argparse.Namespace,
+    config: dict[str, Any],
+    antigens: list[str] | None = None,
+) -> LDMTaskSpec:
+    seq_len = int(config.get("seq_len", 11))
+    acq_name = str(args.acq).lower()
+    return LDMTaskSpec(
+        task="antibody",
+        candidate_space=CandidateSpaceSpec(
+            name="cdrh3_sequence",
+            kind="categorical_sequence",
+            dimension=seq_len,
+            representation="fixed-length amino-acid sequence encoded as categorical indices",
+            constraints={
+                "alphabet": "ACDEFGHIKLMNPQRSTVWY",
+                "alphabet_size": 20,
+                "max_cysteine": 1,
+                "max_hydrophobic_run": 4,
+                "max_aromatic_FWY": 2,
+                "net_charge_range": [-1.0, 2.0],
+                "forbid_n_glycosylation_NXS_or_NXT": True,
+            },
+            metadata={
+                "antigens": list(antigens or []),
+                "n_init": int(args.n_init),
+                "parallel_budget": int(args.parallel_budget),
+            },
+        ),
+        objectives=(
+            ObjectiveSpec(
+                name="absolut_energy",
+                direction="minimize",
+                description="Absolut binding energy; lower is better.",
+            ),
+        ),
+        response_spaces=(
+            ResponseSpaceSpec(
+                name="candidate_pool_selection",
+                output_kind="json",
+                parser="bo.ldm_light.ldm_acq.parse_selected",
+                description="Warmup LLM selects sequence ids from a supplied candidate pool.",
+                schema={
+                    "type": "object",
+                    "required": ["selected"],
+                    "properties": {
+                        "selected": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["id", "sequence", "score"],
+                                "properties": {
+                                    "id": {"type": "integer"},
+                                    "sequence": {"type": "string"},
+                                    "score": {"type": "number"},
+                                },
+                            },
+                        }
+                    },
+                },
+            ),
+            ResponseSpaceSpec(
+                name="dsl_update",
+                output_kind="json",
+                parser="bo.ldm.llm.response_parser.parse_response",
+                description="Post-warmup LLM updates search-space and optional bias DSL atoms.",
+                schema={
+                    "type": "object",
+                    "properties": {
+                        "rationale": {"type": "string"},
+                        "update_trust_region": {"type": "string"},
+                        "update_bias": {"type": "string"},
+                    },
+                    "additionalProperties": False,
+                },
+            ),
+        ),
+        acquisition=AcquisitionSpec(
+            name=acq_name,
+            objective_names=("absolut_energy",),
+            score_direction="maximize",
+            selection_rule="maximize GP acquisition over DSL-expanded candidate pool",
+            parameters={
+                "beta": float(args.acq_beta),
+                "n_init": int(args.n_init),
+                "parallel_budget": int(args.parallel_budget),
+                "batch_size": int(args.batch_size),
+            },
+        ),
+        metadata={
+            "seed": int(args.seed),
+            "n_trials": int(args.n_trials),
+            "include_antigen_context": bool(args.include_antigen_context),
+        },
+    )
 
 
 def configure_llm_environment(args: argparse.Namespace) -> None:
@@ -333,6 +439,7 @@ def run(args: argparse.Namespace) -> list[str]:
             "startTask": 0,
         }
         config["tabular_search_csv"] = None
+        config["device"] = "cpu"
         config["seq_len"] = int(config.get("seq_len", 11))
         antbo_tts.make_llm_client = lambda: DeterministicAntBOTTSLLM()
 

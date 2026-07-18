@@ -6,6 +6,7 @@ description: Small-molecule LDM-TTS run with stratified direct-LLM proposal and 
 env:
   LLM_BASE_URL: http://127.0.0.1:52308/v1
   LLM_API_KEY: EMPTY
+  LLM_MODEL_NAME: Qwen3.5-9B
   VINA: /mnt/data0/dock-project/bin/vina
   VINA_BIN: /mnt/data0/dock-project/bin/vina
   G12D: small_molecule/activity_modeling/best_g12d_model.joblib
@@ -39,9 +40,9 @@ args:
   ehvi-n-samples: 128
   alpha: 1.0
   eta: 3.0
-  llm-url: http://127.0.0.1:52308/v1
-  llm-model-name: Qwen3.5-9B
-  api-key: "EMPTY"
+  llm-url: ${LLM_BASE_URL}
+  llm-model-name: ${LLM_MODEL_NAME}
+  api-key: ${LLM_API_KEY}
   llm-timeout: 120.0
   llm-temperature: 0.7
   llm-max-tokens: 4096
