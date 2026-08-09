@@ -41,7 +41,7 @@ python -m pytest --cov --cov-config=.coveragerc --cov-report=term-missing
 
 The acquisition search tests import PyTorch, which is a declared runtime
 dependency of the antibody package. The coverage configuration measures all
-of `bo/ldm` with branch coverage and enforces a minimum total of 80%.
+of `core/ldm` with branch coverage and enforces a minimum total of 80%.
 
 ## Small Molecule
 
@@ -57,7 +57,7 @@ cd tasks/small_molecule
 uv run python -m pytest --cov --cov-config=.coveragerc --cov-report=term-missing
 ```
 
-The small-molecule coverage configuration measures all of `strbo_v1` with
+The small-molecule coverage configuration measures all of `tasks.small_molecule.core` with
 branch coverage and enforces a minimum total of 80%.
 
 The real ReaSyn, Vina, model-service, and GPU integration tests remain skipped

@@ -20,7 +20,7 @@ does not use ReaSyn, so no GPU or ReaSyn checkout is required.
 
 ```bash
 test -f tasks/small_molecule/uv.lock
-test -s tasks/small_molecule/activity_modeling/best_g12d_model.joblib
+test -s tasks/small_molecule/resources/models/best_g12d_model.joblib
 python scripts/validate_tasks.py --task small_molecule
 ```
 
@@ -65,7 +65,7 @@ Vina is an external executable. Create the repository-provided Conda
 environment when it is not installed already:
 
 ```bash
-conda env create -f tasks/small_molecule/environment_docking.yml
+conda env create -f tasks/small_molecule/environments/docking.yaml
 export VINA_BIN="$(conda run -n markush-dock which vina | sed '/^[[:space:]]*$/d' | tail -n 1)"
 test -x "$VINA_BIN"
 "$VINA_BIN" --help
@@ -75,7 +75,7 @@ If `markush-dock` already exists, update it instead:
 
 ```bash
 conda env update -n markush-dock \
-  -f tasks/small_molecule/environment_docking.yml --prune
+  -f tasks/small_molecule/environments/docking.yaml --prune
 ```
 
 ## 5. Configure The Real Run
@@ -85,7 +85,7 @@ output, or process arguments:
 
 ```bash
 export CUDA_VISIBLE_DEVICES=''
-export G12D="$PWD/tasks/small_molecule/activity_modeling/best_g12d_model.joblib"
+export G12D="$PWD/tasks/small_molecule/resources/models/best_g12d_model.joblib"
 export LLM_BASE_URL=https://your-model-host.example/v1
 export LLM_API_KEY=your-api-key
 export LLM_MODEL_NAME=your-served-model
@@ -156,7 +156,7 @@ CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/small_molecule \
   --set args.dry-run=true \
   --set args.budget=1 \
   --set args.init-size=1 \
-  --set args.trajectory-dir=runs/small_molecule/first_real_contract
+  --set args.trajectory-dir=runs/first_real_contract
 ```
 
 Confirm the resolved plan is CPU-only and contains no API key.
@@ -178,7 +178,7 @@ CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/small_molecule \
   --set args.nn-model-path="$G12D" \
   --set args.vina-exhaustiveness=1 \
   --set args.vina-n-poses=1 \
-  --set args.trajectory-dir=runs/small_molecule/first_real_tiny
+  --set args.trajectory-dir=runs/first_real_tiny
 ```
 
 The validated clean-room trial selected `CC1(C)NC(=O)c2ccccc2N1`, with Vina
@@ -188,9 +188,9 @@ so treat those values as a reference, not an assertion for future runs.
 ## 10. Inspect Results And Run Tests
 
 ```bash
-rg --files tasks/small_molecule/runs/small_molecule/first_real_tiny
+rg --files tasks/small_molecule/runs/first_real_tiny
 sed -n '1,240p' \
-  tasks/small_molecule/runs/small_molecule/first_real_tiny/summary.json
+  tasks/small_molecule/runs/first_real_tiny/summary.json
 
 CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/small_molecule \
   pytest -q tests tasks/small_molecule/tests

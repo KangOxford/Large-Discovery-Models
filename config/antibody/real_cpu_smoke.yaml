@@ -4,7 +4,7 @@ algorithm: ei
 mode: real
 description: One real API-backed AntBO proposal and Absolut evaluation on CPU.
 args:
-  config: bo/config.yaml
+  config: resources/default_config.yaml
   antigen: 1ADQ_A
   seed: 42
   n-trials: 1
@@ -26,4 +26,4 @@ args:
   history-top-k: 10
   include-antigen-context: true
   fallback-random: false
-  out-dir: ldm_runs/antbo_real_cpu_smoke
+  out-dir: runs/antbo_real_cpu_smoke

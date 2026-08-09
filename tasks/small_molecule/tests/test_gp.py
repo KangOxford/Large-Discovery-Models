@@ -1,4 +1,4 @@
-"""Tests for ``strbo_v1.gp``.
+"""Tests for ``tasks.small_molecule.core.gp``.
 
 All GP-related tests are skipped when the heavy stack (torch + gpytorch
 + gauche + rdkit) is unavailable so that the suite can still be run
@@ -23,7 +23,7 @@ try:
     from gauche.kernels.fingerprint_kernels.tanimoto_kernel import TanimotoKernel  # noqa: F401
     from gauche.kernels.string_kernels.sskkernel import SubsequenceStringKernel  # noqa: F401
 
-    from strbo_v1.gp import (
+    from tasks.small_molecule.core.gp import (
         GPSurrogate,
         GPConfig,
         _build_smiles_alphabet,
@@ -290,7 +290,7 @@ class GPSurrogateFitTests(unittest.TestCase):
         surrogate = GPSurrogate(
             GPConfig(impl="fingerprint+tanimoto", **_CPU_CONFIG_KW)
         )
-        with patch("strbo_v1.gp.gpytorch.settings.cholesky_jitter", _failing_cholesky):
+        with patch("tasks.small_molecule.core.gp.gpytorch.settings.cholesky_jitter", _failing_cholesky):
             surrogate.fit(["CCO", "CCN", "CCC"], [-7.0, -7.5, -8.0])
 
         self.assertTrue(surrogate.is_fitted)

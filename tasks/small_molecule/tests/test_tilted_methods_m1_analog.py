@@ -5,10 +5,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.ldm_tilted_case2.config import TiltedLDMCase2Config
-from strbo_v1.ldm_tilted_case2.methods.llm_seed_analog import LLMSeedAnalogReservoirBuilder
-from strbo_v1.llm_advisor.client import MockLLMClient
-from strbo_v1.rng import RNG
+from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
+from tasks.small_molecule.core.ldm_tilted_case2.methods.llm_seed_analog import LLMSeedAnalogReservoirBuilder
+from tasks.small_molecule.core.llm_advisor.client import MockLLMClient
+from tasks.small_molecule.core.rng import RNG
 
 
 def test_llm_seed_analog_uses_llm_seeds_and_analog_generator():

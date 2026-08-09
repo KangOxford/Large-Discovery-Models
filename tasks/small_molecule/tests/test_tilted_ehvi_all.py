@@ -6,11 +6,11 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.gp import GPConfig
-from strbo_v1.ldm_tilted_case2.candidate_record import CandidateRecord
-from strbo_v1.ldm_tilted_case2.config import TiltedLDMCase2Config
-from strbo_v1.ldm_tilted_case2.ehvi_all import compute_ehvi_for_candidates
-from strbo_v1.rng import RNG
+from tasks.small_molecule.core.gp import GPConfig
+from tasks.small_molecule.core.ldm_tilted_case2.candidate_record import CandidateRecord
+from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
+from tasks.small_molecule.core.ldm_tilted_case2.ehvi_all import compute_ehvi_for_candidates
+from tasks.small_molecule.core.rng import RNG
 
 
 def cfg():
@@ -66,7 +66,7 @@ def test_ehvi_gp_failure_fallback(monkeypatch):
     def fail_fit(*args, **kwargs):
         raise RuntimeError("fit failed")
 
-    monkeypatch.setattr("strbo_v1.ldm_tilted_case2.ehvi_all.GPSurrogate.fit", fail_fit)
+    monkeypatch.setattr("tasks.small_molecule.core.ldm_tilted_case2.ehvi_all.GPSurrogate.fit", fail_fit)
     recs = candidates()
     result = compute_ehvi_for_candidates(history(), recs, cfg(), RNG(seed=3))
     np.testing.assert_array_equal(result.ehvi, np.zeros(2))

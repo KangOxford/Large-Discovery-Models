@@ -1,4 +1,4 @@
-"""Tests for ``strbo_v1.objective_vina``.
+"""Tests for ``tasks.small_molecule.core.objective_vina``.
 
 Convention follows ``tests/test_analog.py``: ``unittest`` + ``tempfile``
 + ``unittest.mock`` patching. Vina is mocked everywhere; no real
@@ -27,15 +27,19 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from extract_and_dock import DockingResult, ExtractedCompound, ReceptorConfig  # noqa: E402
+from tasks.small_molecule.core.docking import (  # noqa: E402
+    DockingResult,
+    ExtractedCompound,
+    ReceptorConfig,
+)
 
-from strbo_v1 import (  # noqa: E402
+from tasks.small_molecule.core import (  # noqa: E402
     Scorer,
     VinaScorer,
     VinaScorerConfig,
 )
-from strbo_v1 import objective_vina as objective_module  # noqa: E402
-from strbo_v1.objective_vina import (  # noqa: E402
+from tasks.small_molecule.core import objective_vina as objective_module  # noqa: E402
+from tasks.small_molecule.core.objective_vina import (  # noqa: E402
     _resolve_vina_bin,
     vina_dock_batch,
     vina_dock_one,
@@ -136,7 +140,7 @@ class VinaScorerConfigTests(unittest.TestCase):
 
     def test_default_cache_dir(self) -> None:
         cfg = VinaScorerConfig()
-        self.assertEqual(cfg.cache_dir, Path("docking_work"))
+        self.assertEqual(cfg.cache_dir, Path("runs/docking"))
 
     def test_failure_score_field_removed(self) -> None:
         """The legacy ``failure_score`` field is gone; failures are signalled
@@ -617,7 +621,7 @@ class VinaScorerCallTests(unittest.TestCase):
         # VinaScorer is callable.
         self.assertTrue(callable(self.scorer))
         # The Scorer type alias is importable from the package level.
-        from strbo_v1 import Scorer as TopLevelScorer
+        from tasks.small_molecule.core import Scorer as TopLevelScorer
         self.assertIs(TopLevelScorer, Scorer)
 
     def test_call_does_not_read_vina_bin_env(self) -> None:
@@ -907,7 +911,7 @@ class VinaDockBatchTests(unittest.TestCase):
 
 class PackageExportsTests(unittest.TestCase):
     def test_init_reexports_core_symbols(self) -> None:
-        from strbo_v1 import (
+        from tasks.small_molecule.core import (
             Scorer,
             VinaScorer,
             VinaScorerConfig,
@@ -917,7 +921,7 @@ class PackageExportsTests(unittest.TestCase):
         self.assertIs(Scorer, Scorer)
 
     def test_init_does_not_reexport_removed_or_helper_symbols(self) -> None:
-        import strbo_v1
+        import tasks.small_molecule.core
 
         for removed in (
             "VinaObjective",       # dropped: batch-then-best design
@@ -925,14 +929,14 @@ class PackageExportsTests(unittest.TestCase):
             "aggregate_vina_scores",  # dropped: reducer
             "VinaCandidate",       # dropped: archive state
         ):
-            self.assertNotIn(removed, strbo_v1.__all__)
+            self.assertNotIn(removed, tasks.small_molecule.core.__all__)
         for helper in (
             "vina_dock_one",
             "vina_dock_batch",
         ):
-            # Still importable as strbo_v1.objective_vina.<name>, but not
+            # Still importable as tasks.small_molecule.core.objective_vina.<name>, but not
             # part of the canonical public surface.
-            self.assertNotIn(helper, strbo_v1.__all__)
+            self.assertNotIn(helper, tasks.small_molecule.core.__all__)
 
 
 if __name__ == "__main__":

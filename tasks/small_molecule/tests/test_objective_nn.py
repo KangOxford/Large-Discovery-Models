@@ -1,4 +1,4 @@
-"""Tests for ``strbo_v1.objective_nn`` (``NNScorer``).
+"""Tests for ``tasks.small_molecule.core.objective_nn`` (``NNScorer``).
 
 Loads the committed G12D artifact for end-to-end coverage of the wrapper.
 For the ``on_error`` policies we inject a broken ``predict`` via a
@@ -19,14 +19,14 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from strbo_v1 import NNScorer, NNScorerConfig  # noqa: E402
-from strbo_v1.experiment_defaults import DEFAULT_NN_MODEL_PATH  # noqa: E402
-from strbo_v1.objective_nn import NNScorer as _NNScorer  # noqa: E402
+from tasks.small_molecule.core import NNScorer, NNScorerConfig  # noqa: E402
+from tasks.small_molecule.core.experiment_defaults import DEFAULT_NN_MODEL_PATH  # noqa: E402
+from tasks.small_molecule.core.objective_nn import NNScorer as _NNScorer  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COMMITTED_MODEL = REPO_ROOT / DEFAULT_NN_MODEL_PATH
-COMMITTED_METADATA = REPO_ROOT / "activity_modeling" / "best_g12d_model_metadata.json"
+COMMITTED_METADATA = REPO_ROOT / "resources" / "models" / "best_g12d_model_metadata.json"
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ class LoadCommittedModelTests(unittest.TestCase):
         self.assertIn("G12D", scorer.metadata.get("task", ""))
 
     def test_missing_model_raises_runtime_error(self) -> None:
-        bogus = REPO_ROOT / "activity_modeling" / "does_not_exist.joblib"
+        bogus = REPO_ROOT / "resources" / "models" / "does_not_exist.joblib"
         with self.assertRaises(RuntimeError) as cm:
             NNScorer(NNScorerConfig(model_path=str(bogus)))
         self.assertIn(str(bogus), str(cm.exception))
@@ -106,7 +106,7 @@ class LoadCommittedModelTests(unittest.TestCase):
 
 class CallContractTests(unittest.TestCase):
     """``scorer(smiles_list)`` returns a list[float] matching the contract
-    in ``strbo_v1/scorer.py``: i-th output = i-th SMILES, ``nan`` on
+    in ``tasks.small_molecule.core/scorer.py``: i-th output = i-th SMILES, ``nan`` on
     invalid input, finite on success."""
 
     @classmethod
@@ -189,19 +189,19 @@ class OnErrorPolicyTests(unittest.TestCase):
 
 
 class PackageExportsTests(unittest.TestCase):
-    """The public surface re-exported from ``strbo_v1.__init__`` is
+    """The public surface re-exported from ``tasks.small_molecule.core.__init__`` is
     consistent."""
 
     def test_nnscorer_exported(self) -> None:
-        from strbo_v1 import NNScorer as Imported  # noqa: F401
+        from tasks.small_molecule.core import NNScorer as Imported  # noqa: F401
         self.assertIs(Imported, NNScorer)
 
     def test_nnscorer_config_exported(self) -> None:
-        from strbo_v1 import NNScorerConfig as Imported  # noqa: F401
+        from tasks.small_molecule.core import NNScorerConfig as Imported  # noqa: F401
         self.assertIs(Imported, NNScorerConfig)
 
     def test_scorer_typealias_exported(self) -> None:
-        from strbo_v1 import Scorer  # noqa: F401
+        from tasks.small_molecule.core import Scorer  # noqa: F401
         # Scorer is a TypeAlias; the binding is the alias object itself.
         self.assertTrue(callable(Scorer) or hasattr(Scorer, "__call__"))
 

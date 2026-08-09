@@ -4,8 +4,8 @@ algorithm: lcb
 mode: real
 description: AntBO-style LDM-TTS run using a GP lower-confidence-bound acquisition.
 args:
-  config: bo/config.yaml
-  antigens-file: test_5_antigens.txt
+  config: resources/default_config.yaml
+  antigens-file: resources/antigens.txt
   seed: 42
   n-trials: 1
   budget: 200
@@ -26,4 +26,4 @@ args:
   history-top-k: 10
   include-antigen-context: true
   fallback-random: true
-  out-dir: ldm_runs/antbo_real_lcb
+  out-dir: runs/antbo_real_lcb

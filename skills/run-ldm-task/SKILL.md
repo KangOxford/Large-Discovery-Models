@@ -41,7 +41,7 @@ Read [references/built-in-tasks.md](references/built-in-tasks.md) when running
 Run task-aware commands through the task project:
 
 ```bash
-uv run --project tasks/<task_id> python <script> ...
+uv run --locked --project tasks/<task_id> python <script> ...
 ```
 
 Use `--no-sync` only when the environment is already prepared and the user does
@@ -55,9 +55,9 @@ Run these gates in order:
 
 ```bash
 python scripts/validate_tasks.py --task <task_id>
-uv run --project tasks/<task_id> python scripts/check_task_dependencies.py \
+uv run --locked --project tasks/<task_id> python scripts/check_task_dependencies.py \
   <config_path> [--set path=value ...] [--no-optional]
-uv run --project tasks/<task_id> python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/<task_id> python scripts/run_ldm_tts.py \
   <config_path> --dry-run [--set path=value ...]
 ```
 

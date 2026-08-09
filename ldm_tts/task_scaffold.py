@@ -66,6 +66,8 @@ def _task_files(
         task_root / "__init__.py": f'"""{description}"""\n',
         task_root / "ldm_task" / "__init__.py": '"""Shared-runner adapter for this task."""\n',
         task_root / "ldm_task" / "procedure.py": _procedure_template(task_id),
+        task_root / "core" / "__init__.py": '"""Private task implementation."""\n',
+        task_root / "resources" / "README.md": _resources_readme_template(task_id),
         task_root / "tests" / "__init__.py": "",
         task_root / "tests" / "test_procedure.py": _test_template(task_id),
         task_root / "README.md": _readme_template(task_id, description),
@@ -172,12 +174,22 @@ def _readme_template(task_id: str, description: str) -> str:
 From the repository root:
 
 ```bash
-uv sync --project tasks/{task_id} --group dev
-uv run --project tasks/{task_id} python scripts/run_ldm_tts.py config/{task_id}/mock.yaml
+uv sync --locked --project tasks/{task_id} --group dev
+uv run --locked --project tasks/{task_id} \\
+  python scripts/run_ldm_tts.py config/{task_id}/mock.yaml
 ```
 
 Replace the generated placeholder candidate space, objective, response contract,
 and execution loop before adding a real-run config.
+'''
+
+
+def _resources_readme_template(task_id: str) -> str:
+    return f'''# {task_id} Resources
+
+Store versioned, non-generated task inputs here: schemas, prompts, seed
+programs, small reference datasets, or redistributable model artifacts.
+Runtime outputs belong under `../runs/` and must not be committed.
 '''
 
 

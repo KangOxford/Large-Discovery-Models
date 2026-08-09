@@ -24,15 +24,17 @@ present in the repository.
    python scripts/scaffold_task.py <task_id> --description "<one-line description>"
    ```
 
-4. Replace every generated semantic placeholder in
-   `tasks/<task_id>/ldm_task/procedure.py`. Implement the real candidate space,
-   objectives, model response contract, acquisition rule, and mock control
-   flow. Do not report completion while any `replace_me` or "Replace with"
-   placeholder remains.
-5. Keep domain code, prompts, scorers, model clients, and heavy dependencies
-   inside `tasks/<task_id>/`. Use shared `ldm_tts` modules for runner contracts,
-   acquisition scoring, task-space descriptions, response parsing, trajectory
-   records, and generic search-loop behavior.
+4. Replace every generated semantic placeholder. Keep
+   `tasks/<task_id>/ldm_task/procedure.py` as the stable adapter and implement
+   candidate generation, objectives, model calls, acquisition, evaluation, and
+   mock control flow under `tasks/<task_id>/core/`. Do not report completion
+   while any `replace_me` or "Replace with" placeholder remains.
+5. Keep importable domain code in `core/`, versioned inputs in `resources/`,
+   auxiliary CLIs in `scripts/`, optional external environment specs in
+   `environments/`, and generated artifacts in ignored `runs/`. Use shared
+   `ldm_tts` modules for runner contracts, acquisition scoring, task-space
+   descriptions, response parsing, trajectory records, and generic search-loop
+   behavior.
 6. Add a task-local `dependencies.py` hook only when the task has meaningful
    model, binary, artifact, dataset, accelerator, or evaluator prerequisites.
    Declare it in `task.json`. Keep its module imports lightweight so it can
@@ -46,7 +48,7 @@ present in the repository.
 
    ```bash
    python scripts/validate_tasks.py --task <task_id>
-   uv run --project tasks/<task_id> python -m pytest tasks/<task_id>/tests
+   uv run --locked --project tasks/<task_id> python -m pytest tasks/<task_id>/tests
    python scripts/check_task_dependencies.py config/<task_id>/mock.yaml --no-optional
    python scripts/run_ldm_tts.py config/<task_id>/mock.yaml --dry-run
    python scripts/run_ldm_tts.py config/<task_id>/mock.yaml
@@ -63,6 +65,8 @@ present in the repository.
 - Register through `tasks/<task_id>/task.json`; do not edit a central task map.
 - Keep the conventional module at
   `tasks.<task_id>.ldm_task.procedure` and define `main(argv)`.
+- Keep the conventional module shallow: it delegates into `core/` and does not
+  contain the task implementation.
 - Define `parse_args` and `describe_ldm_task` for consistency and inspection.
 - Keep `describe_ldm_task` faithful to runtime behavior; it is not decorative
   metadata.

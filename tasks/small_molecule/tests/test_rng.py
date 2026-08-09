@@ -1,4 +1,4 @@
-"""Tests for :mod:`strbo_v1.rng`."""
+"""Tests for :mod:`tasks.small_molecule.core.rng`."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.rng import RNG, as_rng  # noqa: E402
+from tasks.small_molecule.core.rng import RNG, as_rng  # noqa: E402
 
 
 class RNGConstructionTests(unittest.TestCase):

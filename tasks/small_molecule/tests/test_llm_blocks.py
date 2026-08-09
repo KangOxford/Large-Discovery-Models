@@ -2,7 +2,7 @@
 
 import pytest
 
-from strbo_v1.llm_advisor import (
+from tasks.small_molecule.core.llm_advisor import (
     LLMBlock,
     NoopBlock,
     PHASE_A_ACTIONS_ALLOWED,

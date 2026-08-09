@@ -12,7 +12,12 @@ tasks/<task_id>/
 ├── __init__.py
 ├── ldm_task/
 │   ├── __init__.py
-│   └── procedure.py
+│   ├── procedure.py
+│   └── dependencies.py
+├── core/
+│   └── __init__.py
+├── resources/
+│   └── README.md
 └── tests/
 
 config/<task_id>/
@@ -55,7 +60,9 @@ def describe_ldm_task(...) -> LDMTaskSpec:
 
 The runner applies config environment variables, changes to the task directory,
 imports the conventional module, and calls `main(argv)`. The task owns all
-domain execution behind that interface.
+domain execution behind that interface. Keep `ldm_task/procedure.py` as a thin
+adapter; put importable search, model, surrogate, and evaluator implementation
+under `core/`, and versioned runtime inputs under `resources/`.
 
 ## Dependency Hook
 
@@ -80,6 +87,8 @@ from `ldm_tts.dependency_checks`. Never print or return unmasked credentials.
 ## Completion Gates
 
 - `scripts/validate_tasks.py --task <task_id>` has no errors.
+- `ldm_task/` contains only the runner and dependency-check adapters.
+- Importable implementation and static inputs live in `core/` and `resources/`.
 - Task tests pass in the task environment.
 - Mock dependency check passes without external systems.
 - Mock runner dry-run resolves the registered module and task directory.

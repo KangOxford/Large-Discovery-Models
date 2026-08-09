@@ -45,7 +45,7 @@ args:
   llm-extra-body-json: null
   llm-max-retries: 2
   llm-retry-wait-seconds: 0.0
-  trajectory-dir: ldm_runs/case2_mock_m1
+  trajectory-dir: runs/case2_mock_m1
   output-dir: null
   resume: false
   resume-from: null
@@ -54,7 +54,7 @@ args:
   debug-llm-chunks: false
   verbose: false
   vina-bin: null
-  nn-model-path: activity_modeling/best_g12d_model.joblib
+  nn-model-path: resources/models/best_g12d_model.joblib
   reasyn-repo: null
   reasyn-model-path: null
   reasyn-devices: "0"

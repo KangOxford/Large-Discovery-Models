@@ -46,7 +46,7 @@ args:
   llm-extra-body-json: null
   llm-max-retries: 10
   llm-retry-wait-seconds: 10
-  trajectory-dir: runs/small_molecule/case2_qwen3_9B_proposer64_bon64_run7
+  trajectory-dir: runs/case2_qwen3_9B_proposer64_bon64_run7
   output-dir: null
   resume: false
   resume-from: null
@@ -66,7 +66,7 @@ args:
   vina-no-cache: false
   vina-allow-zero-charge-fallback: false
   vina-allow-debug-receptor: false
-  nn-model-path: activity_modeling/best_g12d_model.joblib
+  nn-model-path: resources/models/best_g12d_model.joblib
   reasyn-repo: null
   reasyn-python: null
   reasyn-model-path: null

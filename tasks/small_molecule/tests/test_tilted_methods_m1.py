@@ -6,16 +6,16 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.ldm_tilted_case2.config import TiltedLDMCase2Config
-from strbo_v1.ldm_tilted_case2.loop import run_tilted_case2_search
-from strbo_v1.ldm_tilted_case2.methods.direct_llm import (
+from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
+from tasks.small_molecule.core.ldm_tilted_case2.loop import run_tilted_case2_search
+from tasks.small_molecule.core.ldm_tilted_case2.methods.direct_llm import (
     LLM_DIRECT_CHUNK_SIZE,
     M1_MAX_PARALLEL_LLM_CALLS,
     M1_STRATEGIES,
     DirectLLMReservoirBuilder,
 )
-from strbo_v1.llm_advisor.client import MockLLMClient
-from strbo_v1.rng import RNG
+from tasks.small_molecule.core.llm_advisor.client import MockLLMClient
+from tasks.small_molecule.core.rng import RNG
 
 
 def build_client():
@@ -168,7 +168,7 @@ def test_m1_stratified_llm_only_selects_llm_order_without_ehvi(monkeypatch, tmp_
     def fail_ehvi(*_args, **_kwargs):
         raise AssertionError("LLM-only method must not call BO/EHVI")
 
-    monkeypatch.setattr("strbo_v1.ldm_tilted_case2.loop.compute_ehvi_for_candidates", fail_ehvi)
+    monkeypatch.setattr("tasks.small_molecule.core.ldm_tilted_case2.loop.compute_ehvi_for_candidates", fail_ehvi)
 
     client = MockLLMClient(
         scripted_responses=[

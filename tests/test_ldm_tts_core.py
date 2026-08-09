@@ -181,7 +181,7 @@ class LDMRunnerConfigTests(unittest.TestCase):
             "name": "small_molecule_env_refs",
             "task": "small_molecule",
             "env": {
-                "G12D": "tasks/small_molecule/activity_modeling/best_g12d_model.joblib",
+                "G12D": "tasks/small_molecule/resources/models/best_g12d_model.joblib",
                 "VINA_BIN": "/opt/vina/bin/vina",
             },
             "args": {
@@ -196,7 +196,7 @@ class LDMRunnerConfigTests(unittest.TestCase):
         nn_path_index = plan["argv"].index("--nn-model-path") + 1
         self.assertTrue(
             plan["argv"][nn_path_index].endswith(
-                "tasks/small_molecule/activity_modeling/best_g12d_model.joblib"
+                "tasks/small_molecule/resources/models/best_g12d_model.joblib"
             )
         )
         self.assertIn("--vina-bin", plan["argv"])
@@ -441,7 +441,7 @@ class LDMOperationSpaceTests(unittest.TestCase):
     def test_shared_operation_schema_reports_full_and_active_dimensions(self) -> None:
         project_root = Path(__file__).resolve().parents[1] / "tasks" / "nanogpt"
         schema = load_operation_schema(
-            Path("ldm_task/operation_schema_mock_train.json"),
+            Path("resources/schemas/mock_operations.json"),
             project_root,
         )
         active_schema = initial_active_operation_schema(
@@ -462,7 +462,7 @@ class LDMOperationSpaceTests(unittest.TestCase):
     def test_shared_operation_payload_validation_canonicalizes_values(self) -> None:
         project_root = Path(__file__).resolve().parents[1] / "tasks" / "nanogpt"
         schema = load_operation_schema(
-            Path("ldm_task/operation_schema_mock_train.json"),
+            Path("resources/schemas/mock_operations.json"),
             project_root,
         )
 
@@ -548,15 +548,15 @@ class LDMTaskSpecTests(unittest.TestCase):
             "--generator",
             "operation_mock",
             "--operation-schema",
-            "ldm_task/operation_schema_mock_train.json",
+            "resources/schemas/mock_operations.json",
             "--train-file",
-            "ldm_task/mock_train.py",
+            "resources/train/mock_train.py",
             "--method",
             "best_of_n",
         ])
         args.project_root = project_root
         schema = nanogpt_procedure.load_operation_schema(
-            Path("ldm_task/operation_schema_mock_train.json"),
+            Path("resources/schemas/mock_operations.json"),
             project_root,
         )
         active_schema = nanogpt_procedure.initial_active_operation_schema(schema, args)

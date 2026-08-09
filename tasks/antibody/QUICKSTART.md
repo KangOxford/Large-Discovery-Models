@@ -122,7 +122,7 @@ without calling the model or Absolut:
 CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/antibody \
   python scripts/run_ldm_tts.py config/antibody/real_cpu_smoke.yaml \
   --set args.dry-run=true \
-  --set args.out-dir=ldm_runs/antbo_first_real_contract
+  --set args.out-dir=runs/antbo_first_real_contract
 ```
 
 Confirm `device` is `cpu`, the antigen is `1ADQ_A`, the budget is one, and no
@@ -135,7 +135,7 @@ Run at most one heavy antibody smoke at a time:
 ```bash
 CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/antibody \
   python scripts/run_ldm_tts.py config/antibody/real_cpu_smoke.yaml \
-  --set args.out-dir=ldm_runs/antbo_first_real_tiny
+  --set args.out-dir=runs/antbo_first_real_tiny
 ```
 
 This configuration uses one model proposal, one 11-residue CDRH3 evaluation,
@@ -146,7 +146,7 @@ a reference rather than an expected fixed result. Lower energy is better.
 ## 9. Inspect Results
 
 ```bash
-rg --files tasks/antibody/ldm_runs/antbo_first_real_tiny
+rg --files tasks/antibody/runs/antbo_first_real_tiny
 ```
 
 Inspect the newest run directory beneath that path:

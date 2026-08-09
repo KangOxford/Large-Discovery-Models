@@ -4,10 +4,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.ldm_tilted_case2.candidate_record import CandidateRecord
-from strbo_v1.ldm_tilted_case2.config import TiltedLDMCase2Config
-from strbo_v1.ldm_tilted_case2.pool_maintenance import maintain_candidate_pool
-from strbo_v1.rng import RNG
+from tasks.small_molecule.core.ldm_tilted_case2.candidate_record import CandidateRecord
+from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
+from tasks.small_molecule.core.ldm_tilted_case2.pool_maintenance import maintain_candidate_pool
+from tasks.small_molecule.core.rng import RNG
 
 
 def _candidate(smiles: str, q0: float) -> CandidateRecord:

@@ -1,5 +1,5 @@
 # Empty package marker for pytest to discover tests/ as a package.
-# Also sets up sys.path to allow ``from bo.ldm.dsl...`` imports.
+# Also sets up sys.path to allow ``from tasks.antibody.core.ldm.dsl...`` imports.
 import sys
 from pathlib import Path
 

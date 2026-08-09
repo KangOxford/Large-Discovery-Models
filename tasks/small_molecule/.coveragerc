@@ -1,7 +1,7 @@
 [run]
 branch = True
 source =
-    strbo_v1
+    tasks.small_molecule.core
 
 [report]
 fail_under = 80

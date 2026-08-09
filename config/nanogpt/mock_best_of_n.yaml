@@ -4,8 +4,8 @@ algorithm: best_of_n
 mode: mock
 description: Safe nanoGPT LDM-TTS smoke run using the operation mock generator.
 args:
-  train-file: ldm_task/mock_train.py
-  operation-schema: ldm_task/operation_schema_mock_train.json
+  train-file: resources/train/mock_train.py
+  operation-schema: resources/schemas/mock_operations.json
   generator: operation_mock
   method: best_of_n
   breadth: 2
@@ -21,6 +21,6 @@ args:
   surrogate-mode: lcb
   gp-beta: 1.0
   gp-xi: 0.001
-  out-dir: ldm_runs
+  out-dir: runs
   run-name: "{name}"
   eval-command: "python {train_path}"

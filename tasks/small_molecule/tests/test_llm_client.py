@@ -5,15 +5,15 @@ import types
 
 import pytest
 
-from strbo_v1.llm_advisor.client import (
+from tasks.small_molecule.core.llm_advisor.client import (
     LLMClient,
     MockLLMClient,
     OpenAIChatClient,
     _serialize_blocks,
     build_default_client_from_env,
 )
-from strbo_v1.llm_advisor.config import LLMClientConfig
-from strbo_v1.llm_advisor.blocks import NoopBlock, ReviewBOBlock
+from tasks.small_molecule.core.llm_advisor.config import LLMClientConfig
+from tasks.small_molecule.core.llm_advisor.blocks import NoopBlock, ReviewBOBlock
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ def test_mock_no_script_raises() -> None:
 
 
 def test_openai_client_rejects_empty_api_key() -> None:
-    from strbo_v1.llm_advisor.config import LLMClientConfig
+    from tasks.small_molecule.core.llm_advisor.config import LLMClientConfig
     with pytest.raises(ValueError, match="LLM_API_KEY"):
         LLMClientConfig(api_key="", base_url="https://x", model="m")
 
@@ -284,12 +284,12 @@ def test_build_default_client_from_env_reads_optional_max_tokens(monkeypatch) ->
 
 def test_load_env_silent_when_dotenv_missing(monkeypatch, tmp_path) -> None:
     """load_env() is a no-op when no .env exists; it does not raise."""
-    from strbo_v1.llm_advisor.config import _project_root, load_env
+    from tasks.small_molecule.core.llm_advisor.config import _project_root, load_env
     # Point _project_root to a tempdir so the real .env is not found.
     # Easiest: clear env vars and trust the real .env is missing — but
     # in CI it might exist. So we monkey-patch _project_root.
     monkeypatch.setattr(
-        "strbo_v1.llm_advisor.config._project_root",
+        "tasks.small_molecule.core.llm_advisor.config._project_root",
         lambda: tmp_path,
     )
     # No .env in tmp_path.
@@ -310,10 +310,10 @@ def test_load_env_does_not_overwrite_existing_env_var(monkeypatch, tmp_path) -> 
     monkeypatch.setenv("LLM_API_KEY", "from-env")
     monkeypatch.setenv("LLM_BASE_URL", "https://from-env.example/v1")
     monkeypatch.setattr(
-        "strbo_v1.llm_advisor.config._project_root",
+        "tasks.small_molecule.core.llm_advisor.config._project_root",
         lambda: tmp_path,
     )
-    from strbo_v1.llm_advisor.config import load_env
+    from tasks.small_molecule.core.llm_advisor.config import load_env
     load_env()
     # Env vars still win.
     assert __import__("os").environ["LLM_API_KEY"] == "from-env"
@@ -327,9 +327,9 @@ def test_from_env_clear_error_message_when_no_dotenv(monkeypatch, tmp_path) -> N
         monkeypatch.delenv(var, raising=False)
     # Point to an empty tmpdir (no .env there).
     monkeypatch.setattr(
-        "strbo_v1.llm_advisor.config._project_root",
+        "tasks.small_molecule.core.llm_advisor.config._project_root",
         lambda: tmp_path,
     )
-    from strbo_v1.llm_advisor.config import LLMClientConfig
+    from tasks.small_molecule.core.llm_advisor.config import LLMClientConfig
     with pytest.raises(ValueError, match="LLM_API_KEY is empty; set it in .env"):
         LLMClientConfig.from_env()

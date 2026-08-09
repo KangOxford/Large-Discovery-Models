@@ -7,6 +7,24 @@ update DSL trust-region or bias atoms during search.
 For a new installation, follow the numbered
 [clean-room quick start](QUICKSTART.md) before using this reference guide.
 
+## Directory Architecture
+
+The task follows the repository-wide layout documented in
+[`tasks/README.md`](../README.md):
+
+```text
+ldm_task/      shared-runner adapter only
+core/          AntBO search, LLM, GP, and evaluator implementation
+resources/     default AntBO config and antigen inputs
+environments/  optional legacy Conda specification
+tests/         task-local unit and integration tests
+runs/          generated run artifacts (Git-ignored)
+```
+
+The supported runner entry point is `tasks.antibody.ldm_task.procedure:main`.
+Import implementation code from `tasks.antibody.core`; do not add new search
+modules or generated outputs under `ldm_task/`.
+
 ## Quick Start
 
 From the repository root:
@@ -47,7 +65,7 @@ them.
 | --- | --- | --- | --- |
 | Python environment | Pinned AntBO-era BoTorch/gpytorch/torch/sklearn stack plus OpenAI client. | GP acquisition, sequence search, and LLM policy updates. | `uv sync --locked --project tasks/antibody`; run with `uv run --locked --project tasks/antibody ...`. |
 | Absolut | External antibody-antigen binding-energy evaluator. Lower energy is better. It is not bundled with this repository. | Real objective evaluations. | `ABSOLUT_PATH`, `--absolut-path`, or `bbox.path` in a private AntBO config. |
-| Antigen inputs | Antigen name or antigen list. | Real and mock task selection. | `--antigen`, or `--antigens-file` such as `test_5_antigens.txt`. |
+| Antigen inputs | Antigen name or antigen list. | Real and mock task selection. | `--antigen`, or `--antigens-file` such as `resources/antigens.txt`. |
 | LLM endpoint | OpenAI-compatible chat endpoint for DSL updates. | Real LDM loops. | `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL_NAME`. |
 
 ## Dependency Check
@@ -63,13 +81,13 @@ The checker validates:
 
 - LLM URL, model name, and API key setup
 - antigen input or antigens file
-- `tasks/antibody/bo/config.yaml`
+- `tasks/antibody/resources/default_config.yaml`
 - requested CUDA visibility
 - Absolut path for real runs
 
 ## Absolut And AntBO Config
 
-The default AntBO config is `tasks/antibody/bo/config.yaml`. Its `bbox.path` is
+The default AntBO config is `tasks/antibody/resources/default_config.yaml`. Its `bbox.path` is
 intentionally unset because Absolut is an external installation. Prefer an
 environment variable for deployment-specific paths:
 
@@ -119,7 +137,7 @@ Or use an antigen list, as in `config/antibody/real_lcb.yaml`:
 
 ```yaml
 args:
-  antigens-file: test_5_antigens.txt
+  antigens-file: resources/antigens.txt
 ```
 
 Paths are resolved from the antibody task working directory unless they are
@@ -166,7 +184,7 @@ configuration below.
    CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/antibody \
      python scripts/run_ldm_tts.py config/antibody/real_cpu_smoke.yaml \
      --set args.dry-run=true \
-     --set args.out-dir=ldm_runs/antbo_first_real_contract
+     --set args.out-dir=runs/antbo_first_real_contract
    ```
 
 4. Run one real LLM proposal and one Absolut evaluation:
@@ -174,7 +192,7 @@ configuration below.
    ```bash
    CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/antibody \
      python scripts/run_ldm_tts.py config/antibody/real_cpu_smoke.yaml \
-     --set args.out-dir=ldm_runs/antbo_first_real_tiny
+     --set args.out-dir=runs/antbo_first_real_tiny
    ```
 
 The tiny run is not a mock: it contacts the configured model and evaluates the
@@ -207,7 +225,7 @@ python scripts/run_ldm_tts.py config/antibody/real_lcb.yaml --dry-run
 
 ## Legacy Environment Notes
 
-`tasks/antibody/environment.yaml` is retained as the legacy conda environment for the
+`tasks/antibody/environments/legacy.yaml` is retained as the legacy conda environment for the
 original pinned CUDA/PyTorch/DGL AntBO stack. Prefer `uv` for the unified
 LDM-TTS runner unless you need to reproduce the exact legacy environment.
 

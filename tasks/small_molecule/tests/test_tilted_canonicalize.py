@@ -4,9 +4,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.ldm_tilted_case2.canonicalize import RawCandidate, build_candidate_records
-from strbo_v1.ldm_tilted_case2.candidate_record import SourceRecord
-from strbo_v1.ldm_tilted_case2.config import TiltedLDMCase2Config
+from tasks.small_molecule.core.ldm_tilted_case2.canonicalize import RawCandidate, build_candidate_records
+from tasks.small_molecule.core.ldm_tilted_case2.candidate_record import SourceRecord
+from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
 
 
 def cfg():

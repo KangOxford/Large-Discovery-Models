@@ -7,13 +7,13 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.ldm_tilted_case2.base_measure import (
+from tasks.small_molecule.core.ldm_tilted_case2.base_measure import (
     apply_m1_base_measure,
     q0_effective_support,
     q0_entropy,
 )
-from strbo_v1.ldm_tilted_case2.candidate_record import CandidateRecord, SourceRecord
-from strbo_v1.ldm_tilted_case2.config import TiltedLDMCase2Config
+from tasks.small_molecule.core.ldm_tilted_case2.candidate_record import CandidateRecord, SourceRecord
+from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
 
 
 def candidate(smiles, occurrences, *, support=None):

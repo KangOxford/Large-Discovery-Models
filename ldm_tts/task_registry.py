@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 TASK_MANIFEST_NAME = "task.json"
 TASK_MANIFEST_SCHEMA_VERSION = 1
 TASK_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+TASK_ADAPTER_FILES = frozenset({"__init__.py", "dependencies.py", "procedure.py"})
 HOOK_PATTERN = re.compile(
     r"^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$"
 )
@@ -156,6 +157,8 @@ def validate_task_layout(
         root / "__init__.py",
         root / "ldm_task" / "__init__.py",
         root / "ldm_task" / "procedure.py",
+        root / "core" / "__init__.py",
+        root / "resources" / "README.md",
     )
     for path in required_files:
         if not path.is_file():
@@ -198,18 +201,31 @@ def validate_task_layout(
                     )
 
     tests_dir = root / "tests"
-    if not tests_dir.is_dir() and not any(
-        (Path(repository_root).resolve() / "tests").glob(
-            f"test_{definition.task_id}*.py"
-        )
-    ):
+    if not tests_dir.is_dir():
         issues.append(
             TaskValidationIssue(
-                "warning",
-                "No task-local or root task-specific tests were found.",
+                "error",
+                "Task-local tests directory is missing.",
                 tests_dir,
             )
         )
+
+    adapter_dir = root / "ldm_task"
+    if adapter_dir.is_dir():
+        unexpected_adapter_files = sorted(
+            path
+            for path in adapter_dir.iterdir()
+            if path.is_file() and path.name not in TASK_ADAPTER_FILES
+        )
+        for path in unexpected_adapter_files:
+            issues.append(
+                TaskValidationIssue(
+                    "error",
+                    "Task implementation files belong in core/, resources/, or scripts/; "
+                    "ldm_task/ is reserved for the shared-runner adapter.",
+                    path,
+                )
+            )
 
     config_dir = Path(repository_root).resolve() / "config" / definition.task_id
     if not config_dir.is_dir():
@@ -263,6 +279,7 @@ __all__ = [
     "TASK_DISCOVERY_ERROR",
     "TASK_MANIFEST_NAME",
     "TASK_MANIFEST_SCHEMA_VERSION",
+    "TASK_ADAPTER_FILES",
     "TaskDefinition",
     "TaskRegistrationError",
     "TaskValidationIssue",

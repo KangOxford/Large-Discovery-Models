@@ -1,4 +1,4 @@
-"""bo/ root conftest — adds AntBO root to sys.path for pytest collection."""
+"""core/ root conftest — adds AntBO root to sys.path for pytest collection."""
 import sys
 from pathlib import Path
 

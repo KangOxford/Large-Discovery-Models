@@ -21,7 +21,9 @@ from ldm_tts.task_registry import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-NANOGPT_CACHE_DIR = Path("/mnt/data0/hf_data/autoresearch")
+NANOGPT_CACHE_DIR = Path(
+    os.environ.get("AUTORESEARCH_CACHE_DIR", "~/.cache/autoresearch")
+).expanduser().resolve()
 NANOGPT_DATA_DIR = NANOGPT_CACHE_DIR / "data"
 NANOGPT_TOKENIZER_DIR = NANOGPT_CACHE_DIR / "tokenizer"
 REASYN_ENTRYPOINT_REL = Path("reasyn") / "sampler" / "parallel.py"
@@ -256,7 +258,7 @@ def check_nanogpt_data() -> list[DependencyCheck]:
             task,
             "prepare.py data",
             "No parquet shards found. Run `uv run --locked --group train --project tasks/nanogpt "
-            "python tasks/nanogpt/prepare.py` first.",
+            "python tasks/nanogpt/scripts/prepare.py` first.",
             str(NANOGPT_DATA_DIR),
         ))
     tokenizer = NANOGPT_TOKENIZER_DIR / "tokenizer.pkl"
@@ -269,7 +271,7 @@ def check_nanogpt_data() -> list[DependencyCheck]:
             task,
             "prepare.py tokenizer",
             "Tokenizer artifacts are missing. Run `uv run --locked --group train --project tasks/nanogpt "
-            "python tasks/nanogpt/prepare.py` first.",
+            "python tasks/nanogpt/scripts/prepare.py` first.",
             ", ".join(missing),
         ))
     return checks
@@ -315,7 +317,10 @@ def check_small_molecule(
 
     checks.append(check_vina(task, arg_value(args, "vina-bin", default=env.get("VINA_BIN", "")), env))
 
-    nn_model = resolve_task_path(arg_value(args, "nn-model-path", default="activity_modeling/best_g12d_model.joblib"), cwd)
+    nn_model = resolve_task_path(
+        arg_value(args, "nn-model-path", default="resources/models/best_g12d_model.joblib"),
+        cwd,
+    )
     if nn_model is not None and nn_model.exists():
         checks.append(ok(task, "G12D activity model", "Activity model artifact exists.", str(nn_model)))
     else:
@@ -577,7 +582,9 @@ def check_antibody(
     else:
         checks.append(fail(task, "antigen input", "Provide --antigen or --antigens-file."))
 
-    bo_config = resolve_task_path(arg_value(args, "config", default="bo/config.yaml"), cwd)
+    bo_config = resolve_task_path(
+        arg_value(args, "config", default="resources/default_config.yaml"), cwd
+    )
     config_data: dict[str, Any] = {}
     if bo_config is not None and bo_config.exists():
         checks.append(ok(task, "AntBO config", "AntBO config exists.", str(bo_config)))

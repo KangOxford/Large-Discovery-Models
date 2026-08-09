@@ -4,8 +4,8 @@ algorithm: best_of_n
 mode: real_fixed
 description: nanoGPT fixed-dimension operation-tool model-based run against an OpenAI-compatible endpoint.
 args:
-  train-file: ldm_task/real_train.py
-  operation-schema: ldm_task/operation_schema_real_train.json
+  train-file: resources/train/real_train.py
+  operation-schema: resources/schemas/real_operations.json
   generator: operation_tool
   method: best_of_n
   breadth: 4
@@ -13,7 +13,7 @@ args:
   iterations: 100
   warmup: 20
   seed-policy: best
-  buffer: ldm_runs/ablation_buffer/fixed_exp1/gp_warmup.jsonl
+  buffer: runs/ablation_buffer/fixed_exp1/gp_warmup.jsonl
   initial-operation-features: all
   max-active-operation-features: 0
   disable-feature-expansion: true
@@ -21,7 +21,7 @@ args:
   surrogate-mode: lcb
   gp-beta: 1.0
   gp-xi: 0.001
-  out-dir: ldm_runs
+  out-dir: runs
   run-name: "{name}"
   eval-command: "uv run --locked --group train --project {repo_root}/tasks/nanogpt python {train_path}"
   llm-url: null

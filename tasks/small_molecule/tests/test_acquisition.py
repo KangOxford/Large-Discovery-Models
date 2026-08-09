@@ -1,4 +1,4 @@
-"""Tests for :mod:`strbo_v1.acquisition`."""
+"""Tests for :mod:`tasks.small_molecule.core.acquisition`."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.acquisition import (  # noqa: E402
+from tasks.small_molecule.core.acquisition import (  # noqa: E402
     chebyshev_scalarize,
     confidence_bound,
     dominates,
@@ -24,7 +24,7 @@ from strbo_v1.acquisition import (  # noqa: E402
     probability_of_improvement,
     sample_simplex_weights,
 )
-from strbo_v1.rng import RNG  # noqa: E402
+from tasks.small_molecule.core.rng import RNG  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

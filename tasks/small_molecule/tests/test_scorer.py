@@ -1,4 +1,4 @@
-"""Tests for :mod:`strbo_v1.scorer` (multi-obj extensions + ref registry)."""
+"""Tests for :mod:`tasks.small_molecule.core.scorer` (multi-obj extensions + ref registry)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.scorer import (  # noqa: E402
+from tasks.small_molecule.core.scorer import (  # noqa: E402
     DEFAULT_REF,
     Scorer,
     Scorers,

@@ -1,4 +1,4 @@
-"""Tests for ``strbo_v1.analog``.
+"""Tests for ``tasks.small_molecule.core.analog``.
 
 Convention follows the rest of the suite: ``unittest`` + ``tempfile``, with
 fake ReaSyn checkouts built per-test so the GPU / model code paths are
@@ -24,8 +24,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from strbo_v1 import analog  # noqa: E402
-from strbo_v1.analog import (  # noqa: E402
+from tasks.small_molecule.core import analog  # noqa: E402
+from tasks.small_molecule.core.analog import (  # noqa: E402
     ReasynConfig,
     _build_launcher_source,
     _canonicalize_dedup,
@@ -438,7 +438,7 @@ class ResolveDevicesTests(unittest.TestCase):
 
     def test_warns_when_nvidia_smi_unavailable(self) -> None:
         with mock.patch.object(analog, "_query_visible_gpu_ids", return_value=set()):
-            with self.assertLogs("strbo_v1.analog", level="WARNING") as ctx:
+            with self.assertLogs("tasks.small_molecule.core.analog", level="WARNING") as ctx:
                 self.assertEqual(_resolve_devices([1, 2]), [1, 2])
             self.assertTrue(any("nvidia-smi unavailable" in m for m in ctx.output))
 
@@ -656,7 +656,7 @@ class EndToEndSubprocessTests(unittest.TestCase):
         return ReasynConfig(**kwargs)
 
     def test_subprocess_returns_dataframe_with_expected_columns(self) -> None:
-        from strbo_v1.analog import generate_analogs
+        from tasks.small_molecule.core.analog import generate_analogs
 
         df = generate_analogs(["CCO", "CCN"], self._config())
         expected = {"target", "smiles", "score", "synthesis", "num_steps"}
@@ -664,7 +664,7 @@ class EndToEndSubprocessTests(unittest.TestCase):
         self.assertEqual(len(df), 2)
 
     def test_subprocess_cleans_tempfiles_after_call(self) -> None:
-        from strbo_v1.analog import generate_analogs
+        from tasks.small_molecule.core.analog import generate_analogs
 
         generate_analogs(["CCO"], self._config())
         leftovers = sorted(p.name for p in self.tmp_dir.iterdir())
@@ -681,8 +681,8 @@ class EndToEndSubprocessTests(unittest.TestCase):
             # Run the real launcher to keep behavior consistent.
             return real_popen(cmd, *args, **kwargs)
 
-        with mock.patch("strbo_v1.analog.subprocess.Popen", side_effect=fake_popen):
-            from strbo_v1.analog import generate_analogs
+        with mock.patch("tasks.small_molecule.core.analog.subprocess.Popen", side_effect=fake_popen):
+            from tasks.small_molecule.core.analog import generate_analogs
 
             generate_analogs(["CCO"], self._config())
         self.assertEqual(captured["env"]["CUDA_VISIBLE_DEVICES"], "1,2")
@@ -696,8 +696,8 @@ class EndToEndSubprocessTests(unittest.TestCase):
             captured["cmd"] = cmd
             return real_popen(cmd, *args, **kwargs)
 
-        with mock.patch("strbo_v1.analog.subprocess.Popen", side_effect=fake_popen):
-            from strbo_v1.analog import generate_analogs
+        with mock.patch("tasks.small_molecule.core.analog.subprocess.Popen", side_effect=fake_popen):
+            from tasks.small_molecule.core.analog import generate_analogs
 
             generate_analogs(["CCO"], self._config())
         # argv[0] should be the venv python we passed (NOT the test runner's
@@ -708,7 +708,7 @@ class EndToEndSubprocessTests(unittest.TestCase):
         # Run with a custom temp_dir; ensure tempfiles land there.
         custom_dir = Path(tempfile.mkdtemp(prefix="custom_tmp_"))
         try:
-            from strbo_v1.analog import generate_analogs
+            from tasks.small_molecule.core.analog import generate_analogs
 
             generate_analogs(["CCO"], self._config(temp_dir=str(custom_dir)))
             self.assertEqual(list(custom_dir.iterdir()), [])
@@ -718,7 +718,7 @@ class EndToEndSubprocessTests(unittest.TestCase):
             shutil.rmtree(custom_dir, ignore_errors=True)
 
     def test_subprocess_string_input_wrapped_to_list(self) -> None:
-        from strbo_v1.analog import generate_analogs
+        from tasks.small_molecule.core.analog import generate_analogs
 
         df = generate_analogs("CCO", self._config())
         self.assertEqual(len(df), 1)
@@ -763,14 +763,14 @@ class EndToEndInProcessTests(unittest.TestCase):
         return ReasynConfig(**kwargs)
 
     def test_inprocess_mode_works_when_python_matches(self) -> None:
-        from strbo_v1.analog import generate_analogs
+        from tasks.small_molecule.core.analog import generate_analogs
 
         df = generate_analogs(["CCO", "CCN"], self._config())
         self.assertEqual(len(df), 2)
         self.assertEqual(set(df["target"].tolist()), {"CCO", "CCN"})
 
     def test_inprocess_sets_cuda_visible_devices_before_calling_reasyn(self) -> None:
-        from strbo_v1.analog import generate_analogs
+        from tasks.small_molecule.core.analog import generate_analogs
 
         with mock.patch.dict(
             os.environ, {"CUDA_VISIBLE_DEVICES": ""}, clear=False
@@ -781,7 +781,7 @@ class EndToEndInProcessTests(unittest.TestCase):
         os.environ.pop("CUDA_VISIBLE_DEVICES", None)
 
     def test_canonicalize_applies_when_enabled(self) -> None:
-        from strbo_v1.analog import generate_analogs
+        from tasks.small_molecule.core.analog import generate_analogs
 
         df = generate_analogs(["CCO", "CCN"], self._config(canonicalize=True))
         # Each target should appear once (fake parallel returns one row per input).
@@ -805,7 +805,7 @@ class ErrorHandlingTests(unittest.TestCase):
                 ReasynConfig(model_path=["/nope/ar.ckpt", "/nope/eb.ckpt"])
                 # Config construction itself does not validate paths; validation
                 # happens inside generate_analogs / _parse_model_paths.
-                from strbo_v1.analog import generate_analogs
+                from tasks.small_molecule.core.analog import generate_analogs
 
                 generate_analogs("CCO", ReasynConfig(model_path=["/nope/a.ckpt", "/nope/b.ckpt"]))
         self.assertIn("Missing files", str(ctx.exception))
@@ -814,7 +814,7 @@ class ErrorHandlingTests(unittest.TestCase):
         real_reasyn = _real_reasyn_path()
         fake_repo = _build_fake_reasyn_repo(real_reasyn)
         try:
-            from strbo_v1.analog import generate_analogs
+            from tasks.small_molecule.core.analog import generate_analogs
 
             with self.assertRaises(RuntimeError) as ctx:
                 generate_analogs(
@@ -869,7 +869,7 @@ class ErrorHandlingTests(unittest.TestCase):
         ar.write_text("")
         eb.write_text("")
         try:
-            from strbo_v1.analog import generate_analogs
+            from tasks.small_molecule.core.analog import generate_analogs
 
             with self.assertRaises(RuntimeError) as ctx:
                 generate_analogs(
@@ -1003,7 +1003,7 @@ class RealReasynIntegrationTests(unittest.TestCase):
         venv_python = _reasyn_venv_python()
         if venv_python is None:
             self.skipTest("ReaSyn venv python not available")
-        from strbo_v1.analog import generate_analogs
+        from tasks.small_molecule.core.analog import generate_analogs
 
         df = generate_analogs(
             "CCO",

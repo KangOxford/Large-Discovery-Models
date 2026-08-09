@@ -6,10 +6,10 @@ contract, runs a deterministic LDM search, checks its artifacts, and runs the
 relevant tests. It does not install Torch, prepare training data, contact a
 model API, or run a real nanoGPT evaluation.
 
-Run every command from the repository root. On the validated server that is:
+Run every command from the repository root:
 
 ```bash
-cd /mnt/data0/ys/LDM
+cd /path/to/LDM
 ```
 
 ## Prerequisites
@@ -23,8 +23,8 @@ cd /mnt/data0/ys/LDM
 
 ```bash
 test -f tasks/nanogpt/uv.lock
-test -f tasks/nanogpt/ldm_task/mock_train.py
-test -f tasks/nanogpt/ldm_task/operation_schema_mock_train.json
+test -f tasks/nanogpt/resources/train/mock_train.py
+test -f tasks/nanogpt/resources/schemas/mock_operations.json
 python scripts/validate_tasks.py --task nanogpt
 ```
 
@@ -75,8 +75,8 @@ CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/nanogpt \
 
 Confirm that the resolved plan uses:
 
-- `tasks/nanogpt/ldm_task/mock_train.py`
-- `tasks/nanogpt/ldm_task/operation_schema_mock_train.json`
+- `tasks/nanogpt/resources/train/mock_train.py`
+- `tasks/nanogpt/resources/schemas/mock_operations.json`
 - `generator=operation_mock`
 - `eval-command="python {train_path}"`
 
@@ -98,7 +98,7 @@ not measurements from nanoGPT training.
 ## 6. Verify The Mock Result
 
 From a new checkout, the run directory is
-`tasks/nanogpt/ldm_runs/nanogpt_clean_room_mock`. If that name already exists,
+`tasks/nanogpt/runs/nanogpt_clean_room_mock`. If that name already exists,
 the runner appends a numeric suffix; use the newest matching directory below.
 
 ```bash
@@ -107,7 +107,7 @@ import json
 from pathlib import Path
 
 run_dir = sorted(
-    Path("tasks/nanogpt/ldm_runs").glob("nanogpt_clean_room_mock*"),
+    Path("tasks/nanogpt/runs").glob("nanogpt_clean_room_mock*"),
     key=lambda path: path.stat().st_mtime,
 )[-1]
 summary = json.loads((run_dir / "summary.json").read_text())

@@ -222,7 +222,7 @@ Action types:
 ## Small Molecule Collection
 
 Small-molecule runtime collection is already hooked into
-[tasks/small_molecule/strbo_v1/ldm_tilted_case2/trace.py](tasks/small_molecule/strbo_v1/ldm_tilted_case2/trace.py).
+[tasks/small_molecule/core/ldm_tilted_case2/trace.py](tasks/small_molecule/core/ldm_tilted_case2/trace.py).
 
 Enable it with:
 
@@ -231,15 +231,15 @@ LDM_DATA_COLLECTION_ENABLED=1 \
 python -m tasks.small_molecule.ldm_task.procedure \
   --method m1_stratified_direct_llm_oversample_sir \
   --budget 80 \
-  --trajectory-dir ldm_runs/case2_real
+  --trajectory-dir runs/case2_real
 ```
 
 Default output:
 
 ```text
-tasks/small_molecule/ldm_runs/case2_real/ldm_data/ldm_ir.jsonl
-tasks/small_molecule/ldm_runs/case2_real/ldm_data/ldm_sft.jsonl
-tasks/small_molecule/ldm_runs/case2_real/ldm_data/dataset_info.json
+tasks/small_molecule/runs/case2_real/ldm_data/ldm_ir.jsonl
+tasks/small_molecule/runs/case2_real/ldm_data/ldm_sft.jsonl
+tasks/small_molecule/runs/case2_real/ldm_data/dataset_info.json
 ```
 
 To aggregate many runs into one directory:
@@ -417,7 +417,7 @@ The basic IR mapping is:
 - `action.payload.candidates`: emitted sequences
 - `reasoning_available`: `false` for sequence-only traces with no rationale
 
-For the warmup/direct selector in `tasks/antibody/bo/ldm_light/ldm_acq.py`, the right
+For the warmup/direct selector in `tasks/antibody/core/ldm_light/ldm_acq.py`, the right
 collection point is in `run_one`, after `propose(...)` returns accepted
 `selected_candidates` and before `evaluator.energy(...)` is called.
 

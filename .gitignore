@@ -39,6 +39,7 @@ dev/
 results.tsv
 
 # Runtime outputs and generated artifacts
+**/runs/
 **/ldm_runs/
 **/ldm_docs/
 **/docking_work/

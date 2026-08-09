@@ -34,25 +34,25 @@ Model variables: `TTS_LLM_URL`, `TTS_LLM_MODEL`, `TTS_LLM_API_KEY`.
 Mock run:
 
 ```bash
-uv run --project tasks/nanogpt python scripts/check_task_dependencies.py \
+uv run --locked --project tasks/nanogpt python scripts/check_task_dependencies.py \
   config/nanogpt/mock_best_of_n.yaml --no-optional
-uv run --project tasks/nanogpt python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/nanogpt python scripts/run_ldm_tts.py \
   config/nanogpt/mock_best_of_n.yaml --dry-run
-uv run --project tasks/nanogpt python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/nanogpt python scripts/run_ldm_tts.py \
   config/nanogpt/mock_best_of_n.yaml
 ```
 
 Light real dependency check and zero-iteration contract smoke:
 
 ```bash
-uv run --project tasks/nanogpt python scripts/check_task_dependencies.py \
+uv run --locked --project tasks/nanogpt python scripts/check_task_dependencies.py \
   config/nanogpt/real_operation_tool_best_of_n.yaml \
   --set args.iterations=0 \
   --set args.warmup=0 \
   --set args.skip-eval=true \
   --no-optional
 
-uv run --project tasks/nanogpt python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/nanogpt python scripts/run_ldm_tts.py \
   config/nanogpt/real_operation_tool_best_of_n.yaml \
   --set args.iterations=0 \
   --set args.warmup=0 \
@@ -63,14 +63,14 @@ uv run --project tasks/nanogpt python scripts/run_ldm_tts.py \
 Tiny real evaluation after preparing data and tokenizer:
 
 ```bash
-uv run --project tasks/nanogpt python scripts/check_task_dependencies.py \
+uv run --locked --project tasks/nanogpt python scripts/check_task_dependencies.py \
   config/nanogpt/real_operation_tool_best_of_n.yaml \
   --set args.iterations=1 \
   --set args.warmup=0 \
   --set args.breadth=1 \
   --set args.depth=1
 
-uv run --project tasks/nanogpt python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/nanogpt python scripts/run_ldm_tts.py \
   config/nanogpt/real_operation_tool_best_of_n.yaml \
   --set args.iterations=1 \
   --set args.warmup=0 \
@@ -99,24 +99,24 @@ methods.
 Mock run:
 
 ```bash
-uv run --project tasks/small_molecule python scripts/check_task_dependencies.py \
+uv run --locked --project tasks/small_molecule python scripts/check_task_dependencies.py \
   config/small_molecule/mock_m1_stratified_oversample.yaml --no-optional
-uv run --project tasks/small_molecule python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/small_molecule python scripts/run_ldm_tts.py \
   config/small_molecule/mock_m1_stratified_oversample.yaml --dry-run
-uv run --project tasks/small_molecule python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/small_molecule python scripts/run_ldm_tts.py \
   config/small_molecule/mock_m1_stratified_oversample.yaml
 ```
 
 Light real dependency check and contract smoke:
 
 ```bash
-uv run --project tasks/small_molecule python scripts/check_task_dependencies.py \
+uv run --locked --project tasks/small_molecule python scripts/check_task_dependencies.py \
   config/small_molecule/real_m1_seed_analog.yaml \
   --set args.vina-bin="$VINA_BIN" \
   --set args.nn-model-path="$G12D" \
   --no-optional
 
-uv run --project tasks/small_molecule python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/small_molecule python scripts/run_ldm_tts.py \
   config/small_molecule/real_m1_seed_analog.yaml \
   --set args.dry-run=true \
   --set args.budget=1 \
@@ -127,7 +127,7 @@ uv run --project tasks/small_molecule python scripts/run_ldm_tts.py \
 Tiny real direct-LLM evaluation:
 
 ```bash
-uv run --project tasks/small_molecule python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/small_molecule python scripts/run_ldm_tts.py \
   config/small_molecule/real_m1_seed_analog.yaml \
   --set args.budget=1 \
   --set args.init-size=1 \
@@ -152,46 +152,46 @@ Files:
 
 ```text
 tasks/antibody/README.md
-tasks/antibody/bo/config.yaml
+tasks/antibody/resources/default_config.yaml
 config/antibody/mock_ei.yaml
 config/antibody/real_lcb.yaml
 ```
 
 Model variables: `LLM_BASE_URL`, `LLM_MODEL_NAME`, `LLM_API_KEY`. Real runs also
-require `bbox.path` in `tasks/antibody/bo/config.yaml` to locate Absolut.
+require `bbox.path` in `tasks/antibody/resources/default_config.yaml` to locate Absolut.
 
 Mock run:
 
 ```bash
-uv run --project tasks/antibody python scripts/check_task_dependencies.py \
+uv run --locked --project tasks/antibody python scripts/check_task_dependencies.py \
   config/antibody/mock_ei.yaml --no-optional
-uv run --project tasks/antibody python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/antibody python scripts/run_ldm_tts.py \
   config/antibody/mock_ei.yaml --dry-run
-uv run --project tasks/antibody python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/antibody python scripts/run_ldm_tts.py \
   config/antibody/mock_ei.yaml
 ```
 
 Real dependency check and contract smoke for one antigen:
 
 ```bash
-uv run --project tasks/antibody python scripts/check_task_dependencies.py \
+uv run --locked --project tasks/antibody python scripts/check_task_dependencies.py \
   config/antibody/real_lcb.yaml \
   --set args.antigen=YOUR_ANTIGEN
 
-uv run --project tasks/antibody python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/antibody python scripts/run_ldm_tts.py \
   config/antibody/real_lcb.yaml \
   --set args.antigen=YOUR_ANTIGEN \
   --set args.dry-run=true \
   --set args.budget=1 \
   --set args.n-init=1 \
   --set args.parallel-budget=8 \
-  --set args.out-dir=ldm_runs/antbo_first_real_contract
+  --set args.out-dir=runs/antbo_first_real_contract
 ```
 
 Tiny real evaluation:
 
 ```bash
-uv run --project tasks/antibody python scripts/run_ldm_tts.py \
+uv run --locked --project tasks/antibody python scripts/run_ldm_tts.py \
   config/antibody/real_lcb.yaml \
   --set args.antigen=YOUR_ANTIGEN \
   --set args.budget=1 \
@@ -199,7 +199,7 @@ uv run --project tasks/antibody python scripts/run_ldm_tts.py \
   --set args.n-init=1 \
   --set args.parallel-budget=8 \
   --set args.n-trials=1 \
-  --set args.out-dir=ldm_runs/antbo_first_real_tiny
+  --set args.out-dir=runs/antbo_first_real_tiny
 ```
 
 The tiny real run contacts the configured model and evaluates one selected

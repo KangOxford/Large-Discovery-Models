@@ -10,23 +10,44 @@ no shared Python registry or dependency-check dispatch table needs editing.
 tasks/<task_id>/
 ├── task.json                 # registration manifest
 ├── README.md                 # domain setup and run tutorial
+├── QUICKSTART.md             # validated clean-room workflow
 ├── pyproject.toml            # isolated task dependencies
 ├── __init__.py
 ├── ldm_task/
 │   ├── __init__.py
-│   ├── procedure.py          # shared-runner adapter
-│   └── dependencies.py       # optional preflight hook
-└── tests/
-    └── test_procedure.py
+│   ├── procedure.py          # stable shared-runner adapter
+│   └── dependencies.py       # optional dependency-check adapter
+├── core/                     # private task implementation
+│   └── __init__.py
+├── resources/                # versioned schemas, seeds, inputs, models
+│   └── README.md
+├── scripts/                  # optional maintenance/training CLIs
+├── environments/             # optional Conda or external-tool specs
+├── tests/                    # task-local tests
+│   └── test_procedure.py
+└── runs/                     # generated runtime artifacts; Git-ignored
 
 config/<task_id>/
 ├── mock.yaml                 # local, service-free smoke run
 └── real.yaml                 # real model and evaluator settings
 ```
 
-Domain implementations such as model code, scorers, datasets, prompts, or
-scientific libraries may live elsewhere inside `tasks/<task_id>/`. Only the
-small adapter interface above is shared.
+`ldm_task` is the external seam. The shared runner and dependency checker know
+only `procedure.main(argv)` and the optional manifest hook. Keep implementation
+out of this package so the interface remains small and stable.
+
+The remaining directories have one ownership rule each:
+
+- `core/` contains importable search, surrogate, evaluator, and model-client code.
+- `resources/` contains versioned non-generated inputs required at runtime.
+- `scripts/` contains auxiliary CLIs that are not runner entrypoints.
+- `environments/` contains optional environment specifications beyond `pyproject.toml`.
+- `tests/` verifies the task interface and implementation.
+- `runs/` contains all generated artifacts and must never be committed.
+
+Do not create alternate task entrypoints or implementation packages beside
+these directories. Add domain-specific subpackages inside `core/` and organize
+resource types inside `resources/` instead.
 
 ## Scaffold A Task
 
@@ -80,8 +101,10 @@ def main(argv: list[str] | None = None) -> int | None:
 
 The shared runner changes into the task directory, applies config environment
 variables, imports the procedure module, and calls `main(plan_argv)`. The
-adapter owns argument parsing, candidate generation, model calls, surrogate
-fitting, acquisition use, evaluator calls, resume behavior, and artifacts.
+adapter owns argument parsing, task-contract description, execution dispatch,
+and result exit status. Candidate generation, model calls, surrogate fitting,
+acquisition, and evaluators belong in `core/`. Versioned schemas and seed
+inputs belong in `resources/`.
 
 For consistency and inspectability, also define:
 
@@ -96,7 +119,7 @@ def describe_ldm_task(...) -> LDMTaskSpec:
 `describe_ldm_task` is task-internal and may accept domain-specific prepared
 objects. It must describe the candidate space, measured objectives, model
 response contract, and acquisition rule using the shared `ldm_tts.spaces`
-types. Keep domain dependencies and encodings inside the task adapter.
+types. Keep domain dependencies and encodings inside the task implementation.
 
 Every task must provide a deterministic `mode: mock` config that avoids remote
 models, external evaluators, GPUs, and large datasets. This is the contract test
@@ -156,7 +179,7 @@ Run these checks in order:
 
 ```bash
 python scripts/validate_tasks.py --task protein_design
-uv run --project tasks/protein_design python -m pytest tasks/protein_design/tests
+uv run --locked --project tasks/protein_design python -m pytest tasks/protein_design/tests
 python scripts/check_task_dependencies.py config/protein_design/mock.yaml --no-optional
 python scripts/run_ldm_tts.py config/protein_design/mock.yaml --dry-run
 python scripts/run_ldm_tts.py config/protein_design/mock.yaml
@@ -171,6 +194,9 @@ dry contract run, then a tiny evaluated run.
 
 - The manifest validates without warnings or errors.
 - `main(argv)` runs through the shared runner rather than a separate launcher.
+- `ldm_task/` contains only the adapter files accepted by task validation.
+- Importable implementation lives under `core/`; versioned inputs live under `resources/`.
+- Every generated file is written beneath `runs/` or another explicitly ignored temporary path.
 - `describe_ldm_task` matches actual candidates, objectives, response parsing,
   and acquisition behavior.
 - Acquisition scoring uses `ldm_tts.acquisition` unless a documented domain

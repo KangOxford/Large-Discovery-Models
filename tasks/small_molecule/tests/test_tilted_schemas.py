@@ -9,18 +9,18 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.ldm_tilted_case2.config import TiltedLDMCase2Config
-from strbo_v1.ldm_tilted_case2.prompts import (
+from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
+from tasks.small_molecule.core.ldm_tilted_case2.prompts import (
     build_m1_prompt,
     build_m1_analog_seed_prompt,
     summarize_history,
 )
-from strbo_v1.ldm_tilted_case2.schemas import (
+from tasks.small_molecule.core.ldm_tilted_case2.schemas import (
     parse_m1_direct_smiles,
     parse_seed_plan,
 )
-from strbo_v1.ldm_tilted_case2.sources import _chat_openai_subprocess, call_llm_json
-from strbo_v1.llm_advisor.client import MockLLMClient
+from tasks.small_molecule.core.ldm_tilted_case2.sources import _chat_openai_subprocess, call_llm_json
+from tasks.small_molecule.core.llm_advisor.client import MockLLMClient
 
 
 def test_parse_m1_direct_smiles():
@@ -174,7 +174,7 @@ def test_llm_json_call_retries_parse_failure():
 def test_llm_json_call_waits_between_retries(monkeypatch):
     sleeps = []
     monkeypatch.setattr(
-        "strbo_v1.ldm_tilted_case2.sources.time.sleep",
+        "tasks.small_molecule.core.ldm_tilted_case2.sources.time.sleep",
         lambda seconds: sleeps.append(seconds),
     )
     client = MockLLMClient(
@@ -220,7 +220,7 @@ def test_openai_subprocess_uses_old_style_request_timeout(monkeypatch):
         captured["env"] = kwargs["env"]
         return SimpleNamespace(returncode=0, stdout='{"direct_smiles":[]}', stderr="")
 
-    monkeypatch.setattr("strbo_v1.ldm_tilted_case2.sources.subprocess.run", fake_run)
+    monkeypatch.setattr("tasks.small_molecule.core.ldm_tilted_case2.sources.subprocess.run", fake_run)
 
     llm = SimpleNamespace(
         config=SimpleNamespace(api_key="key", base_url="https://example.test/v1", model="model"),

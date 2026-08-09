@@ -657,7 +657,8 @@ def smallmol_ir_from_prompt_response(
     """Convert one accepted M1 direct-SMILES LLM call into ldm-2.0 IR.
 
     This adapter is intentionally narrow: it handles the direct SMILES proposal
-    prompt used by ``strbo_v1.ldm_tilted_case2.prompts.build_m1_prompt``. Seed
+    prompt used by
+    ``tasks.small_molecule.core.ldm_tilted_case2.prompts.build_m1_prompt``. Seed
     planning and non-M1 prompts should use their own adapters rather than being
     forced through this schema.
     """

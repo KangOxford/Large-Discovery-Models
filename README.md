@@ -186,7 +186,7 @@ Small-molecule real runs need additional task dependency paths:
 
 ```bash
 export VINA_BIN=/path/to/vina
-export G12D=tasks/small_molecule/activity_modeling/best_g12d_model.joblib
+export G12D=tasks/small_molecule/resources/models/best_g12d_model.joblib
 export REASYN_REPO=/path/to/ReaSyn
 export REASYN_PYTHON=/path/to/ReaSyn/.venv/bin/python
 ```
@@ -259,7 +259,7 @@ task: small_molecule
 algorithm: m1_stratified_direct_llm_oversample_sir
 mode: mock
 env:
-  G12D: tasks/small_molecule/activity_modeling/best_g12d_model.joblib
+  G12D: tasks/small_molecule/resources/models/best_g12d_model.joblib
 args:
   mock: true
   budget: 8

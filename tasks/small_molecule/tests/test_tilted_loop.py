@@ -4,16 +4,16 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from strbo_v1.gp import GPConfig
-import strbo_v1.ldm_tilted_case2.loop as loop_mod
-from strbo_v1.ldm_tilted_case2.candidate_record import (
+from tasks.small_molecule.core.gp import GPConfig
+import tasks.small_molecule.core.ldm_tilted_case2.loop as loop_mod
+from tasks.small_molecule.core.ldm_tilted_case2.candidate_record import (
     CandidateRecord,
     ReservoirBuildResult,
 )
-from strbo_v1.ldm_tilted_case2.config import TiltedLDMCase2Config
-from strbo_v1.ldm_tilted_case2.loop import _score_smiles, run_tilted_case2_search
-from strbo_v1.llm_advisor.client import MockLLMClient
-from strbo_v1.rng import RNG
+from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
+from tasks.small_molecule.core.ldm_tilted_case2.loop import _score_smiles, run_tilted_case2_search
+from tasks.small_molecule.core.llm_advisor.client import MockLLMClient
+from tasks.small_molecule.core.rng import RNG
 
 
 def test_config_validation():

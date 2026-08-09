@@ -74,7 +74,7 @@ def test_small_molecule_accepts_generic_openai_environment(
 
 
 def test_nanogpt_forwards_openai_url_key_and_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    from tasks.nanogpt.ldm_task import api_generate
+    from tasks.nanogpt.core import api_generate
 
     captured: dict[str, object] = {}
 

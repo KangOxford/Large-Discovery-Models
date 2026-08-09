@@ -4,6 +4,24 @@ The nanoGPT task searches over code or structured operation edits for a
 training script. Mock runs use a tiny deterministic target. Real runs evaluate
 candidate training code and optimize the reported validation BPB.
 
+## Directory Architecture
+
+The task follows the repository-wide layout documented in
+[`tasks/README.md`](../README.md):
+
+```text
+ldm_task/   shared-runner adapter only
+core/       search engines, methods, and model-provider implementation
+resources/  seed training programs and operation schemas
+scripts/    data preparation, training, and compatibility launchers
+tests/      task-local unit and integration tests
+runs/       generated run artifacts (Git-ignored)
+```
+
+The supported runner entry point is `tasks.nanogpt.ldm_task.procedure:main`.
+Import implementation code from `tasks.nanogpt.core`; the legacy launchers in
+`scripts/` delegate to the same canonical workflow.
+
 ## Quick Start
 
 For a new CPU-only checkout, follow the complete
@@ -18,9 +36,9 @@ CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/nanogpt \
 
 The mock config uses:
 
-- `tasks/nanogpt/ldm_task/mock_train.py`
-- `tasks/nanogpt/ldm_task/operation_schema_mock_train.json`
-- output under `tasks/nanogpt/ldm_runs/`
+- `tasks/nanogpt/resources/train/mock_train.py`
+- `tasks/nanogpt/resources/schemas/mock_operations.json`
+- output under `tasks/nanogpt/runs/`
 
 ## Environment
 
@@ -64,20 +82,23 @@ Prepare a small local test dataset:
 
 ```bash
 uv run --locked --group train --project tasks/nanogpt \
-  python tasks/nanogpt/prepare.py --num-shards 8 --download-workers 8
+  python tasks/nanogpt/scripts/prepare.py --num-shards 8 --download-workers 8
 ```
 
 Prepare the default number of shards:
 
 ```bash
 uv run --locked --group train --project tasks/nanogpt \
-  python tasks/nanogpt/prepare.py
+  python tasks/nanogpt/scripts/prepare.py
 ```
 
-Use `--num-shards -1` only when you intentionally want the full shard set. If
-your machine cannot write to `/mnt/data0/hf_data/autoresearch`, point that path
-to local storage with a mount or symlink, or edit `CACHE_DIR` in
-`tasks/nanogpt/prepare.py` for your deployment.
+Use `--num-shards -1` only when you intentionally want the full shard set. The
+default cache is `~/.cache/autoresearch`. To use another volume, set the same
+environment variable for preparation, dependency checks, and real training:
+
+```bash
+export AUTORESEARCH_CACHE_DIR=/path/to/large/local/cache
+```
 
 ## Dependency Check
 
@@ -151,8 +172,8 @@ artifacts remain a blocking failure at that stage.
 
 ## Real Runs
 
-Real code-search runs usually target `tasks/nanogpt/ldm_task/real_train.py` or
-`tasks/nanogpt/train.py`, use `tasks/nanogpt/ldm_task/operation_schema_real_train.json`,
+Real code-search runs usually target `tasks/nanogpt/resources/train/real_train.py` or
+`tasks/nanogpt/scripts/train.py`, use `tasks/nanogpt/resources/schemas/real_operations.json`,
 and evaluate candidates with:
 
 ```bash
@@ -202,8 +223,8 @@ Use a zero-iteration smoke run to write metadata without training:
 uv run --locked --project tasks/nanogpt \
   python -m tasks.nanogpt.ldm_task.procedure \
   --project-root tasks/nanogpt \
-  --train-file ldm_task/mock_train.py \
-  --operation-schema ldm_task/operation_schema_mock_train.json \
+  --train-file resources/train/mock_train.py \
+  --operation-schema resources/schemas/mock_operations.json \
   --generator operation_mock \
   --method best_of_n \
   --iterations 0 \

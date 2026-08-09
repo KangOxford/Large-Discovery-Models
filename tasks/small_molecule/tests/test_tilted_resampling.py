@@ -6,9 +6,9 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from strbo_v1.ldm_tilted_case2.candidate_record import CandidateRecord
-from strbo_v1.ldm_tilted_case2.config import TiltedLDMCase2Config
-from strbo_v1.ldm_tilted_case2.resampling import (
+from tasks.small_molecule.core.ldm_tilted_case2.candidate_record import CandidateRecord
+from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
+from tasks.small_molecule.core.ldm_tilted_case2.resampling import (
     effective_sample_size,
     gumbel_top_k,
     probability_entropy,
@@ -17,7 +17,7 @@ from strbo_v1.ldm_tilted_case2.resampling import (
     tilted_probabilities,
     weighted_sample_candidates,
 )
-from strbo_v1.rng import RNG
+from tasks.small_molecule.core.rng import RNG
 
 
 def test_robust_z_all_equal_returns_zero():

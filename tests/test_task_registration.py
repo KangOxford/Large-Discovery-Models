@@ -39,12 +39,24 @@ def test_scaffolded_task_is_discoverable_and_valid(tmp_path: Path) -> None:
         repository_root=tmp_path,
     )
 
-    assert len(created) == 9
+    assert len(created) == 11
     definitions = discover_task_definitions(tmp_path)
     definition = definitions["protein_design"]
     assert definition.module == "tasks.protein_design.ldm_task.procedure"
     assert definition.dependency_checker is None
     assert validate_task_layout(definition, repository_root=tmp_path) == []
+
+
+def test_layout_rejects_implementation_inside_adapter(tmp_path: Path) -> None:
+    (tmp_path / "tasks").mkdir()
+    scaffold_task("custom", description="Custom task.", repository_root=tmp_path)
+    extra = tmp_path / "tasks" / "custom" / "ldm_task" / "search.py"
+    extra.write_text("", encoding="utf-8")
+
+    definition = discover_task_definitions(tmp_path)["custom"]
+    issues = validate_task_layout(definition, repository_root=tmp_path)
+
+    assert [(issue.level, issue.path) for issue in issues] == [("error", extra)]
 
 
 def test_scaffolder_never_overwrites_existing_task(tmp_path: Path) -> None:
