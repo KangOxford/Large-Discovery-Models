@@ -49,15 +49,19 @@ Each IR record may include an extra top-level `collection` object:
 `collection` is for auditing and filtering only. The renderer ignores it, so it
 does not become part of the model instruction.
 
-## Shared Collection API
+## Shared Data Interface
 
-Shared collection code lives in [ldm_tts/data_collection.py](ldm_tts/data_collection.py).
+Collection, expert augmentation, and rendering are exposed together through
+[ldm_tts/data.py](ldm_tts/data.py). The existing collection implementation remains
+in `ldm_tts/data_collection.py`, but task code should import the public data
+interface.
 
 Use these helpers from task code:
 
 ```python
-from ldm_tts.data_collection import (
+from ldm_tts.data import (
     DataCollectionSink,
+    ExpertJustificationPipeline,
     make_complete_design_ir,
     make_parameter_edit_ir,
     smallmol_irs_from_round_record,
@@ -73,6 +77,8 @@ Main utilities:
   state or expands an active feature space, such as nanogpt operation search.
 - `render_record(ir)`: render one IR record into Alpaca format.
 - `validate_ir_record(ir)`: validate the minimum `ldm-2.0` contract.
+- `ExpertJustificationPipeline`: add resumable expert reasoning to IR or Alpaca
+  records through an injected model adapter.
 
 Runtime collection is controlled with environment variables:
 
@@ -92,6 +98,53 @@ Meanings:
 - `LDM_DATA_COLLECTION_STRIP_PARENT_ARTIFACT`: when truthy, omit large parent
   artifacts such as `train.py` from rendered prompts. Use only when context
   length or memory forces it, because it can create train/inference mismatch.
+
+## Expert Justification Augmentation
+
+The preferred augmentation input is `ldm_ir.jsonl`. Expert reasoning is written
+to `action.reasoning`, keeping the justification structurally attached to the
+accepted action. Use `--sft-output` to regenerate Alpaca data from the augmented
+IR in the same run:
+
+```bash
+export LLM_BASE_URL=https://your-openai-compatible-endpoint/v1
+export LLM_API_KEY=...
+export LLM_MODEL_NAME=DeepSeek-V4-Flash
+
+python scripts/augment_ldm_data.py \
+  --input data/ldm_ir.jsonl \
+  --output data/ldm_ir_justified.jsonl \
+  --sft-output data/ldm_sft_justified.jsonl \
+  --workers 8
+```
+
+The input is always read-only. Successful responses are appended to
+`<output>.checkpoint.jsonl`, keyed by both row index and a content digest. Rerun
+the same command after interruption or partial model failure to reuse completed
+responses and retry only unfinished records. The key also includes the expert
+configuration, so changing the model, endpoint, temperature, or system prompt
+does not reuse stale responses. Augmented IR records store the expert model under
+`collection.augmentation`; the renderer keeps that provenance out of the prompt.
+
+The augmentation pipeline also accepts Alpaca JSON arrays and JSONL files for
+compatibility with older datasets. It updates a JSON target's existing
+`reasoning` field when present; otherwise it prepends a `<think>` block without
+changing the original answer. Output is always JSONL.
+
+By default the pipeline skips:
+
+- records with an existing non-empty justification
+- ldm-2.0 records with `task.reasoning_available: false`
+- rendered protein rows, whose source traces do not contain rationale evidence
+
+Use `--overwrite-reasoning` only to intentionally replace existing content.
+`--include-reasoning-unavailable` is available for explicit experiments, but it
+can fabricate unsupported rationale and conflicts with the default data-quality
+rule in `data/FORMAT_ldm-2.0.md`.
+
+The CLI reads `LLM_API_KEY` from the environment and never accepts or stores a
+credential in source code. It imports `openai` only when the production model
+adapter is constructed, so runtime collection remains dependency-light.
 
 ## Collection Rule
 
@@ -169,13 +222,13 @@ Action types:
 ## Small Molecule Collection
 
 Small-molecule runtime collection is already hooked into
-[small_molecule/strbo_v1/ldm_tilted_case2/trace.py](small_molecule/strbo_v1/ldm_tilted_case2/trace.py).
+[tasks/small_molecule/strbo_v1/ldm_tilted_case2/trace.py](tasks/small_molecule/strbo_v1/ldm_tilted_case2/trace.py).
 
 Enable it with:
 
 ```bash
 LDM_DATA_COLLECTION_ENABLED=1 \
-python -m small_molecule.ldm_task.procedure \
+python -m tasks.small_molecule.ldm_task.procedure \
   --method m1_stratified_direct_llm_oversample_sir \
   --budget 80 \
   --trajectory-dir ldm_runs/case2_real
@@ -184,9 +237,9 @@ python -m small_molecule.ldm_task.procedure \
 Default output:
 
 ```text
-small_molecule/ldm_runs/case2_real/ldm_data/ldm_ir.jsonl
-small_molecule/ldm_runs/case2_real/ldm_data/ldm_sft.jsonl
-small_molecule/ldm_runs/case2_real/ldm_data/dataset_info.json
+tasks/small_molecule/ldm_runs/case2_real/ldm_data/ldm_ir.jsonl
+tasks/small_molecule/ldm_runs/case2_real/ldm_data/ldm_sft.jsonl
+tasks/small_molecule/ldm_runs/case2_real/ldm_data/dataset_info.json
 ```
 
 To aggregate many runs into one directory:
@@ -194,7 +247,7 @@ To aggregate many runs into one directory:
 ```bash
 LDM_DATA_COLLECTION_ENABLED=1 \
 LDM_DATA_COLLECTION_DIR=/abs/path/to/ldm_collection/smallmol \
-python -m small_molecule.ldm_task.procedure ...
+python -m tasks.small_molecule.ldm_task.procedure ...
 ```
 
 What the hook collects:
@@ -225,7 +278,7 @@ Nanogpt uses `parameter_edits` because each teacher action either edits an
 active `train.py` parameter or expands the active operation-feature space.
 
 The right collection point is inside
-`nanogpt/ldm_task/procedure.py`, in `OperationSearchEngine._generate_one`, after:
+`tasks/nanogpt/ldm_task/procedure.py`, in `OperationSearchEngine._generate_one`, after:
 
 1. the prompt has been written
 2. `_call_operation_generator(...)` returns
@@ -364,7 +417,7 @@ The basic IR mapping is:
 - `action.payload.candidates`: emitted sequences
 - `reasoning_available`: `false` for sequence-only traces with no rationale
 
-For the warmup/direct selector in `antibody/bo/ldm_light/ldm_acq.py`, the right
+For the warmup/direct selector in `tasks/antibody/bo/ldm_light/ldm_acq.py`, the right
 collection point is in `run_one`, after `propose(...)` returns accepted
 `selected_candidates` and before `evaluator.energy(...)` is called.
 
@@ -509,7 +562,7 @@ Audit and verify before training:
 python data/scripts/build_ldm2.py audit --in-ir data/ir_all.jsonl
 
 python data/scripts/verify.py all \
-  --run-dir /path/to/nanogpt/run \
+  --run-dir /path/to/run \
   --in-ir data/ir_all.jsonl \
   --sft data/ldm_sft.jsonl \
   --dataset-info data/dataset_info.json \
@@ -569,10 +622,9 @@ mismatch and evaluate it separately.
 The fine-tuned model should be prompted with the same renderer used for SFT:
 
 ```python
-from ldm_tts.data_collection import render_prose
+from ldm_tts.data import render_prose
 ```
 
 Do not train on `ldm-2.0` rendered prompts and then deploy against the legacy
 task-specific prompt format. That mismatch is large enough to make the
 fine-tuned proposer fail even when the dataset itself is valid.
-

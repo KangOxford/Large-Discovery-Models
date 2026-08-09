@@ -3,17 +3,6 @@ task: small_molecule
 algorithm: m1_stratified_direct_llm_oversample_sir
 mode: real
 description: Small-molecule LDM-TTS run with stratified direct-LLM proposal and Vina+NN scoring.
-env:
-  LLM_BASE_URL: http://127.0.0.1:52308/v1
-  LLM_API_KEY: EMPTY
-  LLM_MODEL_NAME: Qwen3.5-9B
-  VINA: /mnt/data0/dock-project/bin/vina
-  VINA_BIN: /mnt/data0/dock-project/bin/vina
-  G12D: small_molecule/activity_modeling/best_g12d_model.joblib
-  REASYN: /mnt/data0/dock-project/ReaSyn
-  REASYN_HOME: /mnt/data0/dock-project/ReaSyn
-  REASYN_REPO: /mnt/data0/dock-project/ReaSyn
-  REASYN_PYTHON: /mnt/data0/dock-project/ReaSyn/.venv/bin
 args:
   mock: false
   method: m1_stratified_direct_llm_oversample_sir
@@ -37,12 +26,13 @@ args:
   gp-device: cpu
   gp-fit-itersteps: 20
   gp-fp-n-bits: 2048
+  acq: ehvi
+  acq-weights: 0.5,0.5
   ehvi-n-samples: 128
   alpha: 1.0
   eta: 3.0
-  llm-url: ${LLM_BASE_URL}
-  llm-model-name: ${LLM_MODEL_NAME}
-  api-key: ${LLM_API_KEY}
+  llm-url: null
+  llm-model-name: null
   llm-timeout: 120.0
   llm-temperature: 0.7
   llm-max-tokens: 4096
@@ -64,7 +54,7 @@ args:
   log-level: INFO
   debug-llm-chunks: false
   verbose: false
-  vina-bin: ${VINA_BIN}
+  vina-bin: null
   vina-cache-dir: null
   vina-pdb-id: 8UN5
   vina-chain-id: A
@@ -76,9 +66,9 @@ args:
   vina-no-cache: false
   vina-allow-zero-charge-fallback: false
   vina-allow-debug-receptor: false
-  nn-model-path: ${G12D}
-  reasyn-repo: ${REASYN_REPO}
-  reasyn-python: ${REASYN_PYTHON}
+  nn-model-path: activity_modeling/best_g12d_model.joblib
+  reasyn-repo: null
+  reasyn-python: null
   reasyn-model-path: null
   reasyn-devices: "0"
   reasyn-time-limit: 1800

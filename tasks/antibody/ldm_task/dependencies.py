@@ -1,0 +1,19 @@
+"""Dependency-check adapter for the antibody task."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from ldm_tts.dependency_checks import (
+    DependencyCheck,
+    check_antibody,
+    plan_check_context,
+)
+
+
+def check_dependencies(
+    plan: dict[str, Any], *, include_optional: bool = True
+) -> list[DependencyCheck]:
+    del include_optional
+    _, args, env, cwd, mode = plan_check_context(plan)
+    return check_antibody(args, env, cwd, mode=mode)

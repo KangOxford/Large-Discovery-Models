@@ -1,0 +1,19 @@
+[run]
+branch = True
+include =
+    ldm_tts/*
+    tasks/nanogpt/ldm_task/mock_train.py
+    tasks/nanogpt/ldm_task/search_core.py
+    tasks/nanogpt/ldm_task/search_methods/*
+    tasks/nanogpt/ldm_task/single_search.py
+
+[report]
+fail_under = 80
+show_missing = True
+skip_empty = True
+precision = 1
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    if __name__ == .__main__.:
+    \.\.\.

@@ -56,7 +56,10 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--no-optional",
         action="store_true",
-        help="Skip optional checks such as ReaSyn when a config mentions it but the selected method may not use it.",
+        help=(
+            "Skip optional checks such as ReaSyn, and skip nanoGPT data/tokenizer "
+            "checks when the plan also uses --skip-eval."
+        ),
     )
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON results.")
     return parser.parse_args(argv)

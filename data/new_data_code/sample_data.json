@@ -1,0 +1,42 @@
+[
+  {
+    "instruction": "一辆汽车以每小时60公里的速度行驶，行驶了2.5小时，一共走了多少公里？",
+    "input": "",
+    "output": "150公里。"
+  },
+  {
+    "instruction": "把下面这句话翻译成英文。",
+    "input": "知识就是力量。",
+    "output": "Knowledge is power."
+  },
+  {
+    "instruction": "判断下面这句话的情感倾向是正面、负面还是中性。",
+    "input": "这家餐厅的菜又贵又难吃，服务态度也很差。",
+    "output": "负面。"
+  },
+  {
+    "instruction": "世界上最高的山峰是哪座？它有多高？",
+    "input": "",
+    "output": "珠穆朗玛峰，海拔约8848.86米。"
+  },
+  {
+    "instruction": "用 Python 写一个函数，判断一个整数是否为质数。",
+    "input": "",
+    "output": "def is_prime(n):\n    if n < 2:\n        return False\n    for i in range(2, int(n ** 0.5) + 1):\n        if n % i == 0:\n            return False\n    return True"
+  },
+  {
+    "instruction": "给下面的产品写一句吸引人的广告语。",
+    "input": "一款续航长达30天的智能手表。",
+    "output": "一次充电，畅享一整月——让时间，永远在线。"
+  },
+  {
+    "instruction": "如果所有的玫瑰都是花，有些花会很快凋谢，那么能否推出「有些玫瑰会很快凋谢」？",
+    "input": "",
+    "output": "不能。虽然玫瑰是花，但「有些花会很快凋谢」中的这些花不一定包含玫瑰，因此无法推出该结论。"
+  },
+  {
+    "instruction": "把摄氏温度转换成华氏温度。",
+    "input": "25摄氏度",
+    "output": "77华氏度。"
+  }
+]

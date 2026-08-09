@@ -1,0 +1,4 @@
+interface:
+  display_name: "Register LDM Task"
+  short_description: "Scaffold and validate a repository task adapter"
+  default_prompt: "Use $register-ldm-task to add a new manifest-registered LDM task to this repository."

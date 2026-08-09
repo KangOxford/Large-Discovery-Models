@@ -279,7 +279,11 @@ def render_record(
         raise LDMDataCollectionError(f"unsupported render mode {mode!r}")
     task_id = normalize_task_id(str(ir["task"]["id"]))
     if mode == "json":
-        shown = {key: value for key, value in ir.items() if key != "action"}
+        shown = {
+            key: value
+            for key, value in ir.items()
+            if key not in {"action", "collection"}
+        }
         instruction = jdump(shown, indent=1)
     else:
         instruction = render_prose(ir, include_parent_artifact=include_parent_artifact)

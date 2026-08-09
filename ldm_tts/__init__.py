@@ -5,11 +5,23 @@ This package holds the small pieces that should be common across tasks:
 budgeted search-loop control, JSON trajectory writing, and score utilities.
 """
 
+from ldm_tts.acquisition import (
+    AcquisitionConfig,
+    AcquisitionFunction,
+    PosteriorAcquisition,
+    make_acquisition,
+)
 from ldm_tts.bo import BOObservation, BOPrediction, BOSelectionResult, FeatureVector
-from ldm_tts.data_collection import (
+from ldm_tts.data import (
+    AugmentationReport,
     DataCollectionPaths,
     DataCollectionSink,
+    EXPERT_JUSTIFICATION_SYSTEM_PROMPT,
+    ExpertJustificationPipeline,
+    ExpertJustifier,
+    JustificationRequest,
     LDMDataCollectionError,
+    OpenAICompatibleExpert,
     dataset_info_payload,
     make_complete_design_ir,
     make_parameter_edit_ir,
@@ -71,8 +83,11 @@ from ldm_tts.trajectory import AtomicJsonLog, JsonlTrajectoryRecorder, load_json
 from ldm_tts.trace_schema import CandidateTraceRecord, LDMRoundTrace
 
 __all__ = [
+    "AcquisitionConfig",
+    "AcquisitionFunction",
     "AcquisitionSpec",
     "AtomicJsonLog",
+    "AugmentationReport",
     "BOObservation",
     "BOPrediction",
     "BOSelectionResult",
@@ -80,8 +95,12 @@ __all__ = [
     "CandidateSpaceSpec",
     "DataCollectionPaths",
     "DataCollectionSink",
+    "EXPERT_JUSTIFICATION_SYSTEM_PROMPT",
+    "ExpertJustificationPipeline",
+    "ExpertJustifier",
     "FeatureVector",
     "JsonlTrajectoryRecorder",
+    "JustificationRequest",
     "LDMDataCollectionError",
     "LDMRoundTrace",
     "LDMSearchLoopResult",
@@ -90,6 +109,8 @@ __all__ = [
     "ObjectiveSpec",
     "OperationParameter",
     "OperationSchema",
+    "OpenAICompatibleExpert",
+    "PosteriorAcquisition",
     "ResponseSpaceSpec",
     "ValidatedOperation",
     "as_float",
@@ -106,6 +127,7 @@ __all__ = [
     "load_jsonl",
     "load_operation_schema",
     "make_complete_design_ir",
+    "make_acquisition",
     "make_parameter_edit_ir",
     "normalize_task_id",
     "normalize_operation_numeric",

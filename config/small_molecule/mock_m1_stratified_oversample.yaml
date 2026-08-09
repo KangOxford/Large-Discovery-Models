@@ -24,6 +24,8 @@ args:
   gp-device: cpu
   gp-fit-itersteps: 20
   gp-fp-n-bits: 2048
+  acq: ehvi
+  acq-weights: 0.5,0.5
   ehvi-n-samples: 128
   alpha: 1.0
   eta: 3.0

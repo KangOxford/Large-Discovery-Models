@@ -12,4 +12,5 @@ args:
   n-init: 3
   parallel-budget: 8
   acq: ei
+  acq-xi: 0.001
   out-dir: ldm_runs/antbo_mock_ei

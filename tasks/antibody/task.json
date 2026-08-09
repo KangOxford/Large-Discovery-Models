@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "antibody",
+  "description": "Optimize antibody CDRH3 sequences for antigen binding.",
+  "dependency_checker": "tasks.antibody.ldm_task.dependencies:check_dependencies"
+}

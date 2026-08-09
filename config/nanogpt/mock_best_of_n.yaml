@@ -18,6 +18,9 @@ args:
   disable-feature-expansion: false
   allow-new-feature-specs: false
   mock-expand-every: 0
+  surrogate-mode: lcb
+  gp-beta: 1.0
+  gp-xi: 0.001
   out-dir: ldm_runs
   run-name: "{name}"
   eval-command: "python {train_path}"

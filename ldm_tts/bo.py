@@ -73,7 +73,11 @@ class FeatureEncoder(Protocol):
 
 
 class AcquisitionSelector(Protocol):
-    """Protocol for task-owned acquisition selectors."""
+    """Protocol for task adapters that fit surrogates and select candidates.
+
+    Acquisition math belongs to :mod:`ldm_tts.acquisition`; adapters own only
+    candidate encoding, surrogate fitting, and selection mechanics.
+    """
 
     def describe(self) -> AcquisitionSpec:
         ...

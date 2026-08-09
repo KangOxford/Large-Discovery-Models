@@ -8,9 +8,16 @@ wheels/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
 # Virtual environments
 .venv
+.venv-standalone
+*/.venv
+*/*/.venv
 worktrees/
 results/
 queue/
@@ -19,6 +26,7 @@ queue/
 .env
 .env.*
 !.env.example
+api_credential.json
 
 # Agent prompt files (generated per-session by launchers)
 CLAUDE.md
@@ -33,6 +41,7 @@ results.tsv
 # Runtime outputs and generated artifacts
 **/ldm_runs/
 **/ldm_docs/
+**/docking_work/
 
 # Task-specific generated data
 /antibody/cache/
@@ -40,7 +49,13 @@ results.tsv
 /antibody/temp/
 /small_molecule/output/
 /small_molecule/runs/
+/tasks/antibody/cache/
+/tasks/antibody/outputs/
+/tasks/antibody/temp/
+/tasks/small_molecule/output/
+/tasks/small_molecule/runs/
 
 .vscode
 .DS_Store
 logs/
+TTS/
