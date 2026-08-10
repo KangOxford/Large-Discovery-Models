@@ -13,7 +13,7 @@ Two targets are provided:
 
 | Config | Target | `enable_thinking` | Dataset |
 | --- | --- | --- | --- |
-| `config/qwen3_5_9b_full_sft_cot.yaml` | chain-of-thought (the released policy) | `true` | `ldm_mixed_cot` |
+| `config/qwen3_5_9b_full_sft_cot.yaml` | chain-of-thought (default) | `true` | `ldm_mixed_cot` |
 | `config/qwen3_5_9b_full_sft_nocot.yaml` | direct answer | `false` | `ldm_mixed_nocot` |
 
 See [`../DATA_COLLECTION.md`](../DATA_COLLECTION.md) for how the search
