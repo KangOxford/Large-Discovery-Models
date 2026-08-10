@@ -18,7 +18,7 @@ overwrite_cache: true
 preprocessing_num_workers: 16
 
 ### output
-output_dir: ./output/qwen3_5_9b_ldm_cot
+output_dir: ./output/ldm_cot
 logging_steps: 5
 save_strategy: epoch
 save_total_limit: 2
