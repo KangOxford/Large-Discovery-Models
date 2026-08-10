@@ -1,0 +1,44 @@
+### model
+model_name_or_path: Qwen/Qwen3.5-9B
+trust_remote_code: true
+
+### method
+stage: sft
+do_train: true
+finetuning_type: full
+deepspeed: LLaMA-Factory/examples/deepspeed/ds_z3_offload_config.json
+
+### dataset
+dataset: ldm_mixed_cot
+dataset_dir: ./data
+template: qwen3_5
+enable_thinking: true          # chain-of-thought target (the released LDM-TTS policy)
+cutoff_len: 16384
+overwrite_cache: true
+preprocessing_num_workers: 16
+
+### output
+output_dir: ./output/ldm_cot
+logging_steps: 5
+save_strategy: epoch
+save_total_limit: 2
+plot_loss: true
+overwrite_output_dir: true
+report_to: none                # set to wandb and add run_name to enable logging
+
+### train
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-5
+num_train_epochs: 2.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+bf16: true
+gradient_checkpointing: true
+flash_attn: sdpa
+ddp_timeout: 180000000
+
+### eval
+val_size: 0.02
+per_device_eval_batch_size: 1
+eval_strategy: epoch
