@@ -1,4 +1,7 @@
-<h1 align="center">LDM-TTS: Large Discovery Model Test-Time Search</h1>
+<h1 align="center">
+  Large Discovery Models (LDM v0.1):<br>
+  Empirically-grounded Model-Based Open-Ended Search
+</h1>
 
 <p align="center">
   <img alt="arXiv" src="https://img.shields.io/badge/arXiv-Paper-B31B1B?style=flat-square">
@@ -14,8 +17,7 @@
 </p>
 
 <p align="center"><em>From producing an answer, to reasoning about an answer,
-to managing an open-ended discovery process. Click the figure to open the
-original PDF.</em></p>
+to managing an open-ended discovery process.</em></p>
 
 **LDM is not primarily a model that tries once to generate an accurate
 answer. It is a model that understands and steers the research process that
@@ -26,6 +28,21 @@ turns external observations into predictions and epistemic uncertainty; and
 an acquisition function turns that search state into the next decision. The
 result is a recurrent `generate -> select -> evaluate -> update` loop grounded
 in evidence rather than model confidence alone.
+
+## Contents
+
+- [Repository Scope](#repository-scope)
+- [The Research Loop](#the-research-loop)
+- [Real Campaign Examples](#real-campaign-examples)
+- [Quick Start](#quick-start)
+- [Environment Setup](#environment-setup)
+- [Dependency Checks](#dependency-checks)
+- [Config-Driven Runs](#config-driven-runs)
+- [LDM Algorithm Abstraction](#ldm-algorithm-abstraction)
+- [Codebase Architecture](#codebase-architecture)
+- [Outputs And Logs](#outputs-and-logs)
+- [Data Collection And Augmentation](#data-collection-and-augmentation)
+- [Customization](#customization)
 
 ## Repository Scope
 
@@ -448,8 +465,11 @@ figures under `assets/` and provenance-documented campaign plots under
 
 Accepted teacher actions can be collected during task execution as ldm-2.0 IR,
 then augmented with expert justification and rendered for LlamaFactory through
-the shared `ldm_tts.data` interface. See [DATA_COLLECTION.md](DATA_COLLECTION.md)
-for the schema, task hooks, quality rules, and CLI workflow.
+the shared `ldm_tts.data` interface. The compact [data pipeline](data/README.md)
+keeps the schema, examples, offline tools, and training configuration together,
+while generated campaigns use one ignored directory each. See
+[DATA_COLLECTION.md](DATA_COLLECTION.md) for the task hooks, quality rules, and
+full CLI workflow.
 
 ## Customization
 

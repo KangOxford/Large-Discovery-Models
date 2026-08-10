@@ -6,7 +6,7 @@ intermediate representation, then render to LlamaFactory alpaca format.
 Pipeline:
     raw task trace --[adapter]--> ldm-2.0 IR --[renderer]--> LlamaFactory alpaca
 
-Design notes (see FORMAT_ldm-2.0.md):
+Design notes (see SCHEMA.md):
   * The design space is STATE (search_state.design_space), not a static header,
     so the model can learn to EXPAND it, not merely fill it in.
   * `action` is a tagged union: propose | expand_design_space | add_new_parameter.

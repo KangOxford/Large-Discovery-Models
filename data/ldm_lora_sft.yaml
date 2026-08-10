@@ -1,11 +1,11 @@
 # LlamaFactory LoRA SFT config for the LDM proposal-distillation dataset.
-# Run:  llamafactory-cli train train/ldm_lora_sft.yaml
+# Run:  llamafactory-cli train data/ldm_lora_sft.yaml
 #
 # IMPORTANT: cutoff_len must be large. nanogpt instructions embed the full parent
 # train.py (~26KB, often >10k tokens). If truncated, the trailing "## Your move"
 # contract is cut off and the model never learns the output format.
 # Check your longest sample before training:
-#   python -c "import json;print(max(len(json.loads(l)['instruction']) for l in open('data/ldm_sft.jsonl')))"
+#   python -c "import json;print(max(len(json.loads(l)['instruction']) for l in open('data/generated/my_campaign/ldm_sft_augmented.jsonl')))"
 
 ### model
 model_name_or_path: Qwen/Qwen2.5-Coder-7B-Instruct   # <-- replace with your base model

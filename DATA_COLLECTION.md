@@ -20,7 +20,9 @@ selection, scores, runtime metadata, and provenance for auditing, but do not let
 that metadata leak into the model-visible instruction unless it was genuinely
 visible to the teacher model at proposal time.
 
-For the full schema, see [data/FORMAT_ldm-2.0.md](data/FORMAT_ldm-2.0.md).
+For the full schema, see [data/SCHEMA.md](data/SCHEMA.md). For the collection,
+augmentation, rendering, and validation workflow, see
+[data/README.md](data/README.md).
 
 ## Output Files
 
@@ -111,10 +113,10 @@ export LLM_BASE_URL=https://your-openai-compatible-endpoint/v1
 export LLM_API_KEY=...
 export LLM_MODEL_NAME=DeepSeek-V4-Flash
 
-python scripts/augment_ldm_data.py \
-  --input data/ldm_ir.jsonl \
-  --output data/ldm_ir_justified.jsonl \
-  --sft-output data/ldm_sft_justified.jsonl \
+python data/augment.py \
+  --input data/generated/my_campaign/ldm_ir.jsonl \
+  --output data/generated/my_campaign/ldm_ir_augmented.jsonl \
+  --sft-output data/generated/my_campaign/ldm_sft_augmented.jsonl \
   --workers 8
 ```
 
@@ -140,7 +142,7 @@ By default the pipeline skips:
 Use `--overwrite-reasoning` only to intentionally replace existing content.
 `--include-reasoning-unavailable` is available for explicit experiments, but it
 can fabricate unsupported rationale and conflicts with the default data-quality
-rule in `data/FORMAT_ldm-2.0.md`.
+rule in `data/SCHEMA.md`.
 
 The CLI reads `LLM_API_KEY` from the environment and never accepts or stores a
 credential in source code. It imports `openai` only when the production model
@@ -526,46 +528,47 @@ Merge only after the action contract is stable.
 
 ## Historical Trace Conversion
 
-The existing `/data` scripts convert historical samples and nanogpt run
+The scripts in `data/` convert historical samples and nanogpt run
 directories into `ldm-2.0` IR.
 
 Sample bundle:
 
 ```bash
-python data/scripts/build_ldm2.py from-sample \
+python data/build_ldm2.py from-sample \
   --in /path/to/ldm_data_sample.json \
-  --out-ir data/ir_sample.jsonl
+  --out-ir data/generated/imported/ldm_ir.jsonl
 ```
 
 Full nanogpt run:
 
 ```bash
-python data/scripts/build_ldm2.py from-nanogpt-run \
+python data/build_ldm2.py from-nanogpt-run \
   --run-dir /path/to/expanded_ldm_bon_N4H4_03 \
-  --out-ir data/ir_ng_eval.jsonl \
+  --out-ir data/generated/imported/ldm_ir.jsonl \
   --min-status evaluated
 ```
 
 Render IR into Alpaca:
 
 ```bash
-python data/scripts/build_ldm2.py render \
-  --in-ir data/ir_all.jsonl \
-  --out data/ldm_sft.jsonl \
+python data/build_ldm2.py render \
+  --in-ir data/generated/imported/ldm_ir.jsonl \
+  --out data/generated/imported/ldm_sft.jsonl \
   --render prose \
-  --dataset-info data/dataset_info.json
+  --dataset-info data/generated/imported/dataset_info.json
 ```
 
 Audit and verify before training:
 
 ```bash
-python data/scripts/build_ldm2.py audit --in-ir data/ir_all.jsonl
+python data/build_ldm2.py audit \
+  --in-ir data/generated/imported/ldm_ir.jsonl
 
-python data/scripts/verify.py all \
+python data/verify.py all \
   --run-dir /path/to/run \
-  --in-ir data/ir_all.jsonl \
-  --sft data/ldm_sft.jsonl \
-  --dataset-info data/dataset_info.json \
+  --in-ir data/generated/imported/ldm_ir.jsonl \
+  --sft data/generated/imported/ldm_sft.jsonl \
+  --dataset-info data/generated/imported/dataset_info.json \
   --cutoff-len 16384
 ```
 
@@ -574,7 +577,10 @@ python data/scripts/verify.py all \
 Run at least:
 
 ```bash
-python -m pytest tests/test_data_collection.py tests/test_ldm_tts_core.py
+python -m pytest \
+  tests/test_data_collection.py \
+  tests/test_data_augmentation.py \
+  tests/test_ldm_tts_core.py
 ```
 
 For generated datasets, check:

@@ -269,7 +269,55 @@ not count generated proposal states as completed real evaluations.
 - Failed warm-up or selected evaluations are reported explicitly and excluded from GP fitting.
 - The best state, score, active feature schema, and real evaluation count are present.
 
-## 11. Plotting
+## 11. Data Collection And Reasoning Augmentation
+
+Root `data/` is the offline training-data workspace, not a task runtime module.
+Task code emits accepted actions through `ldm_tts.data`; never import
+the command-line tools in `data/` into a task. Keep each campaign's generated
+artifacts together under ignored `data/generated/<campaign>/`, as documented in
+`data/README.md`.
+
+Collect ldm-2.0 IR during an authorized task run:
+
+```bash
+export LDM_DATA_COLLECTION_ENABLED=1
+export LDM_DATA_COLLECTION_DIR="$PWD/data/generated/my_campaign"
+export LDM_DATA_COLLECTION_RENDER=prose
+
+python scripts/run_ldm_tts.py <config.yaml>
+```
+
+Preserve collected IR as immutable source data. Add expert reasoning in a new
+file, using only information that was visible when the accepted action was
+proposed:
+
+```bash
+python data/augment.py \
+  --input data/generated/my_campaign/ldm_ir.jsonl \
+  --output data/generated/my_campaign/ldm_ir_augmented.jsonl \
+  --checkpoint data/generated/my_campaign/augmentation.checkpoint.jsonl \
+  --sft-output data/generated/my_campaign/ldm_sft_augmented.jsonl
+```
+
+Run unit tests plus the independent IR and rendered-data checks before using a
+dataset for training:
+
+```bash
+python -m pytest tests/test_data_collection.py tests/test_data_augmentation.py
+python data/build_ldm2.py audit \
+  --in-ir data/generated/my_campaign/ldm_ir_augmented.jsonl
+python data/verify.py validity \
+  --in-ir data/generated/my_campaign/ldm_ir_augmented.jsonl
+python data/verify.py alpaca \
+  --sft data/generated/my_campaign/ldm_sft_augmented.jsonl
+```
+
+Do not expose post-action outcomes to reasoning generation, silently repair
+invalid actions, augment records marked `reasoning_available=false`, or commit
+generated corpora and checkpoints. See `DATA_COLLECTION.md` for the full
+contract and `data/SCHEMA.md` for the IR schema.
+
+## 12. Plotting
 
 Run the maintained plotter in an environment containing Matplotlib and the
 small-molecule plotting dependencies:
@@ -288,7 +336,7 @@ The script infers successful nanoGPT warm-up observations from buffer metadata
 and labels an incomplete nanoGPT plot as interim. Verify PNG magic bytes, row
 counts in the generated CSV files, and visual layout before publishing.
 
-## 12. Known Improvement Priorities
+## 13. Known Improvement Priorities
 
 1. Add a shared launcher/status format that reports live completed iterations, selected state, and progress for all tasks.
 2. Add bounded LLM-call and trace-size controls to molecule reservoir refills; the example required 7,874 model calls and produced a 239 MB round trace.
@@ -297,7 +345,7 @@ counts in the generated CSV files, and visual layout before publishing.
 5. Add multi-seed random, pure-LLM, BO-only, and acquisition-ablation suites before making causal claims about LDM.
 6. Add automated end-to-end artifact validation and plotting to CI using compact mock fixtures.
 
-## 13. Evidence And Claims
+## 14. Evidence And Claims
 
 The examples under `assets/examples/real_100_20260809/` demonstrate that each
 adapter can execute against its real evaluator and that the observed incumbent
