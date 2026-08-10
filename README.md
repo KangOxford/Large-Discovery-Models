@@ -5,8 +5,12 @@
 
 <p align="center">
   <img alt="arXiv" src="https://img.shields.io/badge/arXiv-Paper-B31B1B?style=flat-square">
-  <img alt="Hugging Face" src="https://huggingface.co/Yangtze-ailab">
-  <img alt="Website" src="https://largediscovery.net/en/">
+  <a href="https://huggingface.co/Yangtze-ailab" title="View our models on Hugging Face">
+    <img alt="Hugging Face" src="https://img.shields.io/badge/Hugging_Face-Models-FFD21E?style=flat-square">
+  </a>
+  <a href="https://largediscovery.net/en/" title="Visit the Large Discovery website">
+    <img alt="Website" src="https://img.shields.io/badge/Website-Project_Page-2563EB?style=flat-square">
+  </a>
   <img alt="X / Twitter" src="https://img.shields.io/badge/X_%2F_Twitter-Follow-000000?style=flat-square">
   <a href="assets/wechata_group_invitation.jpg" title="Join our WeChat group">
     <img alt="WeChat group" src="https://img.shields.io/badge/WeChat-Join_Group-07C160?style=flat-square&amp;logo=wechat&amp;logoColor=white">
