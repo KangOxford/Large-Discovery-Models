@@ -23,6 +23,11 @@ tests/         task-local unit and integration tests
 runs/          generated run artifacts (Git-ignored)
 ```
 
+The task declares the shared `single_turn` proposal topology for each LLM
+candidate batch. Its budgeted multi-round loop, molecular acquisition, docking,
+and history updates remain in `core/`; `single_turn` does not mean the complete
+optimization run has only one round.
+
 The supported runner entry point is
 `tasks.small_molecule.ldm_task.procedure:main`. `pyproject.toml` and `uv.lock`
 are the authoritative Python environment definition; import implementation
@@ -40,6 +45,18 @@ CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/small_molecule \
 ```
 
 Mock runs do not need Vina, ReaSyn, the G12D model, or a real LLM endpoint.
+
+## Real Campaign Example
+
+The evaluator-backed example below completed 100 AutoDock Vina plus configured
+G12D activity-model evaluations using EHVI selection. Its Pareto hypervolume
+reached `22.8080517046179`.
+
+![Small-molecule EHVI trajectory](../../assets/examples/real_100_20260809/small_molecule_ehvi_100.png)
+
+See the [campaign provenance and evidence boundary](../../assets/examples/real_100_20260809/README.md).
+The trajectory demonstrates end-to-end optimization progress, not a controlled
+causal estimate of the LDM component.
 
 ## Environment
 

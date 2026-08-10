@@ -27,11 +27,11 @@ agent workflows cataloged under [`skills/`](skills/README.md):
 
 LDM-TTS treats LDM as a task-neutral, closed-loop search contract rather than
 one domain-specific optimizer. Each task adapter describes its candidate space,
-objectives, structured LLM response, and acquisition rule through an
-`LDMTaskSpec`, then supplies the domain evaluator. The shared layer provides
-config dispatch, acquisition scoring, validation, budget, and trajectory
-utilities. Adapters own candidate encoding, surrogate fitting, and domain
-evaluation, while all posterior acquisition math crosses one shared interface.
+objectives, structured LLM response, proposal-search topology, and acquisition
+rule through an `LDMTaskSpec`, then supplies the domain evaluator. The shared
+layer provides config dispatch, proposal traversal, acquisition scoring,
+validation, budget, and trajectory utilities. Adapters own candidate encoding,
+surrogate fitting, and domain evaluation.
 
 ```mermaid
 flowchart TB
@@ -41,19 +41,20 @@ flowchart TB
     R --> M["Small-molecule adapter<br/>SMILES candidates"]
     R --> B["Antibody adapter<br/>CDRH3 sequences"]
 
-    N --> S["Shared LDM contract<br/>candidate space + objectives<br/>response schema + acquisition"]
+    N --> S["Shared LDM contract<br/>candidate space + objectives<br/>response + proposal search + acquisition"]
     M --> S
     B --> S
 
     S --> P
 
     subgraph L["Conceptual LDM search loop"]
+        T["Proposal-search topology<br/>single turn, best-of-N, tree, beam, or MCTS"]
         P["LLM proposes structured candidates"]
         V["Parse, validate, and filter"]
         A["Surrogate and acquisition<br/>rank or sample candidates"]
         E["Domain evaluator scores<br/>selected candidates"]
         H["Update evaluated history"]
-        P --> V --> A --> E --> H --> P
+        T --> P --> V --> A --> E --> H --> T
     end
 
     H --> O["Trajectory, task spec,<br/>summary, and best result"]
@@ -61,16 +62,31 @@ flowchart TB
 
 The three adapters instantiate the same roles with different domain objects:
 
-| Task | LLM candidate | Acquisition or selection | External evaluation |
-| --- | --- | --- | --- |
-| `nanogpt` | Structured `train.py` operations or code edits. | GP-surrogate best-of-N, tree, or beam search. | Run the generated training program and optimize `val_bpb` or another configured metric. |
-| `small_molecule` | Direct SMILES or seed plans for analog generation. | Base-measure sampling tilted by EHVI or weighted posterior mean. | Minimize AutoDock Vina score while maximizing predicted KRAS G12D activity. |
-| `antibody` | CDRH3 pool selections and search-space DSL updates. | EI, LCB, UCB, or posterior mean over a GP-scored candidate pool. | Minimize Absolut binding energy for the selected antigen. |
+| Task | LLM candidate | Proposal search | Acquisition or selection | External evaluation |
+| --- | --- | --- | --- | --- |
+| `nanogpt` | Structured `train.py` operations or code edits. | Configurable `single_turn`, best-of-N, tree, beam, or direct-search MCTS traversal. | LCB, UCB, EI, or posterior mean from the inner GP surrogate. | Run the generated training program and optimize `val_bpb` or another configured metric. |
+| `small_molecule` | Direct SMILES or seed plans for analog generation. | `single_turn` proposal batches within each outer optimization round. | Base-measure sampling tilted by EHVI or weighted posterior mean. | Minimize AutoDock Vina score while maximizing predicted KRAS G12D activity. |
+| `antibody` | CDRH3 pool selections and search-space DSL updates. | `single_turn` proposal/update within each outer optimization round. | EI, LCB, UCB, or posterior mean over a GP-scored candidate pool. | Minimize Absolut binding energy for the selected antigen. |
 
 The shared code keeps orchestration, config loading, task-space specs, response
 parsing, trajectory metadata, and common tests in one place. Task adapters keep
 domain-specific dependencies such as training data, Vina, ReaSyn, and Absolut
 behind task boundaries.
+
+### Proposal Search
+
+Proposal search controls how LLM-generated candidate states are traversed
+within one optimization round. The implementations live in
+`ldm_tts.search_methods` behind a task-neutral engine protocol. `single_turn` is
+the one-level special case; `best_of_n`, `tree_search`, `beam_search`, and
+`mcts` support deeper state traversal. Public aliases such as `beam` and `tree`
+resolve through the shared registry.
+
+Proposal search is intentionally separate from acquisition and the outer
+budgeted loop. For example, antibody and small molecule use one-turn LLM
+outputs but still repeat proposal, acquisition, domain evaluation, and history
+updates until their task budgets are exhausted. Their complete optimizers are
+therefore iterative even though their `proposal_search` is `single_turn`.
 
 ### Acquisition Configuration
 
@@ -87,6 +103,34 @@ larger-is-better score and applies the configured objective direction.
 For example, a small-molecule posterior-mean run uses `acq: mean` and
 `acq-weights: 0.5,0.5`. The same acquisition implementation is used across
 tasks; only the surrogate/posterior adapter remains domain-specific.
+
+## Real Campaign Examples
+
+The repository includes three compact plots from evaluator-backed campaigns in
+[`assets/examples/real_100_20260809/`](assets/examples/real_100_20260809/README.md).
+They establish that all three adapters run end to end and that their observed
+incumbents improve under the configured LDM loops.
+
+| Antibody: UCB, 100 evaluations | Small molecule: EHVI, 100 evaluations | nanoGPT: LCB, interim at 46/100 |
+| --- | --- | --- |
+| ![Antibody UCB trajectory](assets/examples/real_100_20260809/antibody_ucb_100.png) | ![Small-molecule EHVI trajectory](assets/examples/real_100_20260809/small_molecule_ehvi_100.png) | ![nanoGPT LCB interim trajectory](assets/examples/real_100_20260809/nanogpt_lcb_interim_i46.png) |
+
+| Task | Real evidence | Observed result |
+| --- | --- | --- |
+| Antibody | 100 Absolut evaluations on `1ADQ_A`; 20 initialization evaluations followed by 80 UCB selections. | Best binding energy improved from -88.56 after initialization to -96.72. |
+| Small molecule | 100 Vina plus G12D activity evaluations with EHVI selection. | Pareto hypervolume reached 22.8080517046179. |
+| nanoGPT | 20 warm-up attempts and an interim snapshot after 46 real LCB-selected training evaluations. | Best finite `val_bpb` improved from 0.986220 in warm-up to 0.981905. |
+
+The nanoGPT campaign was still running when its example was frozen, so the
+figure is deliberately labeled interim. More importantly, improving curves are
+evidence of optimization progress, not a controlled causal estimate of the LDM
+component. Establishing an LDM advantage requires multiple seeds and matched
+random, pure-LLM, BO-only, and acquisition-ablation baselines.
+
+Use [`AGENT_README.md`](AGENT_README.md) for the machine-oriented execution,
+validation, resume, plotting, and safety checklist. Use
+[`scripts/plot_campaigns.py`](scripts/plot_campaigns.py) to regenerate the
+three trajectory views from persisted artifacts.
 
 ## Quick Start
 
@@ -307,19 +351,21 @@ sequentially.
 
 ## Codebase Architecture
 
-The codebase has three layers:
+The codebase has four layers:
 
 | Layer | Where | Responsibility |
 | --- | --- | --- |
 | Shared runner | `ldm_tts.runner`, `scripts/run_ldm_tts.py` | Load configs, build commands, run suites, and provide dry-runs. |
-| Shared modules | `ldm_tts/` | Describe task spaces, implement acquisition scoring, parse LLM JSON, define operation-space helpers, and serialize trace shapes. |
-| Task adapters | `tasks/<task>/ldm_task/procedure.py` | Own prompts, LLM calls, candidate generation/encoding, surrogate fitting, domain scoring, resume behavior, and output writing. |
+| Shared algorithms | `ldm_tts/` | Describe task spaces, traverse proposal states, implement acquisition scoring and budgets, parse responses, and serialize traces. |
+| Task adapters | `tasks/<task>/ldm_task/procedure.py` | Provide a thin, stable entry point for the shared runner. |
+| Task implementations | `tasks/<task>/core/` | Own prompts, LLM/provider calls, candidate encoding, surrogate adapters, domain scoring, resume behavior, and output writing. |
 
 Key shared modules:
 
 | Module | Purpose |
 | --- | --- |
-| `ldm_tts.spaces` | `LDMTaskSpec`, candidate spaces, objectives, response spaces, and acquisition specs. |
+| `ldm_tts.spaces` | `LDMTaskSpec`, candidate spaces, objectives, response spaces, proposal-search specs, and acquisition specs. |
+| `ldm_tts.search_methods` | Shared `single_turn`, best-of-N, tree, beam, and MCTS proposal traversal behind a generic engine protocol and registry. |
 | `ldm_tts.acquisition` | Shared `mean`, `EI`, `LCB`, `UCB`, and two-objective `EHVI` implementation behind one posterior-scoring interface. |
 | `ldm_tts.response` | Shared LLM JSON extraction and validation helpers. |
 | `ldm_tts.parameter_space` | nanoGPT operation-schema primitives and validators. |
@@ -348,7 +394,8 @@ Common run artifacts:
 | `vina_cache/` | Small-molecule docking and receptor-preparation cache. |
 
 Generated runs, caches, scratch files, plots, notebooks, local virtual
-environments, and `.env` files should stay out of git.
+environments, and `.env` files should stay out of git. Curated, provenance-
+documented example plots under `assets/examples/` are the only plot exception.
 
 ## Data Collection And Augmentation
 

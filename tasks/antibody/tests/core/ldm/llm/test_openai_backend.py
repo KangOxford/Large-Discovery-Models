@@ -97,6 +97,28 @@ class TestOpenAIClientInit:
 
 
 class TestOpenAIClientCall:
+    def test_call_many_requests_and_returns_all_choices(self, monkeypatch):
+        monkeypatch.setenv("LLM_API_KEY", "k")
+        monkeypatch.setenv("LLM_BASE_URL", "https://e/v1")
+        from tasks.antibody.core.ldm.llm.openai_backend import OpenAIClient
+        with patch(OPENAI_PATCH) as MockOpenAI:
+            mock_response = MagicMock()
+            mock_response.choices = [
+                MagicMock(message=MagicMock(content="first")),
+                MagicMock(message=MagicMock(content="second")),
+            ]
+            MockOpenAI.return_value.chat.completions.create.return_value = mock_response
+
+            client = OpenAIClient()
+            assert client.call_many("prompt", 0.4, 12, n=2) == ["first", "second"]
+            MockOpenAI.return_value.chat.completions.create.assert_called_once_with(
+                model="DeepSeek-V4-Flash",
+                messages=[{"role": "user", "content": "prompt"}],
+                temperature=0.4,
+                timeout=12,
+                n=2,
+            )
+
     def test_call_returns_content(self, monkeypatch):
         monkeypatch.setenv("LLM_API_KEY", "k")
         monkeypatch.setenv("LLM_BASE_URL", "https://e/v1")

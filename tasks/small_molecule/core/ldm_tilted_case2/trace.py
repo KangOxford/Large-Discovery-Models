@@ -18,6 +18,7 @@ from ldm_tts.spaces import (
     LDMTaskSpec,
     ObjectiveSpec,
     ResponseSpaceSpec,
+    ProposalSearchSpec,
 )
 from tasks.small_molecule.core.acquisition import hypervolume
 from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
@@ -186,6 +187,11 @@ def _ldm_task_spec(cfg: TiltedLDMCase2Config) -> LDMTaskSpec:
             ),
         ),
         acquisition=acquisition,
+        proposal_search=ProposalSearchSpec(
+            name="single_turn",
+            evaluation_policy="outer_loop_acquisition_selection",
+            parameters={"proposals_per_round": "task_configured_candidate_reservoir"},
+        ),
         metadata={
             "method": cfg.method,
             "init_strategy": cfg.init_strategy,

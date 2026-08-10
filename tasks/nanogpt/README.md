@@ -11,12 +11,16 @@ The task follows the repository-wide layout documented in
 
 ```text
 ldm_task/   shared-runner adapter only
-core/       search engines, methods, and model-provider implementation
+core/       nanoGPT state, generator, surrogate, and model-provider adapters
 resources/  seed training programs and operation schemas
 scripts/    data preparation, training, and compatibility launchers
 tests/      task-local unit and integration tests
 runs/       generated run artifacts (Git-ignored)
 ```
+
+Proposal-search algorithms are shared in `ldm_tts/search_methods/`, not owned
+by this task. NanoGPT supplies the code-state engine and GP-surrogate scoring
+adapter used by `single_turn`, best-of-N, tree, beam, and MCTS traversal.
 
 The supported runner entry point is `tasks.nanogpt.ldm_task.procedure:main`.
 Import implementation code from `tasks.nanogpt.core`; the legacy launchers in
@@ -39,6 +43,19 @@ The mock config uses:
 - `tasks/nanogpt/resources/train/mock_train.py`
 - `tasks/nanogpt/resources/schemas/mock_operations.json`
 - output under `tasks/nanogpt/runs/`
+
+## Real Campaign Example
+
+The evaluator-backed LCB N4H4 campaign below uses real 300-second GPU training
+evaluations. At the frozen interim snapshot, 46 of 100 requested LCB iterations
+were complete; the best finite `val_bpb` improved from `0.986220` during
+warm-up to `0.981905`.
+
+![NanoGPT LCB interim trajectory](../../assets/examples/real_100_20260809/nanogpt_lcb_interim_i46.png)
+
+See the [campaign provenance and evidence boundary](../../assets/examples/real_100_20260809/README.md).
+This is explicitly an interim result, not a completed 100-iteration campaign
+or a controlled causal estimate of the LDM component.
 
 ## Environment
 

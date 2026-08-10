@@ -82,8 +82,14 @@ from ldm_tts.spaces import (
     LDMTaskSpec,
     ObjectiveSpec,
     ResponseSpaceSpec,
+    ProposalSearchSpec,
 )
 from ldm_tts.acquisition import SINGLE_OBJECTIVE_ACQUISITIONS
+from tasks.antibody.core.ldm_light.methods import (
+    METHOD_CHOICES,
+    METHOD_SPECS,
+    normalize_method,
+)
 
 
 class DeterministicAntBOTTSLLM:
@@ -91,6 +97,17 @@ class DeterministicAntBOTTSLLM:
 
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.sequence_counter = 0
+
+    def _direct_sequence(self) -> str:
+        alphabet = "GPQST"
+        value = self.sequence_counter
+        self.sequence_counter += 1
+        sequence = []
+        for _ in range(11):
+            sequence.append(alphabet[value % len(alphabet)])
+            value //= len(alphabet)
+        return "".join(sequence)
 
     def call(self, prompt: str, temperature: float = 0.25, timeout_s: int = 30) -> str:
         self.calls.append({
@@ -98,12 +115,31 @@ class DeterministicAntBOTTSLLM:
             "timeout_s": timeout_s,
             "prompt_prefix": prompt[:200],
         })
+        if '"task": "direct_cdrh3_generation"' in prompt:
+            payload = json.loads(prompt)
+            count = int(payload["constraints"]["num_sequences"])
+            return json.dumps([self._direct_sequence() for _ in range(count)])
         if '"candidate_pool"' in prompt:
             return json.dumps({"selected": [{"id": 0, "sequence": "", "score": 1.0}]})
+        if '"task": "sample_one_antibody_search_policy"' in prompt:
+            return json.dumps({
+                "rationale": "deterministic independent mock policy",
+                "trust_region": "LatinHyperCubeSampling(num=8)",
+                "update_bias": None,
+            })
         return json.dumps({
             "rationale": "deterministic mock TTS search",
             "update_trust_region": "LatinHyperCubeSampling(num=8)",
         })
+
+    def call_many(
+        self,
+        prompt: str,
+        temperature: float = 0.25,
+        timeout_s: int = 30,
+        n: int = 1,
+    ) -> list[str]:
+        return [self.call(prompt, temperature, timeout_s) for _ in range(int(n))]
 
     def close(self) -> None:
         return None
@@ -122,6 +158,32 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--n-init", type=int, default=20)
     parser.add_argument("--parallel-budget", type=int, default=600)
+    parser.add_argument(
+        "--method",
+        type=normalize_method,
+        choices=METHOD_CHOICES,
+        default="policy_max",
+        help="Antibody proposal reservoir and acquisition reduction rule.",
+    )
+    parser.add_argument("--gen-m", type=int, default=5)
+    parser.add_argument("--n-strategies", type=int, default=5)
+    parser.add_argument(
+        "--planner-mode",
+        choices=("choices", "independent"),
+        default="choices",
+        help="Sample direct candidates or policies through one multi-choice request or independent requests.",
+    )
+    parser.add_argument("--softmax-eta", type=float, default=1.0)
+    parser.add_argument(
+        "--per-strategy-budget",
+        type=int,
+        default=0,
+        help="Per-policy candidate budget; zero divides --parallel-budget across policies.",
+    )
+    parser.add_argument("--pool-score", choices=("acq", "combined"), default="acq")
+    parser.add_argument("--selection-score", choices=("acq", "combined"), default="acq")
+    parser.add_argument("--bias-weight", type=float, default=0.05)
+    parser.add_argument("--sample-timeout-s", type=float, default=5.0)
     parser.add_argument(
         "--device",
         choices=("cpu", "cuda"),
@@ -229,6 +291,7 @@ def make_run_tag(args: argparse.Namespace) -> str:
         mode,
         sanitize_run_tag_part(args.acq),
         f"budget{args.n_evals}",
+        f"method-{args.method}",
         f"init{args.n_init}",
         f"parallel{args.parallel_budget}",
         f"batch{args.batch_size}",
@@ -277,6 +340,17 @@ def planned_config_json(args: argparse.Namespace, config: dict[str, Any], antige
         "batch_size": args.batch_size,
         "n_init": args.n_init,
         "parallel_budget": args.parallel_budget,
+        "method": args.method,
+        "method_spec": METHOD_SPECS[args.method],
+        "gen_m": args.gen_m,
+        "n_strategies": args.n_strategies,
+        "planner_mode": args.planner_mode,
+        "softmax_eta": args.softmax_eta,
+        "per_strategy_budget": args.per_strategy_budget,
+        "pool_score": args.pool_score,
+        "selection_score": args.selection_score,
+        "bias_weight": args.bias_weight,
+        "sample_timeout_s": args.sample_timeout_s,
         "device": str(config.get("device") or "cuda"),
         "acq": args.acq,
         "acq_beta": args.acq_beta,
@@ -304,6 +378,7 @@ def describe_ldm_task(
 ) -> LDMTaskSpec:
     seq_len = int(config.get("seq_len", 11))
     acq_name = str(args.acq).lower()
+    method_spec = METHOD_SPECS[args.method]
     return LDMTaskSpec(
         task="antibody",
         candidate_space=CandidateSpaceSpec(
@@ -324,6 +399,8 @@ def describe_ldm_task(
                 "antigens": list(antigens or []),
                 "n_init": int(args.n_init),
                 "parallel_budget": int(args.parallel_budget),
+                "method": args.method,
+                "base_measure": method_spec["base_measure"],
             },
         ),
         objectives=(
@@ -359,6 +436,16 @@ def describe_ldm_task(
                 },
             ),
             ResponseSpaceSpec(
+                name="direct_sequence_generation",
+                output_kind="json",
+                parser="tasks.antibody.core.ldm_light.direct.parse_direct_sequences",
+                description="Direct variants emit a JSON list of CDRH3 sequences.",
+                schema={
+                    "type": "array",
+                    "items": {"type": "string", "minLength": seq_len, "maxLength": seq_len},
+                },
+            ),
+            ResponseSpaceSpec(
                 name="dsl_update",
                 output_kind="json",
                 parser="tasks.antibody.core.ldm.llm.response_parser.parse_response",
@@ -378,13 +465,30 @@ def describe_ldm_task(
             name=acq_name,
             objective_names=("absolut_energy",),
             score_direction="maximize",
-            selection_rule="maximize GP acquisition over DSL-expanded candidate pool",
+            selection_rule=(
+                "no acquisition; evaluate direct LLM generation"
+                if not method_spec["uses_acquisition"]
+                else f"{method_spec['reduction']} over {method_spec['base_measure']} reservoir acquisition scores"
+            ),
             parameters={
                 "beta": float(args.acq_beta),
                 "xi": float(args.acq_xi),
                 "n_init": int(args.n_init),
                 "parallel_budget": int(args.parallel_budget),
                 "batch_size": int(args.batch_size),
+                "softmax_eta": float(args.softmax_eta),
+                "gen_m": int(args.gen_m),
+                "n_strategies": int(args.n_strategies),
+            },
+        ),
+        proposal_search=ProposalSearchSpec(
+            name="single_turn",
+            evaluation_policy="outer_loop_acquisition_selection",
+            parameters={
+                "method": args.method,
+                "proposal_mode": method_spec["base_measure"],
+                "reduction": method_spec["reduction"],
+                "planner_mode": args.planner_mode,
             },
         ),
         metadata={
@@ -428,6 +532,17 @@ def make_runner_args(args: argparse.Namespace, antigens_file: Path, out_dir: Pat
         max_retries=args.max_retries,
         history_top_k=args.history_top_k,
         parallel_budget=args.parallel_budget,
+        method=args.method,
+        gen_m=args.gen_m,
+        n_strategies=args.n_strategies,
+        planner_mode=args.planner_mode,
+        softmax_eta=args.softmax_eta,
+        per_strategy_budget=args.per_strategy_budget,
+        pool_score=args.pool_score,
+        selection_score=args.selection_score,
+        bias_weight=args.bias_weight,
+        sample_timeout_s=args.sample_timeout_s,
+        device=getattr(args, "_runtime_device", args.device or "cpu"),
         n_init=args.n_init,
         acq=args.acq,
         acq_beta=args.acq_beta,
@@ -475,6 +590,8 @@ def run(args: argparse.Namespace) -> list[str]:
         config["seq_len"] = int(config.get("seq_len", 11))
         antbo_tts.make_llm_client = lambda: DeterministicAntBOTTSLLM()
 
+    args._runtime_device = str(config.get("device") or "cpu")
+
     out_dir.mkdir(parents=True, exist_ok=True)
     run_dirs: list[str] = []
     with tempfile.TemporaryDirectory(prefix="antbo_tts_") as td:
@@ -498,6 +615,33 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--acq-xi must be non-negative")
     if args.llm_max_tokens is not None and args.llm_max_tokens <= 0:
         raise ValueError("--llm-max-tokens must be positive")
+    if args.gen_m <= 0:
+        raise ValueError("--gen-m must be positive")
+    if args.n_strategies <= 0:
+        raise ValueError("--n-strategies must be positive")
+    if args.parallel_budget <= 0:
+        raise ValueError("--parallel-budget must be positive")
+    if args.per_strategy_budget < 0:
+        raise ValueError("--per-strategy-budget must be non-negative")
+    if args.softmax_eta < 0 or args.softmax_eta != args.softmax_eta:
+        raise ValueError("--softmax-eta must be non-negative or positive infinity")
+    if args.sample_timeout_s <= 0:
+        raise ValueError("--sample-timeout-s must be positive")
+    if METHOD_SPECS[args.method]["uses_acquisition"] and args.n_init <= 0:
+        raise ValueError("Acquisition-guided antibody methods require --n-init to be positive")
+    if args.method.startswith("direct_") and args.batch_size > args.gen_m:
+        raise ValueError("Direct methods require --batch-size <= --gen-m")
+    if args.method.startswith("policy_") and args.batch_size > args.n_strategies:
+        raise ValueError("Policy methods require --batch-size <= --n-strategies")
+    if (
+        args.method.startswith("policy_")
+        and args.per_strategy_budget == 0
+        and args.parallel_budget < args.n_strategies
+    ):
+        raise ValueError(
+            "Policy methods require --parallel-budget >= --n-strategies "
+            "when --per-strategy-budget is zero"
+        )
     run(args)
     return 0
 

@@ -91,6 +91,7 @@ from ldm_tts.spaces import (
     LDMTaskSpec,
     ObjectiveSpec,
     ResponseSpaceSpec,
+    ProposalSearchSpec,
 )
 
 
@@ -131,6 +132,7 @@ def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
             score_direction="maximize",
             selection_rule="Replace with the task selection rule.",
         ),
+        proposal_search=ProposalSearchSpec(name="single_turn"),
         metadata={{"mock": bool(args.mock)}},
     )
 

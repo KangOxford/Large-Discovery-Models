@@ -45,8 +45,14 @@ from ldm_tts.spaces import (
     LDMTaskSpec,
     ObjectiveSpec,
     ResponseSpaceSpec,
+    ProposalSearchSpec,
 )
 from ldm_tts.response import load_json_object
+from tasks.antibody.core.ldm_light.methods import (
+    METHOD_CHOICES,
+    METHOD_SPECS,
+    normalize_method,
+)
 
 AA = "ACDEFGHIKLMNPQRSTVWY"
 AA_TO_IDX = {aa: i for i, aa in enumerate(AA)}
@@ -79,6 +85,17 @@ def parse_args() -> argparse.Namespace:
                    help="Number of LDM-generated candidates scored by the GP acquisition after warmup.")
     p.add_argument("--n_init", type=int, default=20,
                    help="Number of initial oracle observations before fitting a GP acquisition.")
+    p.add_argument("--method", type=normalize_method, choices=METHOD_CHOICES, default="policy_max")
+    p.add_argument("--gen_m", type=int, default=5)
+    p.add_argument("--n_strategies", type=int, default=5)
+    p.add_argument("--planner_mode", choices=("choices", "independent"), default="choices")
+    p.add_argument("--softmax_eta", type=float, default=1.0)
+    p.add_argument("--per_strategy_budget", type=int, default=0)
+    p.add_argument("--pool_score", choices=("acq", "combined"), default="acq")
+    p.add_argument("--selection_score", choices=("acq", "combined"), default="acq")
+    p.add_argument("--bias_weight", type=float, default=0.05)
+    p.add_argument("--sample_timeout_s", type=float, default=5.0)
+    p.add_argument("--device", choices=("cpu", "cuda"), default="")
     p.add_argument(
         "--acq",
         "--acquisition",
@@ -749,6 +766,8 @@ def describe_ldm_task(
 ) -> LDMTaskSpec:
     seq_len = int(config.get("seq_len", 11))
     acq_name = str(getattr(args, "acq", ACQ_NAME)).lower()
+    method = normalize_method(getattr(args, "method", "policy_max"))
+    method_spec = METHOD_SPECS[method]
     return LDMTaskSpec(
         task="antibody",
         candidate_space=CandidateSpaceSpec(
@@ -769,6 +788,8 @@ def describe_ldm_task(
                 "antigen": antigen,
                 "n_init": int(args.n_init),
                 "parallel_budget": int(args.parallel_budget),
+                "method": method,
+                "base_measure": method_spec["base_measure"],
             },
         ),
         objectives=(
@@ -786,6 +807,12 @@ def describe_ldm_task(
                 description="Warmup LLM selects sequence ids from a supplied candidate pool.",
             ),
             ResponseSpaceSpec(
+                name="direct_sequence_generation",
+                output_kind="json",
+                parser="tasks.antibody.core.ldm_light.direct.parse_direct_sequences",
+                description="Direct variants emit a JSON list of CDRH3 sequences.",
+            ),
+            ResponseSpaceSpec(
                 name="dsl_update",
                 output_kind="json",
                 parser="tasks.antibody.core.ldm.llm.response_parser.parse_response",
@@ -796,13 +823,29 @@ def describe_ldm_task(
             name=acq_name,
             objective_names=("absolut_energy",),
             score_direction="maximize",
-            selection_rule="maximize GP acquisition over DSL-expanded candidate pool",
+            selection_rule=(
+                "no acquisition; evaluate direct LLM generation"
+                if not method_spec["uses_acquisition"]
+                else f"{method_spec['reduction']} over {method_spec['base_measure']} reservoir acquisition scores"
+            ),
             parameters={
                 "beta": float(getattr(args, "acq_beta", 1.0)),
                 "xi": float(getattr(args, "acq_xi", 0.001)),
                 "n_init": int(args.n_init),
                 "parallel_budget": int(args.parallel_budget),
                 "batch_size": int(args.batch_size),
+                "softmax_eta": float(getattr(args, "softmax_eta", 1.0)),
+                "gen_m": int(getattr(args, "gen_m", 5)),
+                "n_strategies": int(getattr(args, "n_strategies", 5)),
+            },
+        ),
+        proposal_search=ProposalSearchSpec(
+            name="single_turn",
+            evaluation_policy="outer_loop_acquisition_selection",
+            parameters={
+                "method": method,
+                "proposal_mode": method_spec["base_measure"],
+                "reduction": method_spec["reduction"],
             },
         ),
         metadata={"seed": int(args.seed), "n_evals": int(args.n_evals)},
@@ -817,6 +860,7 @@ def append_results(
     acquisition_scores: list[float | None],
     elapsed_s: float,
     source: str,
+    acquisition_used: bool,
     start_idx: int,
 ) -> tuple[int, float, str]:
     best_value = min((row["BestValue"] for row in rows), default=float("inf"))
@@ -837,6 +881,7 @@ def append_results(
             "LastProtein": seq,
             "BestProtein": best_seq,
             "Source": source,
+            "AcquisitionUsed": bool(acquisition_used),
         })
         idx += 1
     return idx, best_value, best_seq
@@ -846,14 +891,17 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
     rng = random.Random(seed)
     random.seed(seed)
     np.random.seed(seed)
+    acquisition_rng = np.random.default_rng(seed)
 
     run_id = f"{antigen}_seed{seed}_pid{os.getpid()}"
     seq_len = int(config.get("seq_len", 11))
+    method = normalize_method(getattr(args, "method", "policy_max"))
+    method_spec = METHOD_SPECS[method]
     pool_csv = config.get("tabular_search_csv")
     candidate_library = read_candidate_library(pool_csv, seq_len)
-    if candidate_library:
+    if method == "legacy_policy_max" and candidate_library:
         print(f"[llm-acq] Loaded candidate library: {len(candidate_library)} sequences from {pool_csv}")
-    else:
+    elif method == "legacy_policy_max":
         print("[llm-acq] No candidate library provided; using random temporary candidate pools.")
     llm = make_llm_client()
     evaluator, bbox = make_evaluator(config, antigen, run_id)
@@ -861,7 +909,7 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
     acq_name = str(getattr(args, "acq", ACQ_NAME)).lower()
     acq_beta = float(getattr(args, "acq_beta", 1.0))
     acq_xi = float(getattr(args, "acq_xi", 0.001))
-    mode = f"llm_parallel_{acq_name}_budget{args.parallel_budget}"
+    mode = f"{method}_{acq_name}_budget{args.parallel_budget}"
     run_dir = Path(args.out_root) / f"{mode}_antigen_{antigen}_seed_{seed}_n{args.n_evals}_batch{args.batch_size}"
     run_dir.mkdir(parents=True, exist_ok=True)
     results_path = run_dir / "results.csv"
@@ -875,6 +923,16 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
             "n_evals": int(args.n_evals),
             "batch_size": int(args.batch_size),
             "parallel_budget": int(args.parallel_budget),
+            "method": method,
+            "method_spec": method_spec,
+            "gen_m": int(getattr(args, "gen_m", 5)),
+            "n_strategies": int(getattr(args, "n_strategies", 5)),
+            "planner_mode": str(getattr(args, "planner_mode", "choices")),
+            "softmax_eta": float(getattr(args, "softmax_eta", 1.0)),
+            "per_strategy_budget": int(getattr(args, "per_strategy_budget", 0)),
+            "pool_score": str(getattr(args, "pool_score", "acq")),
+            "selection_score": str(getattr(args, "selection_score", "acq")),
+            "bias_weight": float(getattr(args, "bias_weight", 0.05)),
             "acquisition": acq_name,
             "acq_beta": acq_beta,
             "acq_xi": acq_xi,
@@ -883,28 +941,30 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
         rounds_filename="llm_acq_decisions.jsonl",
         reset_rounds_file=True,
     )
-    from tasks.antibody.core.ldm import DSLConfig, Orchestrator
+    orchestrator = None
+    if method == "legacy_policy_max":
+        from tasks.antibody.core.ldm import DSLConfig, Orchestrator
 
-    ldm_cfg = DSLConfig(
-        llm_init_enabled=False,
-        llm_loop_enabled=True,
-        llm_temperature=float(args.temperature),
-        max_retries=int(args.max_retries),
-        llm_call_timeout_s=int(args.timeout_s),
-        history_max_in_prompt=int(args.history_top_k),
-        bias_weight=0.0,
-        sample_timeout_s=5.0,
-        batch_size=int(args.batch_size),
-        acq_search_budget=int(args.parallel_budget),
-        acq_max_rounds=1,
-        num_llm_review=max(1, min(int(args.parallel_budget), 10)),
-        strategy="ldm-default",
-    )
-    orchestrator = Orchestrator(
-        config=ldm_cfg,
-        llm_client=llm,
-        decision_log_path=run_dir / "ldm_parallel_decisions.json",
-    )
+        ldm_cfg = DSLConfig(
+            llm_init_enabled=False,
+            llm_loop_enabled=True,
+            llm_temperature=float(args.temperature),
+            max_retries=int(args.max_retries),
+            llm_call_timeout_s=int(args.timeout_s),
+            history_max_in_prompt=int(args.history_top_k),
+            bias_weight=0.0,
+            sample_timeout_s=float(getattr(args, "sample_timeout_s", 5.0)),
+            batch_size=int(args.batch_size),
+            acq_search_budget=int(args.parallel_budget),
+            acq_max_rounds=1,
+            num_llm_review=max(1, min(int(args.parallel_budget), 10)),
+            strategy="ldm-default",
+        )
+        orchestrator = Orchestrator(
+            config=ldm_cfg,
+            llm_client=llm,
+            decision_log_path=run_dir / "ldm_parallel_decisions.json",
+        )
 
     antigen_context = None
     if args.include_antigen_context and bbox.get("tool", "Absolut") == "Absolut":
@@ -919,8 +979,49 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
     while eval_idx < args.n_evals:
         batch_size = min(args.batch_size, args.n_evals - eval_idx)
         start = time.time()
-        using_parallel_ldm = len(rows) >= int(args.n_init)
-        if using_parallel_ldm:
+        initialized = len(rows) >= int(args.n_init)
+        using_acquisition = initialized and bool(method_spec["uses_acquisition"])
+
+        if initialized and method_spec["base_measure"] == "policy":
+            from tasks.antibody.core.ldm_light.reservoir import select_with_policy_reservoir
+
+            selected_candidates, decision = select_with_policy_reservoir(
+                llm=llm,
+                rows=rows,
+                antigen=antigen,
+                seed=seed,
+                iteration=eval_idx,
+                antigen_context=antigen_context,
+                batch_size=batch_size,
+                reduction=str(method_spec["reduction"]),
+                args=args,
+            )
+            candidates = decision["representatives"]
+            selected_indices = decision["selected_indices"]
+            acquisition_details = decision["representatives"]
+            selector_source = decision["source"]
+        elif initialized and method_spec["base_measure"] == "direct" and method_spec["uses_acquisition"]:
+            from tasks.antibody.core.ldm_light.direct import select_direct_with_acquisition
+
+            selected_candidates, decision = select_direct_with_acquisition(
+                llm=llm,
+                rng=rng,
+                acquisition_rng=acquisition_rng,
+                antigen=antigen,
+                seq_len=seq_len,
+                observed=observed,
+                rows=rows,
+                antigen_context=antigen_context,
+                batch_size=batch_size,
+                reduction=str(method_spec["reduction"]),
+                args=args,
+            )
+            candidates = decision["candidates"]
+            selected_indices = decision["selected_indices"]
+            acquisition_details = decision["candidates"]
+            selector_source = decision["source"]
+        elif initialized and method_spec["base_measure"] == "legacy_policy":
+            assert orchestrator is not None
             selected_candidates, decision = select_with_parallel_ldm(
                 orchestrator=orchestrator,
                 rows=rows,
@@ -935,7 +1036,7 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
             selected_indices = decision["selected_indices"]
             acquisition_details = decision["parallel_results"]
             selector_source = decision["source"]
-        else:
+        elif method == "legacy_policy_max":
             candidates, decision = propose(
                 llm=llm,
                 rng=rng,
@@ -949,9 +1050,29 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
                 args=args,
             )
             selected_indices = list(range(min(batch_size, len(candidates))))
-            selected_candidates = [candidates[i] for i in selected_indices]
+            selected_candidates = [candidates[index] for index in selected_indices]
             acquisition_details = []
-            selector_source = decision.get("source", "llm")
+            selector_source = decision.get("source", "llm_pool_rerank")
+        else:
+            from tasks.antibody.core.ldm_light.direct import propose_direct_batch
+
+            candidates, decision = propose_direct_batch(
+                llm=llm,
+                rng=rng,
+                antigen=antigen,
+                seq_len=seq_len,
+                n=batch_size,
+                observed=observed,
+                rows=rows,
+                antigen_context=antigen_context,
+                args=args,
+                independent=False,
+            )
+            selected_indices = list(range(min(batch_size, len(candidates))))
+            selected_candidates = [candidates[index] for index in selected_indices]
+            acquisition_details = []
+            decision["phase"] = "generation" if method == "llm_gen" else "initialization"
+            selector_source = method if method == "llm_gen" else f"{method}_init"
 
         proposed_seqs = [candidate["sequence"] for candidate in selected_candidates]
         llm_scores = [candidate.get("score") for candidate in selected_candidates]
@@ -970,6 +1091,7 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
             acquisition_scores=selected_acq_scores,
             elapsed_s=elapsed,
             source=selector_source,
+            acquisition_used=using_acquisition,
             start_idx=eval_idx,
         )
         observed.update(evaluated_seqs)
@@ -988,16 +1110,23 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
             "eval_end": eval_idx,
             "antigen": antigen,
             "seed": seed,
-            "parallel_budget": int(args.parallel_budget) if using_parallel_ldm else batch_size,
+            "method": method,
+            "parallel_budget": int(args.parallel_budget) if using_acquisition else batch_size,
             "candidates": candidates,
             "acquisition": {
-                "enabled": True,
-                "used": bool(using_parallel_ldm),
+                "enabled": bool(method_spec["uses_acquisition"]),
+                "used": bool(using_acquisition),
                 "name": acq_name,
                 "beta": acq_beta,
                 "xi": acq_xi,
                 "n_init": args.n_init,
-                "parallel_executor": "tasks.antibody.core.ldm.acquisition.parallel_search.execute_atoms" if using_parallel_ldm else None,
+                "reduction": method_spec["reduction"],
+                "softmax_eta": float(getattr(args, "softmax_eta", 1.0)),
+                "parallel_executor": (
+                    "tasks.antibody.core.ldm.acquisition.parallel_search.execute_atoms"
+                    if using_acquisition and method_spec["base_measure"] in {"policy", "legacy_policy"}
+                    else None
+                ),
                 "scores": acquisition_details,
                 "selected_indices": selected_indices,
                 "selected_candidates": selected_candidates,
@@ -1025,7 +1154,27 @@ def main() -> None:
         raise ValueError("--acq_beta must be non-negative")
     if args.acq_xi < 0:
         raise ValueError("--acq_xi must be non-negative")
+    if args.gen_m <= 0 or args.n_strategies <= 0:
+        raise ValueError("--gen_m and --n_strategies must be positive")
+    if args.softmax_eta < 0 or np.isnan(args.softmax_eta):
+        raise ValueError("--softmax_eta must be non-negative or positive infinity")
+    if args.per_strategy_budget < 0:
+        raise ValueError("--per_strategy_budget must be non-negative")
+    if args.sample_timeout_s <= 0:
+        raise ValueError("--sample_timeout_s must be positive")
+    if METHOD_SPECS[args.method]["uses_acquisition"] and args.n_init <= 0:
+        raise ValueError("Acquisition-guided methods require --n_init to be positive")
+    if (
+        str(args.method).startswith("policy_")
+        and args.per_strategy_budget == 0
+        and args.parallel_budget < args.n_strategies
+    ):
+        raise ValueError(
+            "Policy methods require --parallel_budget >= --n_strategies "
+            "when --per_strategy_budget is zero"
+        )
     config = read_yaml(os.path.abspath(args.config))
+    args.device = args.device or str(config.get("device") or "cpu")
     antigens = read_antigens(args.antigens_file)
     print(f"LLM + parallel {args.acq.upper()} baseline antigens: {antigens}")
 

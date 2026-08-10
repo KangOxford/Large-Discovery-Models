@@ -63,6 +63,7 @@ from ldm_tts.spaces import (
     LDMTaskSpec,
     ObjectiveSpec,
     ResponseSpaceSpec,
+    ProposalSearchSpec,
 )
 from ldm_tts.dependency_checks import check_small_molecule, format_checks, has_failures
 
@@ -534,6 +535,11 @@ def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
             ),
         ),
         acquisition=acquisition,
+        proposal_search=ProposalSearchSpec(
+            name="single_turn",
+            evaluation_policy="outer_loop_acquisition_selection",
+            parameters={"proposals_per_round": "task_configured_candidate_reservoir"},
+        ),
         metadata={
             "method": args.method,
             "init_strategy": args.init_strategy,

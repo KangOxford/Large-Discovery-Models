@@ -1,8 +1,8 @@
 """Shared primitives for Large Discovery Model test-time search.
 
 The task folders keep their domain-specific generators, scorers, and prompts.
-This package holds the small pieces that should be common across tasks:
-budgeted search-loop control, JSON trajectory writing, and score utilities.
+This package holds the pieces that should be common across tasks: proposal
+search, acquisition, budgeted loop control, trajectory writing, and scoring.
 """
 
 from ldm_tts.acquisition import (
@@ -78,6 +78,7 @@ from ldm_tts.spaces import (
     LDMTaskSpec,
     ObjectiveSpec,
     ResponseSpaceSpec,
+    ProposalSearchSpec,
 )
 from ldm_tts.trajectory import AtomicJsonLog, JsonlTrajectoryRecorder, load_jsonl
 from ldm_tts.trace_schema import CandidateTraceRecord, LDMRoundTrace
@@ -112,6 +113,7 @@ __all__ = [
     "OpenAICompatibleExpert",
     "PosteriorAcquisition",
     "ResponseSpaceSpec",
+    "ProposalSearchSpec",
     "ValidatedOperation",
     "as_float",
     "best_item",

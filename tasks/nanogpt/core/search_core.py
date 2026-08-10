@@ -146,6 +146,12 @@ class SearchEngine:
                 generator=self.config.generator,
             )
 
+    @property
+    def evaluation_interval(self) -> int:
+        """Depth interval used by task-neutral search traversal."""
+
+        return max(1, int(self.config.eval_each_num_steps))
+
     def start_progress(self, total: int, *, label: str = "search") -> None:
         if not self.config.show_progress or total <= 0:
             return
@@ -203,7 +209,7 @@ class SearchEngine:
         depth = int(depth)
         if depth <= 0:
             return True
-        interval = max(1, self.config.eval_each_num_steps)
+        interval = self.evaluation_interval
         if depth % interval == 0:
             return True
         return max_depth is not None and depth >= max_depth
@@ -250,12 +256,21 @@ class SearchEngine:
         stderr_path = state.workdir / "stderr.log"
         env = dict(os.environ)
         env["AUTORESEARCH_DIAGNOSTICS_JSON"] = str(diagnostics_path)
-        existing_pythonpath = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = (
-            str(self.config.project_root)
-            if not existing_pythonpath
-            else str(self.config.project_root) + os.pathsep + existing_pythonpath
+        project_python_paths = [self.config.project_root]
+        scripts_dir = self.config.project_root / "scripts"
+        if scripts_dir.is_dir():
+            project_python_paths.insert(0, scripts_dir)
+        inherited_python_paths = [
+            Path(entry)
+            for entry in env.get("PYTHONPATH", "").split(os.pathsep)
+            if entry and Path(entry) not in project_python_paths
+        ]
+        env["PYTHONPATH"] = os.pathsep.join(
+            str(path) for path in [*project_python_paths, *inherited_python_paths]
         )
+        task_cache_dir = self.config.project_root / "cache" / "autoresearch"
+        if task_cache_dir.is_dir() and not env.get("AUTORESEARCH_CACHE_DIR"):
+            env["AUTORESEARCH_CACHE_DIR"] = str(task_cache_dir)
 
         command = self._format_eval_command(state, diagnostics_path)
         start = time.time()
@@ -353,6 +368,33 @@ class SearchEngine:
             if state.score is not None and _is_finite_number(state.score)
         ]
         return sorted(candidates, key=lambda state: state.score, reverse=not self.config.minimize)
+
+    def reward(self, state: SearchState) -> float:
+        """Map a valid task score to a larger-is-better reward for MCTS."""
+
+        failure_statuses = {
+            "crash",
+            "evaluation_error",
+            "generation_error",
+            "score_missing",
+            "timeout",
+        }
+        if state.status in failure_statuses or not _is_finite_number(state.score):
+            return 0.0
+        scored = [
+            float(candidate.score)
+            for candidate in self.states
+            if candidate.status not in failure_statuses and _is_finite_number(candidate.score)
+        ]
+        if not scored:
+            return 0.0
+        low = min(scored)
+        high = max(scored)
+        if high <= low:
+            return 1.0
+        score = float(state.score)
+        reward = (high - score) / (high - low) if self.config.minimize else (score - low) / (high - low)
+        return min(1.0, max(0.0, reward))
 
     def write_summary(self, *, method: str, args: dict[str, Any], best: SearchState | None) -> Path:
         summary = {

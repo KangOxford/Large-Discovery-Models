@@ -575,6 +575,8 @@ class LDMTaskSpecTests(unittest.TestCase):
             "train_operations",
             {response_space.name for response_space in spec.response_spaces},
         )
+        self.assertEqual(spec.proposal_search.name, "best_of_n")
+        self.assertEqual(spec.proposal_search.breadth, 2)
 
     def test_small_molecule_spec_reports_two_objective_space(self) -> None:
         from tasks.small_molecule.ldm_task import procedure as molecule_procedure
@@ -589,6 +591,7 @@ class LDMTaskSpecTests(unittest.TestCase):
             [("vina", "minimize"), ("activity", "maximize")],
         )
         self.assertEqual(spec.candidate_space.constraints["max_smiles_len"], 80)
+        self.assertEqual(spec.proposal_search.name, "single_turn")
 
     def test_antibody_spec_reports_categorical_sequence_space(self) -> None:
         from tasks.antibody.ldm_task import procedure as antibody_procedure
@@ -604,6 +607,7 @@ class LDMTaskSpecTests(unittest.TestCase):
         self.assertEqual(spec.candidate_space.dimension, 11)
         self.assertEqual(spec.candidate_space.constraints["alphabet_size"], 20)
         self.assertEqual(spec.objectives[0].direction, "minimize")
+        self.assertEqual(spec.proposal_search.name, "single_turn")
 
 
 if __name__ == "__main__":

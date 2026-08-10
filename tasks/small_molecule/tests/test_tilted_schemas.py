@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -233,6 +234,28 @@ def test_openai_subprocess_uses_old_style_request_timeout(monkeypatch):
     assert captured["timeout"] == 305.0
     assert captured["env"]["LDM_SUBPROCESS_LLM_TIMEOUT"] == "300.0"
     assert captured["env"]["LDM_SUBPROCESS_LLM_REQUEST_TIMEOUT"] == "300.0"
+
+
+def test_openai_subprocess_can_import_workspace_package_from_task_cwd(monkeypatch):
+    captured = {}
+    monkeypatch.setenv("PYTHONPATH", "/unrelated")
+
+    def fake_run(args, **kwargs):
+        captured["env"] = kwargs["env"]
+        return SimpleNamespace(returncode=0, stdout='{"direct_smiles":[]}', stderr="")
+
+    monkeypatch.setattr("tasks.small_molecule.core.ldm_tilted_case2.sources.subprocess.run", fake_run)
+    llm = SimpleNamespace(
+        config=SimpleNamespace(api_key="key", base_url="https://example.test/v1", model="model"),
+        temperature=0.2,
+        max_tokens=None,
+    )
+
+    _chat_openai_subprocess(llm, "system", "user", 30.0)
+
+    workspace_root = str(Path(__file__).resolve().parents[3])
+    python_path = captured["env"].get("PYTHONPATH", "").split(os.pathsep)
+    assert workspace_root in python_path
 
 
 def test_llm_json_call_retries_llm_exception():

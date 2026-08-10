@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import importlib
 import json
 import os
 import re
@@ -20,16 +19,10 @@ if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
 
 from tasks.nanogpt.core.search_core import DEFAULT_TASK_CONTEXT, SearchConfig, SearchEngine
+from ldm_tts.search_methods import SEARCH_METHOD_ALIASES, run_search_method
 
 
-METHODS = {
-    "best_of_n": "tasks.nanogpt.core.search_methods.best_of_n",
-    "beam": "tasks.nanogpt.core.search_methods.beam_search",
-    "beam_search": "tasks.nanogpt.core.search_methods.beam_search",
-    "mcts": "tasks.nanogpt.core.search_methods.mcts",
-    "tree": "tasks.nanogpt.core.search_methods.tree_search",
-    "tree_search": "tasks.nanogpt.core.search_methods.tree_search",
-}
+METHODS = dict(SEARCH_METHOD_ALIASES)
 
 
 def safe_path_tag(value: object, *, default: str = "run") -> str:
@@ -241,8 +234,8 @@ async def async_main(argv: list[str] | None = None) -> int:
     )
     engine = SearchEngine(config)
 
-    method_module = importlib.import_module(METHODS[args.method])
-    best = await method_module.run(
+    best = await run_search_method(
+        args.method,
         engine,
         breadth=max(1, args.breadth),
         depth=max(1, args.depth),

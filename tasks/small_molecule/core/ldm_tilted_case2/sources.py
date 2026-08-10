@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 import json
 import multiprocessing
 import os
+from pathlib import Path
 import queue
 import signal
 import subprocess
@@ -135,6 +136,13 @@ def _chat_openai_subprocess(llm, system: str, user: str, seconds: float) -> str:
         json.dump(payload, fh)
         payload_path = fh.name
     env = dict(os.environ)
+    workspace_root = str(Path(__file__).resolve().parents[4])
+    inherited_python_path = [
+        entry
+        for entry in env.get("PYTHONPATH", "").split(os.pathsep)
+        if entry and entry != workspace_root
+    ]
+    env["PYTHONPATH"] = os.pathsep.join([workspace_root, *inherited_python_path])
     env.update({
         "LLM_API_KEY": str(llm.config.api_key),
         "LLM_BASE_URL": str(llm.config.base_url),

@@ -105,3 +105,22 @@ class OpenAIClient(LLMClient):
         kwargs = self.make_chat_completion_kwargs(prompt, temperature, timeout_s)
         response = self._client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
+
+    def call_many(
+        self,
+        prompt: str,
+        temperature: float,
+        timeout_s: int,
+        n: int,
+    ) -> list[str]:
+        """Request independent choices in one OpenAI-compatible call."""
+        if int(n) <= 0:
+            raise ValueError("n must be positive")
+        kwargs = self.make_chat_completion_kwargs(
+            prompt,
+            temperature,
+            timeout_s,
+            n=int(n),
+        )
+        response = self._client.chat.completions.create(**kwargs)
+        return [choice.message.content or "" for choice in response.choices]

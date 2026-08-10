@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -53,7 +52,6 @@ from tasks.nanogpt.core.search_core import (
     truncate_text,
     tune_mock_train_text,
 )
-from tasks.nanogpt.core.search_methods import beam_search, best_of_n, mcts, tree_search
 from tasks.nanogpt.core.single_search import default_run_name, make_unique_run_dir, parse_args, safe_path_tag
 
 
@@ -65,154 +63,30 @@ def _state(tmp_path: Path, state_id: str, depth: int, score: float | None = None
     return SearchState(state_id, None, depth, workdir, train_path, score=score)
 
 
-class FakeEngine:
-    def __init__(self, tmp_path: Path, *, interval: int = 1, root_score: float | None = None) -> None:
-        self.tmp_path = tmp_path
-        self.config = SimpleNamespace(
-            eval_each_num_steps=interval,
-            failure_score=999.0,
-            minimize=True,
-        )
-        self.states: list[SearchState] = []
-        self.evaluation_count = 0
-        self.deferred: list[str] = []
-        self.progress: list[tuple[str, int | str]] = []
-        self.root_score = root_score
-        self.counter = 0
-
-    def start_progress(self, total: int, *, label: str) -> None:
-        self.progress.append((label, total))
-
-    def finish_progress(self) -> None:
-        self.progress.append(("finished", self.evaluation_count))
-
-    def create_seed_state(self) -> SearchState:
-        state = _state(self.tmp_path, "root", 0, self.root_score)
-        self.states.append(state)
-        return state
-
-    def should_evaluate_depth(self, depth: int, max_depth: int | None = None) -> bool:
-        return depth % self.config.eval_each_num_steps == 0 or (
-            max_depth is not None and depth >= max_depth
-        )
-
-    def evaluation_depths(self, max_depth: int) -> list[int]:
-        return [depth for depth in range(1, max_depth + 1) if self.should_evaluate_depth(depth, max_depth)]
-
-    async def expand_state(self, parent: SearchState, count: int, *, search_note: str) -> list[SearchState]:
-        children = []
-        for _ in range(max(0, count)):
-            self.counter += 1
-            state = _state(self.tmp_path, f"s{self.counter}", parent.depth + 1)
-            state.description = search_note
-            self.states.append(state)
-            children.append(state)
-        return children
-
-    async def evaluate_many(self, states: list[SearchState]) -> None:
-        for state in states:
-            if state.score is None:
-                state.score = 100.0 - int(state.state_id.removeprefix("s") or 0)
-            state.status = "evaluated"
-            self.evaluation_count += 1
-
-    async def defer_evaluation_many(self, states: list[SearchState], *, reason: str) -> None:
-        for state in states:
-            state.status = "evaluation_deferred"
-            state.error = reason
-            self.deferred.append(state.state_id)
-
-    def ranked_states(self, states: list[SearchState] | None = None) -> list[SearchState]:
-        pool = self.states if states is None else states
-        return sorted((state for state in pool if state.score is not None), key=lambda state: state.score)
-
-    def best_state(self) -> SearchState | None:
-        ranked = self.ranked_states()
-        return ranked[0] if ranked else None
-
-
-class TestSearchMethods:
-    @pytest.mark.parametrize(
-        ("breadth", "depth", "limit", "interval", "expected"),
-        [
-            (2, 2, None, 1, 6),
-            (2, 3, None, 2, 12),
-            (0, 0, None, 1, 1),
-            (3, 4, 5, 1, 5),
-        ],
-    )
-    def test_tree_budget_estimation(self, breadth: int, depth: int, limit: int | None, interval: int, expected: int) -> None:
-        assert tree_search.estimate_budget(breadth, depth, limit, interval) == expected
-
-    @pytest.mark.parametrize(
-        ("breadth", "depth", "width", "limit", "interval", "expected"),
-        [
-            (2, 2, 1, None, 1, 4),
-            (2, 3, 2, None, 2, 8),
-            (0, 0, 0, None, 1, 1),
-            (3, 4, 2, 5, 1, 5),
-        ],
-    )
-    def test_beam_budget_estimation(self, breadth: int, depth: int, width: int, limit: int | None, interval: int, expected: int) -> None:
-        assert beam_search.estimate_budget(breadth, depth, width, limit, interval) == expected
-
-    def test_best_of_n_runs_independent_branches_and_enforces_cap(self, tmp_path: Path) -> None:
-        engine = FakeEngine(tmp_path, interval=2)
-        best = asyncio.run(
-            best_of_n.run(engine, breadth=3, depth=2, beam_width=1, max_evaluations=2, evaluate_root=False)
-        )
-        assert best is not None
-        assert engine.evaluation_count == 2
-        assert engine.deferred
-        assert engine.progress[-1][0] == "finished"
-
-    def test_tree_search_expands_deferred_frontier(self, tmp_path: Path) -> None:
-        engine = FakeEngine(tmp_path, interval=2)
-        best = asyncio.run(
-            tree_search.run(engine, breadth=2, depth=2, beam_width=1, max_evaluations=3, evaluate_root=False)
-        )
-        assert best is not None
-        assert engine.evaluation_count == 3
-        assert len(engine.deferred) == 2
-
-    def test_beam_search_prunes_and_can_evaluate_root(self, tmp_path: Path) -> None:
-        engine = FakeEngine(tmp_path, interval=1, root_score=200.0)
-        best = asyncio.run(
-            beam_search.run(engine, breadth=3, depth=2, beam_width=1, max_evaluations=4, evaluate_root=True)
-        )
-        assert best is not None and best.state_id != "root"
-        assert engine.evaluation_count == 4
-
-    def test_mcts_runs_with_deferred_depths(self, tmp_path: Path) -> None:
-        engine = FakeEngine(tmp_path, interval=2, root_score=100.0)
-        best = asyncio.run(
-            mcts.run(engine, breadth=2, depth=2, beam_width=2, max_evaluations=4, evaluate_root=True)
-        )
-        assert best is not None
-        assert engine.progress[-1][0] == "finished"
-
-    def test_mcts_node_helpers(self, tmp_path: Path) -> None:
-        root = mcts.MCTSNode(_state(tmp_path, "root", 0, 2.0))
-        child = mcts.MCTSNode(_state(tmp_path, "child", 1, 1.0), parent=root)
-        root.children.append(child)
-        assert math.isinf(mcts._uct(child, 1.0))
-        mcts._backpropagate(child, 0.5)
-        assert child.visits == root.visits == 1
-        assert child.value_mean == 0.5
-        assert mcts._select(root, max_depth=2, max_children=1, exploration=1.0) is child
-
-        engine = FakeEngine(tmp_path)
-        engine.states = [root.state, child.state]
-        assert mcts._reward(engine, child.state) == 1.0
-        engine.config.minimize = False
-        assert mcts._reward(engine, child.state) == 0.0
-        child.state.score = float("nan")
-        assert mcts._reward(engine, child.state) == 0.0
-        child.state.score = engine.config.failure_score
-        assert mcts._reward(engine, child.state) == 0.0
-
-
 class TestSearchEngineIntegration:
+    def test_engine_reward_orients_scores_and_rejects_failed_states(self, tmp_path: Path) -> None:
+        config = SearchConfig(
+            project_root=tmp_path,
+            seed_train_path=Path(mock_train.__file__).resolve(),
+            out_dir=tmp_path / "run",
+            generator="mock",
+            show_progress=False,
+        )
+        engine = SearchEngine(config)
+        better = _state(tmp_path, "better", 1, 1.0)
+        worse = _state(tmp_path, "worse", 1, 3.0)
+        failed = _state(tmp_path, "failed", 1, engine.config.failure_score)
+        better.status = worse.status = "evaluated"
+        failed.status = "crash"
+        engine.states = [better, worse, failed]
+
+        assert engine.reward(better) == 1.0
+        assert engine.reward(worse) == 0.0
+        assert engine.reward(failed) == 0.0
+        engine.config.minimize = False
+        assert engine.reward(better) == 0.0
+        assert engine.reward(worse) == 1.0
+
     def test_engine_can_be_constructed_after_an_event_loop_closes(self, tmp_path: Path) -> None:
         asyncio.run(asyncio.sleep(0))
         config = SearchConfig(
@@ -253,6 +127,48 @@ class TestSearchEngineIntegration:
         assert json.loads(summary.read_text(encoding="utf-8"))["evaluation_count"] == 2
         assert (out_dir / "best_train.py").exists()
         assert len((out_dir / "manifest.jsonl").read_text(encoding="utf-8").splitlines()) >= 5
+
+    def test_evaluation_exposes_task_scripts_and_local_cache(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        project_root = tmp_path / "nanogpt"
+        scripts_dir = project_root / "scripts"
+        cache_dir = project_root / "cache" / "autoresearch"
+        scripts_dir.mkdir(parents=True)
+        cache_dir.mkdir(parents=True)
+        seed = project_root / "train.py"
+        seed.write_text(
+            "\n".join(
+                [
+                    "import os",
+                    f"assert {str(scripts_dir)!r} in os.environ.get('PYTHONPATH', '').split(os.pathsep)",
+                    f"assert os.environ.get('AUTORESEARCH_CACHE_DIR') == {str(cache_dir)!r}",
+                    "print('val_bpb: 0.5')",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        monkeypatch.delenv("AUTORESEARCH_CACHE_DIR", raising=False)
+        engine = SearchEngine(
+            SearchConfig(
+                project_root=project_root,
+                seed_train_path=seed,
+                out_dir=project_root / "run",
+                eval_command=f"{sys.executable} {{train_path}}",
+                generator="mock",
+                show_progress=False,
+                timeout_seconds=10,
+            )
+        )
+
+        root = engine.create_seed_state()
+        engine.evaluate_state(root)
+
+        assert root.status == "evaluated"
+        assert root.score == pytest.approx(0.5)
 
     def test_skipped_and_generation_error_evaluations(self, tmp_path: Path) -> None:
         config = SearchConfig(

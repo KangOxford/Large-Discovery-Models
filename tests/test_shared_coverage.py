@@ -91,6 +91,7 @@ from ldm_tts.spaces import (
     LDMTaskSpec,
     ObjectiveSpec,
     ResponseSpaceSpec,
+    ProposalSearchSpec,
 )
 from ldm_tts.trace_schema import CandidateTraceRecord, LDMRoundTrace
 from ldm_tts.trajectory import AtomicJsonLog, JsonlTrajectoryRecorder, load_jsonl, utc_timestamp
@@ -551,8 +552,15 @@ class TestLoopTrajectoryAndSpecs:
             objectives=(ObjectiveSpec("loss", "minimize"),),
             response_spaces=(ResponseSpaceSpec("items", "structured", {"type": "object"}),),
             acquisition=AcquisitionSpec("ei", ("loss",), "maximize", "argmax"),
+            proposal_search=ProposalSearchSpec(
+                name="beam_search",
+                breadth=3,
+                depth=2,
+                beam_width=2,
+            ),
         )
         assert task.to_dict()["candidate_space"]["dimension"] == 2
+        assert task.to_dict()["proposal_search"]["name"] == "beam_search"
         assert BOPrediction("x").to_dict()["candidate_id"] == "x"
         candidate = CandidateTraceRecord("x", {"a": 1})
         assert candidate.to_dict()["candidate_id"] == "x"

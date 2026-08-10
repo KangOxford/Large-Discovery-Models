@@ -1,8 +1,8 @@
 # Antibody Task Guide
 
 The antibody task wraps an AntBO-style CDRH3 optimization loop. It proposes
-fixed-length amino-acid sequences, evaluates binding energy, and lets the LLM
-update DSL trust-region or bias atoms during search.
+fixed-length amino-acid sequences, evaluates binding energy, and supports both
+direct LLM sequence reservoirs and LLM-parameterized DSL policy reservoirs.
 
 For a new installation, follow the numbered
 [clean-room quick start](QUICKSTART.md) before using this reference guide.
@@ -21,6 +21,10 @@ tests/         task-local unit and integration tests
 runs/          generated run artifacts (Git-ignored)
 ```
 
+The task declares the shared `single_turn` proposal topology for each LLM pool
+selection or DSL update. Its budgeted multi-round AntBO loop, GP acquisition,
+Absolut evaluation, and observation updates remain in `core/`.
+
 The supported runner entry point is `tasks.antibody.ldm_task.procedure:main`.
 Import implementation code from `tasks.antibody.core`; do not add new search
 modules or generated outputs under `ldm_task/`.
@@ -36,6 +40,63 @@ CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/antibody \
 ```
 
 Mock runs do not need Absolut or a real LLM endpoint.
+
+## Real Campaign Example
+
+The evaluator-backed example below completed 100 Absolut evaluations on
+antigen `1ADQ_A`: 20 initialization evaluations followed by 80 UCB selections.
+The best binding energy improved from `-88.56` after initialization to
+`-96.72`.
+
+![Antibody UCB trajectory](../../assets/examples/real_100_20260809/antibody_ucb_100.png)
+
+See the [campaign provenance and evidence boundary](../../assets/examples/real_100_20260809/README.md).
+The trajectory demonstrates end-to-end optimization progress, not a controlled
+causal estimate of the LDM component.
+
+## Paper Methods
+
+The workflow exposes the four antibody LDM variants from the paper as stable
+`--method` values:
+
+| Method | LLM base measure | Acquisition reduction |
+| --- | --- | --- |
+| `direct_max` | Five independently generated CDRH3 sequences (`--gen-m 5`) | Deterministic acquisition maximum |
+| `direct_softmax` | Five independently generated CDRH3 sequences (`--gen-m 5`) | Seeded acquisition Softmax |
+| `policy_max` | Five independently generated DSL policies (`--n-strategies 5`) | Deterministic maximum over one representative per policy |
+| `policy_softmax` | Five independently generated DSL policies (`--n-strategies 5`) | Seeded Softmax over one representative per policy |
+
+`llm_gen` is the pure-LLM direct-generation baseline and never fits or uses an
+acquisition function. `legacy_policy_max` preserves the older merged workflow:
+one DSL update, one flattened candidate pool, and global acquisition argmax.
+
+Softmax uses `P(x_i) proportional to exp(eta * acquisition_i)`. Set
+`--softmax-eta 0` for uniform sampling. Positive infinity is handled as an
+explicit deterministic maximum and does not enter the floating-point Softmax
+calculation.
+
+For Policy methods, `--parallel-budget` is the total generated-candidate budget
+and is divided across the independently sampled policies. Set
+`--per-strategy-budget` to a positive value to override that derived cap. Each
+policy pool contributes at most one unique representative to the final Max or
+Softmax reduction, preventing a larger pool from dominating merely by size.
+
+Publication-oriented five-antigen, five-seed, 200-evaluation configurations are
+committed separately so every curve has an unambiguous executable definition:
+
+```bash
+python scripts/run_ldm_tts.py config/antibody/paper_direct_max.yaml
+python scripts/run_ldm_tts.py config/antibody/paper_direct_softmax.yaml
+python scripts/run_ldm_tts.py config/antibody/paper_policy_max.yaml
+python scripts/run_ldm_tts.py config/antibody/paper_policy_softmax.yaml
+python scripts/run_ldm_tts.py config/antibody/paper_pure_llm.yaml
+```
+
+All methods use direct LLM generation for the first `--n-init` evaluations so
+the acquisition-guided variants begin from the same type of observation
+history. Their trajectory snapshots record the canonical method, base measure,
+reduction rule, candidate or policy count, selection probabilities, selected
+indices, GP posterior values, and acquisition values.
 
 ## Environment
 

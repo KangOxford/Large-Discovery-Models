@@ -1,0 +1,24 @@
+name: antibody_paper_pure_llm
+task: antibody
+algorithm: llm
+mode: real
+description: Paper pure-LLM direct generation baseline over five antigens and five seeds.
+args:
+  config: resources/default_config.yaml
+  antigens-file: resources/antigens.txt
+  method: llm_gen
+  seed: 42
+  n-trials: 5
+  budget: 200
+  batch-size: 1
+  n-init: 20
+  parallel-budget: 600
+  device: cuda
+  acq: ei
+  llm-temperature: 0.7
+  timeout-s: 120
+  max-retries: 3
+  history-top-k: 20
+  include-antigen-context: true
+  fallback-random: true
+  out-dir: runs/paper/pure_llm

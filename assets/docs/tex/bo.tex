@@ -1,0 +1,44 @@
+
+% ============================================================
+\section{Bayesian Optimisation with LLM Prior}
+\label{sec:llm-bo}
+% ============================================================
+
+Bayesian optimisation provides a principled workflow for experimental design, and our LDM borrows heavily from its core concepts: a Gaussian-process surrogate and the acquisition functions built upon it. The design space $\mathcal{X}$, the noisy reward $r_t = R(x_t) + \epsilon_t$ with $\epsilon_t \sim \mathcal{N}(0, \sigma_n^2)$, and the historical data $\mathcal{D}_t = \{(x_i, r_i)\}_{i=1}^{t}$ are defined as in \S\ref{sec:algo}.
+
+\paragraph{GP Inference with LLM-informed Priors.}
+While standard Bayesian optimisation often defaults to a zero or constant prior mean, our framework integrates domain knowledge directly into the surrogate by using an LLM-informed prior mean. Specifically, we take the prior mean function $m(x)$ to be a computationally cheap estimate of design quality supplied by the LLM.
+
+Let $\br_t = (r_1, \dots, r_t)^\top$ be the vector of observed rewards, and let $\mvec_t = (m(x_1), \dots, m(x_t))^\top$ be the prior means evaluated on the observed designs. We define the $t \times t$ kernel matrix $\bK_t$ and the $t$-dimensional cross-covariance vector $\bk_t(x)$ side-by-side:
+\begin{equation}
+\bK_t =
+\begin{bmatrix}
+k(x_1, x_1) & k(x_1, x_2) & \dots & k(x_1, x_t) \\
+k(x_2, x_1) & k(x_2, x_2) & \dots & k(x_2, x_t) \\
+\vdots      & \vdots      & \ddots & \vdots      \\
+k(x_t, x_1) & k(x_t, x_2) & \dots & k(x_t, x_t)
+\end{bmatrix},\quad
+\bk_t(x) =
+\begin{bmatrix}
+k(x_1, x) \\
+k(x_2, x) \\
+\vdots \\
+k(x_t, x)
+\end{bmatrix} \in \mathbb{R}^t.
+\end{equation}
+Given observation noise variance $\sigma_n^2$, the conditioned posterior distribution $R(x) \mid \mathcal{D}_t$ is Gaussian with mean $\mu_t(x)$ and variance $\sigma_t^2(x)$ given by:
+\begin{align}
+\mu_t(x) &= m(x) + \bk_t(x)^\top (\bK_t + \sigma_n^2 I)^{-1} (\br_t - \mvec_t), \label{eq:postmean} \\
+\sigma_t^2(x) &= k(x, x) - \bk_t(x)^\top (\bK_t + \sigma_n^2 I)^{-1} \bk_t(x). \label{eq:postvar}
+\end{align}
+
+This GP acts as our forward model of the reward space, yielding both a prediction $\mu_t(x)$ and a calibrated uncertainty estimate $\sigma_t(x)$ for any candidate. Crucially, the GP posterior mean dynamically corrects the LLM’s prior guess using the observed residuals $(\br_t - \mvec_t)$. If the LLM’s prior is misspecified, the discrepancy is naturally absorbed into the residual function $g = R - m$. This can increase the effective Reproducing Kernel Hilbert Space (RKHS) norm of the residual, which is compensated for by adjusting the confidence bands during optimisation \citep{srinivas2010gaussian,chowdhury2017kernelized}; we discuss this theoretical safeguard in Appendix~\ref{sec:theory}.
+
+\paragraph{Acquisition Functions.}
+Acquisition functions evaluate the utility of candidate designs for the subsequent experimental iteration by combining the posterior mean (exploitation) and uncertainty (exploration). Two common choices for maximization are:
+\begin{align}
+\alpha^{\mathrm{EI}}(x) &= (\mu_t(x) - r_t^\star - \xi) \Phi(z) + \sigma_t(x) \varphi(z),
+   \quad z = \tfrac{\mu_t(x) - r_t^\star - \xi}{\sigma_t(x)}, \label{eq:ei}\\
+\alpha^{\mathrm{UCB}}(x) &= \mu_t(x) + \sqrt{\beta_t} \sigma_t(x), \label{eq:ucb}
+\end{align}
+where $r_t^\star = \max_{i \le t} r_i$, $\xi \ge 0$, and $\Phi, \varphi$ represent the standard normal CDF and PDF, respectively. Expected Improvement (EI) originates from the Efficient Global Optimisation framework \citep{jonesEfficientGlobalOptimization1998}, while the Upper Confidence Bound (UCB) form \eqref{eq:ucb} supports rigorous cumulative regret bounds in the GP-bandit setting \citep{srinivas2010gaussian}, which we build on in Appendix~\ref{sec:theory}.

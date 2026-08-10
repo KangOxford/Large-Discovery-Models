@@ -31,6 +31,12 @@ if str(_WORKSPACE_ROOT) not in sys.path:
 from ldm_tts.scoring import as_float as shared_as_float
 from ldm_tts.scoring import is_finite_number
 from ldm_tts.acquisition import make_acquisition
+from ldm_tts.search_methods import (
+    SEARCH_METHOD_ALIASES as SHARED_SEARCH_METHOD_ALIASES,
+    canonical_search_method,
+    estimate_generated,
+    get_traversal_method,
+)
 from ldm_tts.parameter_space import (
     OperationParameter,
     OperationSchema,
@@ -56,6 +62,7 @@ from ldm_tts.spaces import (
     LDMTaskSpec,
     ObjectiveSpec,
     ResponseSpaceSpec,
+    ProposalSearchSpec,
 )
 
 from tasks.nanogpt.core.single_search import make_unique_run_dir, safe_path_tag
@@ -83,13 +90,14 @@ GENERATORS = {
     "tool_call",
 }
 OPERATION_GENERATORS = {"operation_mock", "operation_tool", "operation_tool_plain_text"}
+SURROGATE_SEARCH_METHODS = {"single_turn", "best_of_n", "beam_search", "tree_search"}
 SEARCH_METHOD_ALIASES = {
     "auto": "auto",
-    "best_of_n": "best_of_n",
-    "beam": "beam_search",
-    "beam_search": "beam_search",
-    "tree": "tree_search",
-    "tree_search": "tree_search",
+    **{
+        alias: canonical
+        for alias, canonical in SHARED_SEARCH_METHOD_ALIASES.items()
+        if canonical in SURROGATE_SEARCH_METHODS
+    },
 }
 
 FEATURE_VERSION = "code_numeric_hash_v2"
@@ -2003,167 +2011,132 @@ async def run_inner_surrogate_search(
     progress: ModelBasedProgress,
 ) -> tuple[list[SearchState], list[SearchState]]:
     method = resolve_search_method(args)
-    if method == "best_of_n":
-        return await run_surrogate_best_of_n(engine, args, root, surrogate, iteration=iteration, progress=progress)
-    if method == "beam_search":
-        return await run_surrogate_beam_search(engine, args, root, surrogate, iteration=iteration, progress=progress)
-    return await run_surrogate_tree_search(engine, args, root, surrogate, iteration=iteration, progress=progress)
-
-
-async def run_surrogate_best_of_n(
-    engine: SearchEngine,
-    args: argparse.Namespace,
-    root: SearchState,
-    surrogate: "GPSurrogate",
-    *,
-    iteration: int,
-    progress: ModelBasedProgress,
-) -> tuple[list[SearchState], list[SearchState]]:
-    scored_states: list[SearchState] = []
-    leaves: list[SearchState] = []
-    branch_count = max(1, args.breadth)
-    branch_depth = max(1, args.depth)
-    for branch_index in range(1, branch_count + 1):
-        parent = root
-        last_child: SearchState | None = None
-        for level in range(1, branch_depth + 1):
-            children = await expand_and_score(
-                engine,
-                parent,
-                1,
-                surrogate,
-                args,
-                iteration=iteration,
-                progress=progress,
-                search_note=(
-                    f"model_based best_of_n iteration {iteration}, branch "
-                    f"{branch_index}/{branch_count}, step {level}/{branch_depth}: "
-                    "continue this independent surrogate-scored rollout branch."
-                ),
-            )
-            if not children:
-                break
-            child = children[0]
-            scored_states.append(child)
-            last_child = child
-            parent = child
-        if last_child is not None:
-            leaves.append(last_child)
-    return scored_states, leaves
-
-
-async def run_surrogate_tree_search(
-    engine: SearchEngine,
-    args: argparse.Namespace,
-    root: SearchState,
-    surrogate: "GPSurrogate",
-    *,
-    iteration: int,
-    progress: ModelBasedProgress,
-) -> tuple[list[SearchState], list[SearchState]]:
-    frontier: list[SearchState] = [root]
-    scored_states: list[SearchState] = []
-    leaves: list[SearchState] = []
-    max_depth = max(1, args.depth)
-    for level in range(1, max_depth + 1):
-        next_frontier: list[SearchState] = []
-        for parent in frontier:
-            children = await expand_and_score(
-                engine,
-                parent,
-                max(1, args.breadth),
-                surrogate,
-                args,
-                iteration=iteration,
-                progress=progress,
-                search_note=(
-                    f"model_based tree_search iteration {iteration}, depth {level}/{max_depth}: "
-                    "expand this node with candidates valued by the GP surrogate."
-                ),
-            )
-            next_frontier.extend(children)
-            scored_states.extend(children)
-        if not next_frontier:
-            break
-        leaves = next_frontier
-        frontier = next_frontier
-    return scored_states, leaves
-
-
-async def run_surrogate_beam_search(
-    engine: SearchEngine,
-    args: argparse.Namespace,
-    root: SearchState,
-    surrogate: "GPSurrogate",
-    *,
-    iteration: int,
-    progress: ModelBasedProgress,
-) -> tuple[list[SearchState], list[SearchState]]:
-    beam: list[SearchState] = [root]
-    scored_states: list[SearchState] = []
-    leaves: list[SearchState] = []
-    max_depth = max(1, args.depth)
-    beam_width = max(1, args.beam_width if args.beam_width > 0 else args.breadth)
-    for level in range(1, max_depth + 1):
-        next_candidates: list[SearchState] = []
-        for parent in beam:
-            children = await expand_and_score(
-                engine,
-                parent,
-                max(1, args.breadth),
-                surrogate,
-                args,
-                iteration=iteration,
-                progress=progress,
-                search_note=(
-                    f"model_based beam_search iteration {iteration}, depth {level}/{max_depth}: "
-                    "expand this beam parent with candidates valued by the GP surrogate."
-                ),
-            )
-            next_candidates.extend(children)
-            scored_states.extend(children)
-        if not next_candidates:
-            break
-        leaves = next_candidates
-        beam = sorted(next_candidates, key=surrogate_sort_key)[:beam_width]
-    return scored_states, leaves
-
-
-async def expand_and_score(
-    engine: SearchEngine,
-    parent: SearchState,
-    child_count: int,
-    surrogate: "GPSurrogate",
-    args: argparse.Namespace,
-    *,
-    iteration: int,
-    progress: ModelBasedProgress,
-    search_note: str,
-) -> list[SearchState]:
-    progress.status(f"generating children from {parent.state_id}")
-    previous_acquisition_context = getattr(engine.config, "acquisition_context", "")
-    engine.config.acquisition_context = build_acquisition_feedback(
+    adapter = SurrogateSearchAdapter(
         engine,
         args,
-        parent,
+        root,
         surrogate,
         iteration=iteration,
+        progress=progress,
     )
-    try:
-        children = await engine.expand_state(parent, max(1, child_count), search_note=search_note)
-    finally:
-        engine.config.acquisition_context = previous_acquisition_context
-    for child in children:
-        if isinstance(engine, OperationSearchEngine):
-            current_dim = operation_feature_dim(engine.operation_schema)
-            if len(surrogate.entries) > 0:
-                first_dim = len(surrogate.entries[0].feature_vector)
-                if first_dim != current_dim:
-                    surrogate.entries = project_buffer_entries(surrogate.entries, engine.operation_schema, args)
-                    surrogate._fit()
-        score_with_surrogate(engine, child, surrogate, args, iteration=iteration)
-        progress.generated(child)
-    return children
+    traversal = get_traversal_method(method)
+    result = await traversal(
+        adapter,
+        root,
+        breadth=max(1, args.breadth),
+        depth=max(1, args.depth),
+        beam_width=max(1, args.beam_width if args.beam_width > 0 else args.breadth),
+        max_evaluations=None,
+    )
+    return list(result.generated), list(result.leaves)
+
+
+class SurrogateSearchAdapter:
+    """Score shared proposal traversals with nanoGPT's inner GP surrogate."""
+
+    def __init__(
+        self,
+        engine: SearchEngine,
+        args: argparse.Namespace,
+        root: SearchState,
+        surrogate: "GPSurrogate",
+        *,
+        iteration: int,
+        progress: ModelBasedProgress,
+    ) -> None:
+        self.engine = engine
+        self.args = args
+        self.root = root
+        self.surrogate = surrogate
+        self.iteration = iteration
+        self.progress = progress
+        self.evaluation_count = 0
+
+    @property
+    def evaluation_interval(self) -> int:
+        return 1
+
+    def create_seed_state(self) -> SearchState:
+        return self.root
+
+    async def expand_state(
+        self,
+        parent: SearchState,
+        count: int,
+        *,
+        search_note: str = "",
+    ) -> list[SearchState]:
+        self.progress.status(f"generating children from {parent.state_id}")
+        previous_context = getattr(self.engine.config, "acquisition_context", "")
+        self.engine.config.acquisition_context = build_acquisition_feedback(
+            self.engine,
+            self.args,
+            parent,
+            self.surrogate,
+            iteration=self.iteration,
+        )
+        try:
+            return await self.engine.expand_state(
+                parent,
+                max(1, count),
+                search_note=f"model_based iteration {self.iteration}: {search_note}",
+            )
+        finally:
+            self.engine.config.acquisition_context = previous_context
+
+    async def evaluate_many(self, states: list[SearchState]) -> None:
+        for state in states:
+            self._refresh_operation_features()
+            score_with_surrogate(
+                self.engine,
+                state,
+                self.surrogate,
+                self.args,
+                iteration=self.iteration,
+            )
+            self.progress.generated(state)
+            self.evaluation_count += 1
+
+    async def defer_evaluation_many(self, states: list[SearchState], *, reason: str) -> None:
+        del states, reason
+        raise RuntimeError("Surrogate proposal traversal scores every generated depth.")
+
+    def should_evaluate_depth(self, depth: int, max_depth: int | None = None) -> bool:
+        del depth, max_depth
+        return True
+
+    def ranked_states(self, states: list[SearchState] | None = None) -> list[SearchState]:
+        candidates = self.engine.states if states is None else states
+        return sorted(candidates, key=surrogate_sort_key)
+
+    def best_state(self, states: list[SearchState] | None = None) -> SearchState | None:
+        ranked = self.ranked_states(states)
+        return ranked[0] if ranked else None
+
+    def reward(self, state: SearchState) -> float:
+        ranked = self.ranked_states()
+        if state not in ranked:
+            return 0.0
+        return 1.0 - ranked.index(state) / max(1, len(ranked) - 1)
+
+    def start_progress(self, total: int, *, label: str) -> None:
+        del total, label
+
+    def finish_progress(self) -> None:
+        return None
+
+    def _refresh_operation_features(self) -> None:
+        if not isinstance(self.engine, OperationSearchEngine) or not self.surrogate.entries:
+            return
+        current_dim = operation_feature_dim(self.engine.operation_schema)
+        first_dim = len(self.surrogate.entries[0].feature_vector)
+        if first_dim != current_dim:
+            self.surrogate.entries = project_buffer_entries(
+                self.surrogate.entries,
+                self.engine.operation_schema,
+                self.args,
+            )
+            self.surrogate._fit()
 
 
 def build_acquisition_feedback(
@@ -2858,7 +2831,7 @@ def describe_ldm_task(
             )
         )
 
-    method = effective_method or str(getattr(args, "effective_method", args.method))
+    method = effective_method or resolve_search_method(args)
     return LDMTaskSpec(
         task="nanogpt",
         candidate_space=candidate_space,
@@ -2887,6 +2860,14 @@ def describe_ldm_task(
                 "depth": int(args.depth),
                 "beam_width": int(args.beam_width),
             },
+        ),
+        proposal_search=ProposalSearchSpec(
+            name=method,
+            breadth=max(1, int(args.breadth)),
+            depth=max(1, int(args.depth)),
+            beam_width=max(1, int(args.beam_width) if int(args.beam_width) > 0 else int(args.breadth)),
+            evaluation_policy="surrogate_each_depth_then_real_selected_candidate",
+            parameters={"select_from": str(args.select_from)},
         ),
         metadata={
             "generator": args.generator,
@@ -4975,17 +4956,7 @@ def resolve_search_method(args: argparse.Namespace) -> str:
     method = SEARCH_METHOD_ALIASES.get(str(getattr(args, "method", "auto")), "auto")
     if method == "auto":
         return "beam_search" if int(getattr(args, "beam_width", 0)) > 0 else "tree_search"
-    return method
-
-
-def estimate_generated(breadth: int, depth: int, beam_width: int, method: str) -> int:
-    breadth = max(1, int(breadth))
-    depth = max(1, int(depth))
-    if method == "best_of_n":
-        return breadth * depth
-    if method == "tree_search":
-        return estimate_tree_generated(breadth, depth)
-    return estimate_beam_generated(breadth, depth, beam_width)
+    return canonical_search_method(method)
 
 
 def estimate_progress_total(args: argparse.Namespace, generated_per_iteration: int) -> int:
@@ -5001,26 +4972,6 @@ def estimate_progress_total(args: argparse.Namespace, generated_per_iteration: i
     if args.max_real_evaluations > 0:
         real_total = min(real_total, max(0, int(args.max_real_evaluations)))
     return generated_total + real_total
-
-
-def estimate_tree_generated(breadth: int, depth: int) -> int:
-    total = 0
-    parents = 1
-    for _level in range(1, depth + 1):
-        parents *= breadth
-        total += parents
-    return total
-
-
-def estimate_beam_generated(breadth: int, depth: int, beam_width: int) -> int:
-    total = 0
-    parents = 1
-    keep = max(1, int(beam_width) if int(beam_width) > 0 else breadth)
-    for _level in range(1, depth + 1):
-        generated = parents * breadth
-        total += generated
-        parents = min(generated, keep)
-    return total
 
 
 def feature_dim(hash_dims: int) -> int:

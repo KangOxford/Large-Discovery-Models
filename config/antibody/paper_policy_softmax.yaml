@@ -1,0 +1,33 @@
+name: antibody_paper_policy_softmax
+task: antibody
+algorithm: ei
+mode: real
+description: Paper Policy_Softmax antibody experiment over five antigens and five seeds.
+args:
+  config: resources/default_config.yaml
+  antigens-file: resources/antigens.txt
+  method: policy_softmax
+  seed: 42
+  n-trials: 5
+  budget: 200
+  batch-size: 1
+  n-init: 20
+  n-strategies: 5
+  planner-mode: choices
+  softmax-eta: 1.0
+  parallel-budget: 600
+  per-strategy-budget: 0
+  pool-score: acq
+  selection-score: acq
+  bias-weight: 0.05
+  sample-timeout-s: 5.0
+  device: cuda
+  acq: ei
+  acq-xi: 0.001
+  llm-temperature: 0.25
+  timeout-s: 120
+  max-retries: 3
+  history-top-k: 20
+  include-antigen-context: true
+  fallback-random: true
+  out-dir: runs/paper/policy_softmax

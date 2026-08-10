@@ -1,0 +1,110 @@
+% ============================================================
+\section{Search and Discovery in Open-Ended Design Spaces}
+\label{sec:ldm}
+% ============================================================
+
+In this work, we aim to discover a design or hypothesis $x\in\X$ that achieves the highest
+reward $R(x)$, i.e.\ to find or closely approximate
+$x^\star\in\argmax_{x\in\X}R(x)$. This setting presents two intrinsic
+difficulties. First, $R$ is a black-box function that is expensive to evaluate
+and potentially noisy. Second, the hypothesis space $\X$ is typically open-ended: vast,
+combinatorial, structured, or not even fully specified in advance, as in the
+design of molecules, biological sequences, computer programs, and experimental
+workflows.
+
+This differs from classical numerical optimisation or combinatorial search,
+which generally assumes a fixed and explicitly specified domain together with
+a gradient, numerical oracle, or known set of valid search operations. In
+scientific discovery, the full hypothesis space may not be enumerable, and the
+search may need to formulate hypotheses that lie beyond its current
+representation or reach.
+
+To reason about what is currently known, we introduce
+\emph{a probabilistic surrogate}, i.e.\ a posterior
+$p(R\mid\mathcal{D}_t)$ over the reward surface $R$ conditioned on the dataset
+$\mathcal{D}_t=\{(x_i,r_i)\}_{i=1}^{t-1}$ of previously evaluated designs and
+their noisy feedback $r_i\approx R(x_i)$. Its predictive belief is usually
+summarised by posterior moments $(\mu_t(x),\sigma_t(x))$, representing the
+expected reward and predictive uncertainty on the surrogate's modelling
+support. The surrogate therefore describes the search's current empirical
+knowledge, but it does not by itself determine or enumerate the full
+hypothesis space.
+
+Using this surrogate-relative notion of knowledge, we partition $\X$ into four
+epistemic regimes, as illustrated in
+Figure~\ref{fig:knowledge-regimes}.
+
+\begin{itemize}[leftmargin=1.6em,itemsep=2pt,topsep=2pt]
+    \item \emph{Known knowns} are evaluated designs whose rewards are
+    sufficiently well understood. The surrogate predicts their values with
+    low posterior uncertainty $\sigma_t(x)$.
+
+    \item \emph{Known unknowns} are designs that the search can formulate and
+    the surrogate can model, but whose rewards remain unresolved. They are
+    represented by high posterior uncertainty $\sigma_t(x)$ and can be
+    resolved through further evaluation.
+
+\item \emph{Unknown knowns} are designs or evaluation results that exist in
+    an external source, such as a database, a previous experiment, or a
+    parallel discovery process, but are absent from the current search
+    context. They can become available only through an explicit retrieval
+    operation.
+    
+    \item \emph{Unknown unknowns} are designs that lie beyond the search's
+    current effective reach. This can occur for two reasons:
+    (i)~$\X$ is too large, combinatorial, or effectively unbounded for the current
+    search procedure to reach the design; or (ii)~the design lies outside the
+    surrogate's modelling support, so that $(\mu_t(x),\sigma_t(x))$ does not
+    constitute a meaningful calibrated prediction.
+\end{itemize}
+
+These regimes distinguish uncertainty, reachability, modelling, and
+knowledge. A design does not become known merely because it belongs to a
+mathematically defined space; a reachable design is not necessarily supported
+by the surrogate; and information stored externally is not available unless
+it is retrieved into the current context. All four regimes may therefore
+persist throughout the search.
+
+The \emph{search frontier} is the conceptual boundary of what the current
+procedure can effectively formulate, reach, and model. Designs inside this
+frontier are accessible to the search, although their rewards may remain
+uncertain. Designs outside it have not yet entered the modelled search
+process. This distinction gives rise to three operations closely related to \cite{wang2008infinitely}:
+
+\begin{itemize}[leftmargin=1.6em,itemsep=2pt,topsep=2pt]
+    \item \emph{Exploitation} acts on known knowns by selecting designs for
+    which the surrogate predicts both high reward $\mu_t(x)$ and low
+    uncertainty $\sigma_t(x)$.
+
+    \item \emph{Exploration} resolves known unknowns by evaluating reachable
+    but uncertain designs. The resulting observations reduce posterior
+    uncertainty and may turn known unknowns into known knowns.
+
+    \item \emph{Discovery} expands the search frontier by formulating
+    hypotheses that were previously outside the search's effective reach.
+    This brings unknown unknowns into the modelled hypothesis space, where they
+    become known unknowns that can subsequently be evaluated.
+\end{itemize}
+
+Discovery is therefore not simply the evaluation of an untested design. An
+untested design that already lies within the surrogate's modelling support is
+a known unknown and belongs to exploration. Discovery instead changes what
+the search can express, reach, or meaningfully model. Experimental evaluation
+then determines the value of the newly surfaced hypothesis.
+
+The three operations correspond to three transitions in
+Figure~\ref{fig:knowledge-regimes}: discovery moves hypotheses from unknown
+unknowns to known unknowns, exploration moves them from known unknowns to
+known knowns, and exploitation operates within the known-known regime. The
+unknown-known regime requires separate memory read and write operations. We
+leave memory retrieval and federated discovery to future work and focus here
+on discovery, exploration, and exploitation within a single sequential search
+process.
+
+This formulation is conceptual and does not prescribe a particular discovery
+algorithm. The next section introduces the Large Discovery Model, which
+instantiates these operations by combining a generative foundation model, the
+probabilistic surrogate introduced above, and an acquisition-guided
+inference-time search policy.
+
+

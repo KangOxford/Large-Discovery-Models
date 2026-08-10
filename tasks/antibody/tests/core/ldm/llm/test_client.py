@@ -34,3 +34,9 @@ class TestLLMClientAbstract:
         for i in range(3):
             client.call(f"prompt {i}", 0.1, 5)
         assert len(client.calls) == 3
+
+    def test_call_many_falls_back_to_independent_calls(self):
+        client = MockClient("choice")
+
+        assert client.call_many("prompt", 0.2, 7, n=3) == ["choice"] * 3
+        assert len(client.calls) == 3
