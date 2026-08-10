@@ -84,6 +84,34 @@ def check_dependencies(
 Return only `DependencyCheck` objects. Use `ok`, `warn`, `fail`, and `skip`
 from `ldm_tts.dependency_checks`. Never print or return unmasked credentials.
 
+## Fine-Tuning Data Collection
+
+Tasks that accept model-generated actions must expose an opt-in runtime
+collection path through the public `ldm_tts.data` module:
+
+```python
+from ldm_tts.data import DataCollectionSink
+
+sink = DataCollectionSink.from_env(default_root=run_dir / "ldm_data")
+```
+
+Append only after the task parser and validator have accepted the action. Build
+the canonical `ldm-2.0` IR from the accepted payload, not from an unvalidated
+response transcript. Store run IDs, task-specific source IDs, selection results,
+and evaluator outcomes under `collection.provenance` or `collection.outcome` so
+the renderer cannot leak them into the prompt.
+
+Do not collect rejected attempts, deterministic/random fallbacks, or a different
+semantic response type under an existing dataset contract. For example, direct
+sequence proposals and search-policy DSL updates require separate action
+contracts. Use a run-local ignored `ldm_data/` directory unless
+`LDM_DATA_COLLECTION_DIR` explicitly selects an aggregate campaign directory.
+
+The mock task test must enable `LDM_DATA_COLLECTION_ENABLED=1`, execute at least
+one accepted action, validate the emitted IR, and verify that collection-only
+metadata is absent from rendered SFT instructions. If collection is inapplicable,
+the task README must state why and identify the future accepted-action boundary.
+
 ## Completion Gates
 
 - `scripts/validate_tasks.py --task <task_id>` has no errors.
@@ -94,5 +122,7 @@ from `ldm_tts.dependency_checks`. Never print or return unmasked credentials.
 - Mock runner dry-run resolves the registered module and task directory.
 - Mock runner execution succeeds.
 - Shared tests and `git diff --check` pass.
+- The mock collection test emits valid `ldm-2.0` IR, or the task documents why
+  its response contract is not collectable.
 - No scaffold placeholders, task-name dispatch branches, secrets, or generated
   artifacts remain.

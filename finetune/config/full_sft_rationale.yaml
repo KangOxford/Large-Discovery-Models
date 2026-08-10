@@ -9,21 +9,22 @@ finetuning_type: full
 deepspeed: LLaMA-Factory/examples/deepspeed/ds_z3_offload_config.json
 
 ### dataset
-dataset: ldm_mixed_cot
-dataset_dir: ./data
-template: qwen3_5
-enable_thinking: true          # chain-of-thought target (the released LDM-TTS policy)
+dataset: ldm_rationale_train
+eval_dataset: ldm_rationale_eval
+dataset_dir: ../data/generated/full_sft
+template: qwen3_5_nothink
+enable_thinking: false
 cutoff_len: 16384
 overwrite_cache: true
 preprocessing_num_workers: 16
 
 ### output
-output_dir: ./output/ldm_cot
+output_dir: ../data/generated/full_sft/checkpoints/qwen3_5_9b_full_sft_rationale
 logging_steps: 5
 save_strategy: epoch
 save_total_limit: 2
 plot_loss: true
-overwrite_output_dir: true
+overwrite_output_dir: false
 report_to: none                # set to wandb and add run_name to enable logging
 
 ### train
@@ -39,6 +40,5 @@ flash_attn: sdpa
 ddp_timeout: 180000000
 
 ### eval
-val_size: 0.02
 per_device_eval_batch_size: 1
 eval_strategy: epoch

@@ -279,18 +279,27 @@ they should become SFT data.
 Nanogpt uses `parameter_edits` because each teacher action either edits an
 active `train.py` parameter or expands the active operation-feature space.
 
-The right collection point is inside
-`tasks/nanogpt/ldm_task/procedure.py`, in `OperationSearchEngine._generate_one`, after:
+Runtime collection is hooked into
+`tasks/nanogpt/core/workflow.py`, in `OperationSearchEngine._generate_one`, after:
 
 1. the prompt has been written
 2. `_call_operation_generator(...)` returns
 3. `validate_generator_action(...)` has accepted the action
 4. `operations_payload` has been created from the validated action
 
-Do not train from the first tool call in `response.md`; use the accepted
-`operations_payload`.
+The hook does not train from the first tool call in `response.md`; it uses the
+accepted `operations_payload`. Enable run-local collection with:
 
-Suggested action mapping:
+```bash
+LDM_DATA_COLLECTION_ENABLED=1 \
+python scripts/run_ldm_tts.py config/nanogpt/mock_best_of_n.yaml
+```
+
+Unless `LDM_DATA_COLLECTION_DIR` selects a shared campaign directory, the sink
+writes `ldm_ir.jsonl`, `ldm_sft.jsonl`, and `dataset_info.json` beneath the
+NanoGPT run's `<run_dir>/ldm_data/` directory.
+
+Implemented action mapping:
 
 ```python
 if action.kind == "feature":
@@ -327,7 +336,7 @@ else:
     }
 ```
 
-Then build and append:
+The hook builds and appends:
 
 ```python
 sink = DataCollectionSink.from_env(default_root=self.config.out_dir / "ldm_data")
@@ -419,11 +428,27 @@ The basic IR mapping is:
 - `action.payload.candidates`: emitted sequences
 - `reasoning_available`: `false` for sequence-only traces with no rationale
 
-For the warmup/direct selector in `tasks/antibody/core/ldm_light/ldm_acq.py`, the right
-collection point is in `run_one`, after `propose(...)` returns accepted
-`selected_candidates` and before `evaluator.energy(...)` is called.
+Runtime collection is hooked into
+`tasks/antibody/core/ldm_light/ldm_acq.py` in `run_one`, after a direct proposal
+path returns and before `evaluator.energy(...)` is called. For acquisition-guided
+direct generation, the target contains the full validated LLM candidate set from
+before acquisition selection, not only the candidates selected using hidden GP
+scores. This covers direct initialization, pure LLM generation, direct
+generation with downstream acquisition, and the legacy model-selected candidate
+pool. It deliberately skips random fallback and post-warmup policy/DSL actions.
 
-Build direct-sequence IR like:
+Enable it with any antibody config, for example:
+
+```bash
+LDM_DATA_COLLECTION_ENABLED=1 \
+python scripts/run_ldm_tts.py config/antibody/mock_ei.yaml
+```
+
+The default output is `<run_dir>/ldm_data/{ldm_ir.jsonl,ldm_sft.jsonl,dataset_info.json}`.
+Set `LDM_DATA_COLLECTION_DIR` to aggregate multiple antigen/seed runs into one
+campaign; provenance retains the antigen, seed, method, source, and run path.
+
+The hook builds direct-sequence IR like:
 
 ```python
 ir = make_complete_design_ir(
@@ -617,6 +642,13 @@ dataset_info.json
 
 in its `data/` directory or merge the `dataset_info.json` entry into the
 existing registry.
+
+For the repository's full-parameter Qwen rationale-distillation recipe, keep the
+augmented IR in `data/generated/<campaign>/` and use
+[`finetune/prepare_dataset.py`](finetune/prepare_dataset.py) to create
+provenance-grouped train/evaluation shards plus their registry under
+`data/generated/full_sft/`. See [`finetune/README.md`](finetune/README.md) for
+the complete validation, training, and inference-parity workflow.
 
 Use a cutoff length that fits the rendered prompt. For nanogpt with embedded
 `train.py`, use a large cutoff such as `16384`. If you use

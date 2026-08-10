@@ -154,6 +154,32 @@ the task. Keep `dependencies.py` import-light: import optional scientific or
 model packages inside the check function so the hook can report that they are
 missing instead of failing during module import.
 
+## Fine-Tuning Data Collection Contract
+
+Every task that accepts model-generated actions must make an explicit data
+collection decision. Use `DataCollectionSink.from_env` from `ldm_tts.data` and a
+run-local `<run_dir>/ldm_data` default when the accepted action can be represented
+as canonical `ldm-2.0` IR. Collection remains off unless
+`LDM_DATA_COLLECTION_ENABLED` or `LDM_DATA_COLLECTION_DIR` enables it.
+
+The hook belongs at the accepted-action boundary: after response parsing and
+task validation, but before downstream evaluation changes what was visible to
+the model. Build the target from the accepted structured payload. Never train on
+the first raw response, rejected retries, or random fallbacks. Put run identity,
+selection results, and evaluator outcomes under `collection.provenance` or
+`collection.outcome`; those fields are intentionally excluded from rendered
+instructions.
+
+Different semantic actions need different contracts. A direct candidate
+proposal must not share a target schema with a search-policy or DSL update unless
+the inference API intentionally supports both. When a task cannot yet emit a
+trainable action, document the reason and intended future boundary in its README.
+
+Mock coverage must enable collection, execute one accepted action, validate the
+emitted IR, and confirm collection-only metadata is absent from rendered SFT.
+Stable run/task provenance is required because fine-tuning preparation groups
+related records to prevent split leakage.
+
 ## Config Contract
 
 Create configs under `config/<task_id>/` using the registered `task_id`:

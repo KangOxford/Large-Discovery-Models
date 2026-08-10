@@ -4,6 +4,12 @@
 </h1>
 
 <p align="center">
+  <a href="assets/wechata_group_invitation.jpg" title="Join our WeChat group">
+    <img alt="Join our WeChat group" src="https://cdn.simpleicons.org/wechat/07C160" width="28" height="28">
+  </a>
+</p>
+
+<p align="center">
   <img alt="arXiv" src="https://img.shields.io/badge/arXiv-Paper-B31B1B?style=flat-square">
   <img alt="Hugging Face" src="https://img.shields.io/badge/Hugging_Face-Models-FFD21E?style=flat-square">
   <img alt="Website" src="https://img.shields.io/badge/Website-Project_Page-2563EB?style=flat-square">
@@ -42,6 +48,7 @@ in evidence rather than model confidence alone.
 - [Codebase Architecture](#codebase-architecture)
 - [Outputs And Logs](#outputs-and-logs)
 - [Data Collection And Augmentation](#data-collection-and-augmentation)
+- [Fine-Tuning The Proposal Model](#fine-tuning-the-proposal-model)
 - [Customization](#customization)
 
 ## Repository Scope
@@ -471,6 +478,58 @@ while generated campaigns use one ignored directory each. See
 [DATA_COLLECTION.md](DATA_COLLECTION.md) for the task hooks, quality rules, and
 full CLI workflow.
 
+## Fine-Tuning The Proposal Model
+
+Collected LDM-TTS trajectories can be distilled into a proposal model that emits
+the same JSON action contract used by the search loop. The training target is an
+accepted teacher proposal before BO selection or evaluation:
+
+```json
+{"type":"propose","reasoning":"<visible rationale>","payload":{},"summary":"..."}
+```
+
+Reasoning remains a visible field in the parseable JSON response rather than a
+hidden `<think>...</think>` channel. This keeps the trained model compatible with
+the existing prompts, validators, and task response parsers.
+
+Start with reasoning-augmented `ldm-2.0` IR produced by the
+[data pipeline](data/README.md). Prepare deterministic train and evaluation
+shards from the repository root:
+
+```bash
+python finetune/prepare_dataset.py \
+  --input data/generated/my_campaign/ldm_ir_augmented.jsonl \
+  --output-dir data/generated/full_sft \
+  --eval-fraction 0.10 \
+  --seed 42
+```
+
+The preparation command validates IR, excludes records without supported
+reasoning, and assigns whole runs, trajectories, antigens, or seeds to either
+training or evaluation. Do not use a random row-level split: adjacent rounds
+from the same search trajectory would leak context into validation. Generated
+shards, their LlamaFactory registry, split metadata, and checkpoints remain under
+the ignored `data/generated/full_sft/` directory.
+
+Run the documented IR and Alpaca quality gates before training. Then initialize
+the pinned LlamaFactory submodule and launch the full-parameter Qwen example:
+
+```bash
+git submodule update --init --recursive finetune/LLaMA-Factory
+
+cd finetune
+FORCE_TORCHRUN=1 CUDA_VISIBLE_DEVICES=0,1,2,3 \
+  llamafactory-cli train config/full_sft_rationale.yaml
+```
+
+The example uses full-parameter SFT of `Qwen/Qwen3.5-9B`, DeepSpeed ZeRO-3 CPU
+offload, explicit provenance-held-out evaluation data, and the
+`qwen3_5_nothink` template. A smaller LoRA baseline remains available at
+[`data/ldm_lora_sft.yaml`](data/ldm_lora_sft.yaml). See the
+[full fine-tuning guide](finetune/README.md) for CUDA and DeepSpeed installation,
+dataset auditing, context-length checks, checkpoint handling, and inference-time
+prompt parity.
+
 ## Customization
 
 Start from the closest YAML file under `config/`, then edit `env` and `args`.
@@ -492,7 +551,8 @@ python scripts/validate_tasks.py --task protein_design
 ```
 
 See [Registering LDM Tasks](tasks/README.md) for the complete manifest,
-procedure, config, dependency-hook, mock-run, and verification contracts.
+procedure, config, dependency-hook, data-collection, mock-run, and verification
+contracts.
 
 See the task guides for domain-specific customization:
 

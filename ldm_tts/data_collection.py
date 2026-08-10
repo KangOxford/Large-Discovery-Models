@@ -247,6 +247,8 @@ def render_prose(ir: Mapping[str, Any], *, include_parent_artifact: bool = True)
                 parts.append(f"## {title}\n{raw_context[key]}")
         if raw_context.get("target_context"):
             parts.append("## Target context\n" + jdump(raw_context["target_context"], indent=1)[:4000])
+        if raw_context.get("candidate_pool"):
+            parts.append("## Candidate pool\n" + jdump(raw_context["candidate_pool"], indent=1))
         if include_parent_artifact and raw_context.get("parent_train_py"):
             parts.append("## Current parent artifact\n" + str(raw_context["parent_train_py"]))
 

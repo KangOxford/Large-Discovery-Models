@@ -39,6 +39,7 @@ if str(WORKSPACE_ROOT) not in sys.path:
 
 from ldm_tts.trajectory import JsonlTrajectoryRecorder
 from ldm_tts.acquisition import SINGLE_OBJECTIVE_ACQUISITIONS, make_acquisition
+from ldm_tts.data import DataCollectionSink, make_complete_design_ir
 from ldm_tts.spaces import (
     AcquisitionSpec,
     CandidateSpaceSpec,
@@ -887,6 +888,141 @@ def append_results(
     return idx, best_value, best_seq
 
 
+def collect_direct_sequence_action(
+    sink: DataCollectionSink,
+    *,
+    decision: dict[str, Any],
+    selected_candidates: list[dict[str, Any]],
+    rows: list[dict[str, Any]],
+    observed: set[str],
+    antigen: str,
+    antigen_context: dict[str, Any] | None,
+    seq_len: int,
+    history_top_k: int,
+    seed: int,
+    eval_start: int,
+    method: str,
+    run_dir: Path,
+) -> bool:
+    """Collect a validated direct LLM action and reject fallback/DSL decisions."""
+
+    if not sink.enabled:
+        return False
+    source = str(decision.get("source") or "")
+    candidate_pool = None
+    if source == "llm":
+        candidate_pool = decision.get("candidate_pool")
+        teacher_candidates = selected_candidates
+    elif source == "llm_direct":
+        teacher_candidates = selected_candidates
+    elif source.startswith("direct_"):
+        generation = decision.get("generation")
+        if not isinstance(generation, dict):
+            return False
+        generation_source = str(generation.get("source") or "")
+        if generation_source != "llm_direct":
+            return False
+        raw_candidates = decision.get("candidates")
+        if not isinstance(raw_candidates, list):
+            return False
+        teacher_candidates = raw_candidates
+    else:
+        return False
+
+    candidates = [
+        {"design": candidate["sequence"], "rationale": None}
+        for candidate in teacher_candidates
+        if isinstance(candidate, dict) and candidate.get("sequence")
+    ]
+    if not candidates:
+        return False
+
+    best_row = min(rows, key=lambda row: float(row["LastValue"])) if rows else None
+    observations = []
+    for row in rows[-max(1, int(history_top_k)) :]:
+        roles = ["recent"]
+        if best_row is row:
+            roles.append("best")
+        observations.append(
+            {
+                "design": row["LastProtein"],
+                "results": {"absolut_energy": float(row["LastValue"])},
+                "roles": roles,
+                "round": int(row["Index"]),
+            }
+        )
+    best_so_far = (
+        None
+        if best_row is None
+        else {
+            "design": best_row["LastProtein"],
+            "results": {"absolut_energy": float(best_row["LastValue"])},
+            "round": int(best_row["Index"]),
+        }
+    )
+    raw_context: dict[str, Any] = {
+        "target_id": antigen,
+        "target_context": antigen_context or {},
+    }
+    if isinstance(candidate_pool, list) and candidate_pool:
+        raw_context["candidate_pool"] = candidate_pool
+
+    ir = make_complete_design_ir(
+        task_id="protein",
+        domain="antibody_sequence",
+        task_description=(
+            f"Direct CDRH3 antibody sequence generation for antigen {antigen}. "
+            "Generate developable antibody strings directly."
+        ),
+        objectives=[
+            {
+                "name": "absolut_energy",
+                "direction": "minimize",
+                "description": "Absolut binding energy; lower is better.",
+            }
+        ],
+        design_space_description=(
+            "Fixed-length CDRH3 sequence over the standard amino-acid alphabet "
+            "with developability constraints."
+        ),
+        active_parameters=[
+            {
+                "name": "sequence",
+                "type": "string",
+                "domain": {"length": int(seq_len), "alphabet": list(AA)},
+                "edit_op": None,
+            }
+        ],
+        observations=observations,
+        best_so_far=best_so_far,
+        candidates=candidates,
+        request_description=(
+            f"Propose {len(candidates)} CDRH3 sequence(s) of length {seq_len} "
+            f"over alphabet {AA}; do not repeat observed sequences."
+        ),
+        num_candidates=len(candidates),
+        round_idx=eval_start,
+        num_evaluated=len(rows),
+        do_not_repeat=sorted(observed)[-200:],
+        allows_new_parameters=False,
+        reasoning_available=False,
+        raw_context=raw_context,
+    )
+    sink.append(
+        ir,
+        provenance={
+            "task": "protein",
+            "run_dir": str(run_dir),
+            "antigen": antigen,
+            "seed": seed,
+            "eval_start": eval_start,
+            "method": method,
+            "source": source,
+        },
+    )
+    return True
+
+
 def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Namespace) -> Path:
     rng = random.Random(seed)
     random.seed(seed)
@@ -913,6 +1049,7 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
     run_dir = Path(args.out_root) / f"{mode}_antigen_{antigen}_seed_{seed}_n{args.n_evals}_batch{args.batch_size}"
     run_dir.mkdir(parents=True, exist_ok=True)
     results_path = run_dir / "results.csv"
+    data_sink = DataCollectionSink.from_env(default_root=run_dir / "ldm_data")
     decision_recorder = JsonlTrajectoryRecorder(
         run_dir,
         config_snapshot={
@@ -1079,6 +1216,21 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
         selected_acq_scores = [
             candidate.get("acquisition_score") for candidate in selected_candidates
         ]
+        collect_direct_sequence_action(
+            data_sink,
+            decision=decision,
+            selected_candidates=selected_candidates,
+            rows=rows,
+            observed=observed,
+            antigen=antigen,
+            antigen_context=antigen_context,
+            seq_len=seq_len,
+            history_top_k=int(args.history_top_k),
+            seed=seed,
+            eval_start=eval_idx,
+            method=method,
+            run_dir=run_dir,
+        )
         values, evaluated_seqs = evaluator.energy(seqs_to_indices(proposed_seqs))
         elapsed = time.time() - start
 

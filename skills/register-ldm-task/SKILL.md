@@ -35,16 +35,24 @@ present in the repository.
    `ldm_tts` modules for runner contracts, acquisition scoring, task-space
    descriptions, response parsing, trajectory records, and generic search-loop
    behavior.
-6. Add a task-local `dependencies.py` hook only when the task has meaningful
+6. Define the task's fine-tuning collection boundary. When the runtime produces
+   validated model actions, create `DataCollectionSink.from_env` with a
+   run-local `runs/.../ldm_data` default and append canonical `ldm-2.0` IR only
+   after parsing/validation succeeds. Keep provenance and evaluator outcomes in
+   `collection`, never in model-visible state. Do not collect rejected attempts,
+   random fallbacks, or task actions whose inference contract differs from the
+   training target. If the task cannot produce trainable actions yet, document
+   that decision in its README and tests.
+7. Add a task-local `dependencies.py` hook only when the task has meaningful
    model, binary, artifact, dataset, accelerator, or evaluator prerequisites.
    Declare it in `task.json`. Keep its module imports lightweight so it can
    diagnose missing optional packages. Omit the hook for dependency-free tasks.
-7. Finish the mock config and tests first. Mock execution must avoid remote
+8. Finish the mock config and tests first. Mock execution must avoid remote
    models, external evaluators, GPUs, large downloads, and secrets.
-8. Add real configs only after mock execution passes. Put endpoint URLs, model
+9. Add real configs only after mock execution passes. Put endpoint URLs, model
    names, and non-secret defaults in config; source credentials from environment
    variables. Document a staged first real run in the task README.
-9. Run the required verification sequence from the repository root:
+10. Run the required verification sequence from the repository root:
 
    ```bash
    python scripts/validate_tasks.py --task <task_id>
@@ -56,7 +64,7 @@ present in the repository.
    git diff --check
    ```
 
-10. Scan for the task ID in shared dispatch conditionals. Registration must not
+11. Scan for the task ID in shared dispatch conditionals. Registration must not
     require a new task-name branch in `ldm_tts.runner` or
     `ldm_tts.dependency_checks`.
 
@@ -75,6 +83,14 @@ present in the repository.
 - Prefer `ldm_tts.acquisition` for Mean, EI, LCB, UCB, and EHVI scoring. Add
   task-local acquisition behavior only when the domain algorithm requires more
   than posterior scoring, and document that distinction.
+- Import collection APIs from `ldm_tts.data`. Instantiate the sink once per run
+  or recorder, and use the run directory's `ldm_data/` child as the default.
+- Build IR from the accepted parsed action, not the raw first response. Preserve
+  stable run/task provenance so `finetune/prepare_dataset.py` can group related
+  records and prevent train/evaluation leakage.
+- Add a mock integration test with `LDM_DATA_COLLECTION_ENABLED=1` that validates
+  the emitted IR and confirms private provenance/outcomes do not enter the
+  rendered instruction.
 - Never put API keys, tokens, credentials, downloaded models, run outputs, or
   virtual environments into tracked files.
 

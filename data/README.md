@@ -31,7 +31,12 @@ LDM-TTS task run
 | `build_ldm2.py` | Import historical traces, render IR, and audit records. |
 | `fabricate.py` | Optional, provenance-marked rule-based post-processing. |
 | `verify.py` | Independent IR, action, run, and Alpaca validation. |
-| `ldm_lora_sft.yaml` | LlamaFactory LoRA fine-tuning configuration. |
+| `ldm_lora_sft.yaml` | LlamaFactory LoRA fine-tuning baseline. |
+| [`../finetune/`](../finetune/) | Full-parameter rationale-distillation recipe and grouped dataset preparation. |
+
+This directory owns the canonical collection, augmentation, validation, and
+generated-data contracts. The full-SFT recipe consumes augmented IR from this
+pipeline; it does not define a parallel data format.
 
 Generated data belongs in the ignored `data/generated/<campaign>/` directory.
 Keep the stages visible in filenames instead of creating another directory for
@@ -61,6 +66,10 @@ python scripts/run_ldm_tts.py <config.yaml>
 
 `ldm_ir.jsonl` is the authoritative source. Preserve it unchanged; rendered
 files written during collection are convenience artifacts that can be rebuilt.
+The structured NanoGPT operation runtime, small-molecule direct proposer, and
+antibody direct-sequence paths all support this sink contract. See the detailed
+task mapping for boundaries that remain intentionally excluded, such as antibody
+policy/DSL updates and random fallbacks.
 
 ## Add Expert Reasoning
 

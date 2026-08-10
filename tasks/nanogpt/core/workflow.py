@@ -31,6 +31,7 @@ if str(_WORKSPACE_ROOT) not in sys.path:
 from ldm_tts.scoring import as_float as shared_as_float
 from ldm_tts.scoring import is_finite_number
 from ldm_tts.acquisition import make_acquisition
+from ldm_tts.data import DataCollectionSink, make_parameter_edit_ir
 from ldm_tts.search_methods import (
     SEARCH_METHOD_ALIASES as SHARED_SEARCH_METHOD_ALIASES,
     canonical_search_method,
@@ -409,6 +410,54 @@ class FeedbackMemory:
         return sorted(valid_rows, key=lambda item: item[0], reverse=not self.minimize)[0][1]
 
 
+def operation_schema_ir_parameters(
+    schema: OperationSchema,
+    current_values: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Map one operation schema into the canonical ldm-2.0 parameter shape."""
+
+    parameters: list[dict[str, Any]] = []
+    for parameter in schema.parameters.values():
+        domain = (
+            list(parameter.choices)
+            if parameter.kind == "choice"
+            else [parameter.min_value, parameter.max_value]
+        )
+        parameters.append(
+            {
+                "name": parameter.name,
+                "type": parameter.kind,
+                "domain": domain,
+                "scale": parameter.scale if parameter.kind != "choice" else None,
+                "edit_op": (
+                    "set_choice" if parameter.kind == "choice" else "set_numeric"
+                ),
+                "current_value": current_values.get(parameter.name),
+            }
+        )
+    return parameters
+
+
+def nanogpt_ir_observations(engine: SearchEngine) -> list[dict[str, Any]]:
+    """Return the evaluated history that was visible to the proposal model."""
+
+    observations: list[dict[str, Any]] = []
+    for index, candidate in enumerate(engine.ranked_states()[:8]):
+        if candidate.score is None or not finite_score(candidate.score):
+            continue
+        roles = ["best_so_far", "best_path"] if index == 0 else ["evaluated"]
+        observations.append(
+            {
+                "design": {"state_id": candidate.state_id},
+                "results": {engine.config.score_key: float(candidate.score)},
+                "round": candidate.depth,
+                "roles": roles,
+                "description": candidate.description or None,
+            }
+        )
+    return observations
+
+
 class OperationSearchEngine(SearchEngine):
     def __init__(self, config: SearchConfig, operation_schema: OperationSchema, args: argparse.Namespace):
         super().__init__(config)
@@ -433,6 +482,9 @@ class OperationSearchEngine(SearchEngine):
         self.current_iteration: int | None = None
         self._mock_counter = 0
         self.args.operation_schema_object = self.operation_schema
+        self._data_sink = DataCollectionSink.from_env(
+            default_root=self.config.out_dir / "ldm_data"
+        )
 
     def inactive_operation_schema(self) -> OperationSchema:
         active = set(self.operation_schema.parameters)
@@ -546,6 +598,10 @@ class OperationSearchEngine(SearchEngine):
                     )
                     state.prompt_path = self._edit_artifact_path(state, "prompt", edit_index, num_edits, "md")
                     state.prompt_path.write_text(prompt, encoding="utf-8")
+
+                    active_schema_before = self.operation_schema
+                    inactive_schema_before = self.inactive_operation_schema()
+                    expansion_history_before = list(self.expansion_history)
 
                     action, response, token_usage, validation_log = await self._call_operation_generator(
                         prompt,
@@ -661,6 +717,20 @@ class OperationSearchEngine(SearchEngine):
                         "status": "applied",
                     }
                     state.edits.append(edit_record)
+                    self._collect_operation_action(
+                        action=action,
+                        active_schema=active_schema_before,
+                        inactive_schema=inactive_schema_before,
+                        expansion_history=expansion_history_before,
+                        current_text=current_text,
+                        parent=parent,
+                        state=state,
+                        search_note=search_note,
+                        prior_operations=prior_operations,
+                        operations_payload=operations_payload,
+                        operations_path=operations_path,
+                        edit_index=edit_index,
+                    )
                     prior_operations.extend(apply_result.records)
                     current_text = apply_result.text
 
@@ -703,6 +773,167 @@ class OperationSearchEngine(SearchEngine):
         self._record_manifest(state)
         self._progress_status(f"generated {state.state_id}")
         return state
+
+    def _collect_operation_action(
+        self,
+        *,
+        action: GeneratorAction,
+        active_schema: OperationSchema,
+        inactive_schema: OperationSchema,
+        expansion_history: list[dict[str, Any]],
+        current_text: str,
+        parent: SearchState,
+        state: SearchState,
+        search_note: str,
+        prior_operations: list[dict[str, Any]],
+        operations_payload: dict[str, Any],
+        operations_path: Path,
+        edit_index: int,
+    ) -> None:
+        if not self._data_sink.enabled:
+            return
+
+        current_values = extract_top_level_assignment_values(current_text)
+        active_parameters = operation_schema_ir_parameters(
+            active_schema,
+            current_values,
+        )
+        inactive_parameters = operation_schema_ir_parameters(
+            inactive_schema,
+            current_values,
+        )
+        allowed_actions = ["propose"]
+        if inactive_parameters:
+            allowed_actions.append("expand_design_space")
+        if self.allow_new_feature_specs:
+            allowed_actions.append("add_new_parameter")
+
+        if action.kind == "feature":
+            if action.feature is None:
+                raise ValueError("feature action did not include a feature")
+            if action.feature.name in inactive_schema.parameters:
+                action_type = "expand_design_space"
+                payload = {
+                    "activate": action.feature.name,
+                    "initial_value": current_values.get(action.feature.name),
+                }
+                summary = f"Activate {action.feature.name}"
+            else:
+                action_type = "add_new_parameter"
+                payload = {
+                    "parameter": operation_parameter_to_json(action.feature),
+                    "code_sketch": None,
+                    "why_new_axis": action.rationale or None,
+                }
+                summary = f"Add operation feature {action.feature.name}"
+            ir_action = {
+                "type": action_type,
+                "reasoning": action.rationale or None,
+                "payload": payload,
+                "summary": summary,
+            }
+        else:
+            operations = action.operations or []
+            ir_action = {
+                "type": "propose",
+                "reasoning": " ".join(
+                    operation.rationale
+                    for operation in operations
+                    if operation.rationale
+                )
+                or None,
+                "payload": {
+                    "candidates": [
+                        {
+                            "parent": parent.state_id,
+                            "edits": [
+                                {
+                                    "parameter": operation.name,
+                                    "edit_op": operation.op,
+                                    "value": operation.value,
+                                    "rationale": operation.rationale or None,
+                                }
+                                for operation in operations
+                            ],
+                        }
+                    ]
+                },
+                "summary": operations_payload.get("summary"),
+            }
+
+        observations = nanogpt_ir_observations(self)
+        best_so_far = observations[0] if observations else None
+        acquisition_context = str(
+            getattr(self.config, "acquisition_context", "") or ""
+        ).strip()
+        raw_context: dict[str, Any] = {"parent_train_py": current_text}
+        if search_note:
+            raw_context["search_state_note"] = search_note
+        if self.config.feedback_context.strip():
+            raw_context["feedback"] = self.config.feedback_context.strip()
+
+        ir = make_parameter_edit_ir(
+            task_id="nanogpt",
+            domain="training_program",
+            task_description=self.config.task_context,
+            objectives=[
+                {
+                    "name": self.config.score_key,
+                    "direction": "minimize" if self.config.minimize else "maximize",
+                    "description": (
+                        "Objective measured after executing the candidate train.py."
+                    ),
+                }
+            ],
+            active_parameters=active_parameters,
+            inactive_parameters=inactive_parameters,
+            action=ir_action,
+            request_description=(
+                "Choose one valid action: propose edits to active parameters or "
+                "expand the operation-feature design space."
+            ),
+            design_space_description=active_schema.description,
+            allowed_actions=allowed_actions,
+            num_candidates=1,
+            max_edits_per_candidate=self.max_operations_per_step,
+            round_idx=self.current_iteration,
+            num_evaluated=sum(
+                state.score is not None and finite_score(state.score)
+                for state in self.states
+            ),
+            observations=observations,
+            best_so_far=best_so_far,
+            surrogate_feedback=(
+                {"description": acquisition_context} if acquisition_context else None
+            ),
+            expansion_history=[
+                {
+                    "round": item.get("iteration"),
+                    "activated": item.get("name"),
+                    "reason": item.get("rationale") or item.get("source"),
+                }
+                for item in expansion_history
+            ],
+            applied_this_transition=prior_operations,
+            allows_new_parameters=self.allow_new_feature_specs,
+            reasoning_available=True,
+            raw_context=raw_context,
+        )
+        self._data_sink.append(
+            ir,
+            provenance={
+                "task": "nanogpt",
+                "run_dir": str(self.config.out_dir),
+                "state_id": state.state_id,
+                "parent_state_id": parent.state_id,
+                "iteration": self.current_iteration,
+                "edit_index": edit_index,
+                "generator": self.config.generator,
+                "action_source": action.source or self.config.generator,
+                "prompt_path": str(state.prompt_path),
+                "operations_path": str(operations_path),
+            },
+        )
 
     async def _call_operation_generator(
         self,
