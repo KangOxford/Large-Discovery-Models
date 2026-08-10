@@ -4,16 +4,13 @@
 </h1>
 
 <p align="center">
-  <a href="assets/wechata_group_invitation.jpg" title="Join our WeChat group">
-    <img alt="Join our WeChat group" src="https://cdn.simpleicons.org/wechat/07C160" width="28" height="28">
-  </a>
-</p>
-
-<p align="center">
   <img alt="arXiv" src="https://img.shields.io/badge/arXiv-Paper-B31B1B?style=flat-square">
   <img alt="Hugging Face" src="https://img.shields.io/badge/Hugging_Face-Models-FFD21E?style=flat-square">
   <img alt="Website" src="https://img.shields.io/badge/Website-Project_Page-2563EB?style=flat-square">
   <img alt="X / Twitter" src="https://img.shields.io/badge/X_%2F_Twitter-Follow-000000?style=flat-square">
+  <a href="assets/wechata_group_invitation.jpg" title="Join our WeChat group">
+    <img alt="WeChat group" src="https://img.shields.io/badge/WeChat-Join_Group-07C160?style=flat-square&amp;logo=wechat&amp;logoColor=white">
+  </a>
 </p>
 
 <p align="center">
@@ -91,18 +88,19 @@ The repository includes three compact plots from evaluator-backed campaigns in
 They establish that all three adapters run end to end and that their observed
 incumbents improve under the configured LDM loops.
 
-| Antibody: UCB, 100 evaluations | Small molecule: EHVI, 100 evaluations | nanoGPT: LCB, interim at 46/100 |
+| Antibody: UCB, 100 evaluations | Small molecule: EHVI, 100 evaluations | nanoGPT: LCB, 100 iterations |
 | --- | --- | --- |
-| ![Antibody UCB trajectory](assets/examples/real_100_20260809/antibody_ucb_100.png) | ![Small-molecule EHVI trajectory](assets/examples/real_100_20260809/small_molecule_ehvi_100.png) | ![nanoGPT LCB interim trajectory](assets/examples/real_100_20260809/nanogpt_lcb_interim_i46.png) |
+| ![Antibody UCB trajectory](assets/examples/real_100_20260809/antibody_ucb_100.png) | ![Small-molecule EHVI trajectory](assets/examples/real_100_20260809/small_molecule_ehvi_100.png) | ![nanoGPT LCB trajectory](assets/examples/real_100_20260809/nanogpt_lcb_100.png) |
 
 | Task | Real evidence | Observed result |
 | --- | --- | --- |
 | Antibody | 100 Absolut evaluations on `1ADQ_A`; 20 initialization evaluations followed by 80 UCB selections. | Best binding energy improved from -88.56 after initialization to -96.72. |
 | Small molecule | 100 Vina plus G12D activity evaluations with EHVI selection. | Pareto hypervolume reached 22.8080517046179. |
-| nanoGPT | 20 warm-up attempts and an interim snapshot after 46 real LCB-selected training evaluations. | Best finite `val_bpb` improved from 0.986220 in warm-up to 0.981905. |
+| nanoGPT | 20 warm-up attempts followed by 100 LCB iterations; 99 outer candidates reached real training, for 116 finite observations overall. | Best finite `val_bpb` improved from 0.986220 in warm-up to 0.981844. |
 
-The nanoGPT campaign was still running when its example was frozen, so the
-figure is deliberately labeled interim. More importantly, improving curves are
+The nanoGPT launcher completed with return code 0. Three failed warm-up
+evaluations and one invalid outer candidate at iteration 83 are recorded in the
+run artifacts and excluded from GP fitting and the plot. Improving curves are
 evidence of optimization progress, not a controlled causal estimate of the LDM
 component. Establishing an LDM advantage requires multiple seeds and matched
 random, pure-LLM, BO-only, and acquisition-ablation baselines.

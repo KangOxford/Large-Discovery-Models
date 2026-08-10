@@ -10,12 +10,14 @@ optimization trajectories improve. They are not a controlled ablation study.
 | --- | --- | --- | --- |
 | `antibody_ucb_100.png` | Antibody `policy_max`, UCB, antigen `1ADQ_A`, seed 42 | Complete: 100 real Absolut evaluations, 20 initialization plus 80 UCB selections | Best binding energy improved from -88.56 after initialization to -96.72. |
 | `small_molecule_ehvi_100.png` | Direct-LLM molecule generation, EHVI, seed 42 | Complete: 100 real Vina plus G12D activity evaluations | Pareto hypervolume reached 22.8080517046179. |
-| `nanogpt_lcb_interim_i46.png` | Operation-tool best-of-N N4H4, LCB, seed 42 | Interim: 20 warm-up attempts, 17 finite warm-up observations, and 46 completed LCB iterations | Best `val_bpb` improved from 0.986220 in finite warm-up to 0.981905. |
+| `nanogpt_lcb_100.png` | Operation-tool best-of-N N4H4, LCB, seed 42 | Complete: 20 warm-up attempts and 100 LCB iterations; 99 outer candidates reached real training, yielding 116 finite observations overall | Best `val_bpb` improved from 0.986220 in finite warm-up to 0.981844. |
 
-The nanoGPT run was still active when its plot was frozen. Do not describe it
-as a completed 100-iteration result. The x-axis includes finite observations;
-three crashed warm-up candidates are recorded in the run log but excluded from
-the GP buffer and plot.
+The nanoGPT launcher completed with return code 0. Iterations are contiguous
+from 1 through 100, and all selected and best states are persisted. The x-axis
+includes finite observations: three failed warm-up evaluations and the invalid
+outer candidate selected at iteration 83 are recorded in the run artifacts but
+excluded from the GP buffer and plot. Iteration 83 did not launch real training,
+so the completed campaign contains 119 real training attempts rather than 120.
 
 ## Evidence Boundary
 

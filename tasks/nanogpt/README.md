@@ -47,15 +47,17 @@ The mock config uses:
 ## Real Campaign Example
 
 The evaluator-backed LCB N4H4 campaign below uses real 300-second GPU training
-evaluations. At the frozen interim snapshot, 46 of 100 requested LCB iterations
-were complete; the best finite `val_bpb` improved from `0.986220` during
-warm-up to `0.981905`.
+evaluations. All 100 requested LCB iterations completed; 99 outer candidates
+reached real training, and the best finite `val_bpb` improved from `0.986220`
+during warm-up to `0.981844`.
 
-![NanoGPT LCB interim trajectory](../../assets/examples/real_100_20260809/nanogpt_lcb_interim_i46.png)
+![NanoGPT LCB trajectory](../../assets/examples/real_100_20260809/nanogpt_lcb_100.png)
 
 See the [campaign provenance and evidence boundary](../../assets/examples/real_100_20260809/README.md).
-This is explicitly an interim result, not a completed 100-iteration campaign
-or a controlled causal estimate of the LDM component.
+The launcher completed with return code 0. Three failed warm-up evaluations and
+one invalid outer candidate at iteration 83 were excluded from GP fitting. This
+single completed campaign is not a controlled causal estimate of the LDM
+component.
 
 ## Environment
 
