@@ -1,0 +1,22 @@
+{
+  "ldm_mixed_cot": {
+    "file_name": "ldm_mixed_cot_sft.jsonl",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "ldm_mixed_nocot": {
+    "file_name": "ldm_mixed_nocot_sft.jsonl",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  }
+}
