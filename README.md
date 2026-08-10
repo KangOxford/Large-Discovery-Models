@@ -36,6 +36,12 @@ an acquisition function turns that search state into the next decision. The
 result is a recurrent `generate -> select -> evaluate -> update` loop grounded
 in evidence rather than model confidence alone.
 
+### Updates
+
+- **August 2026 - LDM v0.1 released!** The initial release includes end-to-end
+  LDM workflows for language-model training, small-molecule discovery, and
+  antibody design, plus a manifest-driven interface for user-defined tasks.
+
 ## Contents
 
 - [Repository Scope](#repository-scope)
