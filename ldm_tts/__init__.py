@@ -1,15 +1,27 @@
 """Shared primitives for Large Discovery Model test-time search.
 
 The task folders keep their domain-specific generators, scorers, and prompts.
-This package holds the small pieces that should be common across tasks:
-budgeted search-loop control, JSON trajectory writing, and score utilities.
+This package holds the pieces that should be common across tasks: proposal
+search, acquisition, budgeted loop control, trajectory writing, and scoring.
 """
 
+from ldm_tts.acquisition import (
+    AcquisitionConfig,
+    AcquisitionFunction,
+    PosteriorAcquisition,
+    make_acquisition,
+)
 from ldm_tts.bo import BOObservation, BOPrediction, BOSelectionResult, FeatureVector
-from ldm_tts.data_collection import (
+from ldm_tts.data import (
+    AugmentationReport,
     DataCollectionPaths,
     DataCollectionSink,
+    EXPERT_JUSTIFICATION_SYSTEM_PROMPT,
+    ExpertJustificationPipeline,
+    ExpertJustifier,
+    JustificationRequest,
     LDMDataCollectionError,
+    OpenAICompatibleExpert,
     dataset_info_payload,
     make_complete_design_ir,
     make_parameter_edit_ir,
@@ -66,13 +78,17 @@ from ldm_tts.spaces import (
     LDMTaskSpec,
     ObjectiveSpec,
     ResponseSpaceSpec,
+    ProposalSearchSpec,
 )
 from ldm_tts.trajectory import AtomicJsonLog, JsonlTrajectoryRecorder, load_jsonl
 from ldm_tts.trace_schema import CandidateTraceRecord, LDMRoundTrace
 
 __all__ = [
+    "AcquisitionConfig",
+    "AcquisitionFunction",
     "AcquisitionSpec",
     "AtomicJsonLog",
+    "AugmentationReport",
     "BOObservation",
     "BOPrediction",
     "BOSelectionResult",
@@ -80,8 +96,12 @@ __all__ = [
     "CandidateSpaceSpec",
     "DataCollectionPaths",
     "DataCollectionSink",
+    "EXPERT_JUSTIFICATION_SYSTEM_PROMPT",
+    "ExpertJustificationPipeline",
+    "ExpertJustifier",
     "FeatureVector",
     "JsonlTrajectoryRecorder",
+    "JustificationRequest",
     "LDMDataCollectionError",
     "LDMRoundTrace",
     "LDMSearchLoopResult",
@@ -90,7 +110,10 @@ __all__ = [
     "ObjectiveSpec",
     "OperationParameter",
     "OperationSchema",
+    "OpenAICompatibleExpert",
+    "PosteriorAcquisition",
     "ResponseSpaceSpec",
+    "ProposalSearchSpec",
     "ValidatedOperation",
     "as_float",
     "best_item",
@@ -106,6 +129,7 @@ __all__ = [
     "load_jsonl",
     "load_operation_schema",
     "make_complete_design_ir",
+    "make_acquisition",
     "make_parameter_edit_ir",
     "normalize_task_id",
     "normalize_operation_numeric",

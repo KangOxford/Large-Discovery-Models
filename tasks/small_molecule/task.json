@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "small_molecule",
+  "description": "Optimize molecular candidates against docking and activity objectives.",
+  "dependency_checker": "tasks.small_molecule.ldm_task.dependencies:check_dependencies"
+}

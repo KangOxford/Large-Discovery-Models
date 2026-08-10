@@ -13,27 +13,18 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
+from ldm_tts.task_registry import (
+    REPOSITORY_RELATIVE_PREFIXES,
+    TASK_DEFINITIONS,
+    TaskRegistrationError,
+    get_task_definition,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ENV_VAR_PATTERN = re.compile(r"\$(?P<brace>\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)\})|\$(?P<plain>[A-Za-z_][A-Za-z0-9_]*)")
+SENSITIVE_NAME_SUFFIXES = ("api-key", "password", "secret", "access-token", "auth-token")
 
-TASK_DEFAULTS: dict[str, dict[str, str]] = {
-    "nanogpt": {
-        "cwd": "nanogpt",
-        "module": "nanogpt.ldm_task.procedure",
-    },
-    "small_molecule": {
-        "cwd": "small_molecule",
-        "module": "small_molecule.ldm_task.procedure",
-    },
-    "antibody": {
-        "cwd": "antibody",
-        "module": "antibody.ldm_task.procedure",
-    },
-}
-REPO_RELATIVE_PREFIXES = tuple(
-    sorted({details["cwd"] for details in TASK_DEFAULTS.values()} | {"config", "ldm_tts", "scripts"})
-)
 NEGATABLE_BOOLEAN_KEYS = {
     "allow-early-stop",
     "fallback-random",
@@ -169,17 +160,21 @@ def build_plan(config: dict[str, Any], config_path: Path) -> dict[str, Any]:
     task = str(config.get("task", "")).strip()
     if not task:
         raise SystemExit(f"Missing required field `task` in {config_path}")
-    if task not in TASK_DEFAULTS:
-        raise SystemExit(f"Unknown task {task!r}; expected one of {sorted(TASK_DEFAULTS)}")
-
-    defaults = TASK_DEFAULTS[task]
+    try:
+        definition = get_task_definition(task)
+    except (KeyError, TaskRegistrationError) as exc:
+        raise SystemExit(str(exc).strip("'")) from exc
     runner = config.get("runner") or {}
     if not isinstance(runner, dict):
         raise SystemExit("runner must be an object when provided.")
 
     context = make_context(config, config_path, task)
-    cwd = resolve_repo_path(str(runner.get("cwd", defaults["cwd"])), context)
-    module_name = expand_string(str(runner.get("module", defaults["module"])), context)
+    cwd = resolve_repo_path(
+        str(runner.get("cwd", definition.relative_root.as_posix())), context
+    )
+    module_name = expand_string(
+        str(runner.get("module", definition.module)), context
+    )
 
     env_overrides = config.get("env") or {}
     if not isinstance(env_overrides, dict):
@@ -195,6 +190,7 @@ def build_plan(config: dict[str, Any], config_path: Path) -> dict[str, Any]:
     argv.extend(extra_args_to_cli(config.get("extra_args", []), context, variables))
 
     command = [sys.executable, "-m", module_name, *argv]
+    display_command = [sys.executable, "-m", module_name, *redact_cli_values(argv)]
     return {
         "name": str(config.get("name") or config_path.stem),
         "task": task,
@@ -205,7 +201,7 @@ def build_plan(config: dict[str, Any], config_path: Path) -> dict[str, Any]:
         "module": module_name,
         "argv": argv,
         "command": command,
-        "command_display": shlex.join(command),
+        "command_display": shlex.join(display_command),
         "env_overrides": env,
     }
 
@@ -233,7 +229,7 @@ def validate_config_keys(config: dict[str, Any], config_path: Path) -> None:
 
 
 def make_context(config: dict[str, Any], config_path: Path, task: str) -> dict[str, str]:
-    task_dir = REPO_ROOT / TASK_DEFAULTS[task]["cwd"]
+    task_dir = REPO_ROOT / get_task_definition(task).relative_root
     return {
         "repo_root": str(REPO_ROOT),
         "config_dir": str(config_path.parent),
@@ -338,6 +334,39 @@ def extra_args_to_cli(
     return [expand_value(item, context, variables) for item in extra_args]
 
 
+def is_sensitive_name(value: str) -> bool:
+    normalized = value.lower().replace("_", "-").lstrip("-")
+    return any(
+        normalized == suffix or normalized.endswith("-" + suffix)
+        for suffix in SENSITIVE_NAME_SUFFIXES
+    )
+
+
+def redact_cli_values(argv: list[str]) -> list[str]:
+    redacted: list[str] = []
+    hide_next = False
+    for value in argv:
+        if hide_next:
+            redacted.append("***")
+            hide_next = False
+            continue
+        if value.startswith("--") and "=" in value:
+            flag, _, _ = value.partition("=")
+            redacted.append(f"{flag}=***" if is_sensitive_name(flag) else value)
+            continue
+        redacted.append(value)
+        if value.startswith("--") and is_sensitive_name(value):
+            hide_next = True
+    return redacted
+
+
+def redact_environment(env: dict[str, str]) -> dict[str, str]:
+    return {
+        key: "***" if is_sensitive_name(key) else value
+        for key, value in env.items()
+    }
+
+
 def expand_value(value: Any, context: dict[str, str], variables: dict[str, str] | None = None) -> str:
     if isinstance(value, str):
         return expand_string(value, context, variables)
@@ -370,7 +399,10 @@ def resolve_repo_relative_reference(value: str) -> str:
     if path.is_absolute():
         return value
     normalized = value.replace("\\", "/")
-    if not any(normalized == prefix or normalized.startswith(prefix + "/") for prefix in REPO_RELATIVE_PREFIXES):
+    if not any(
+        normalized == prefix or normalized.startswith(prefix + "/")
+        for prefix in REPOSITORY_RELATIVE_PREFIXES
+    ):
         return value
     return str((REPO_ROOT / path).resolve())
 
@@ -431,9 +463,9 @@ def plan_for_json(plan: dict[str, Any]) -> dict[str, Any]:
         "config_path": plan["config_path"],
         "cwd": plan["cwd"],
         "module": plan["module"],
-        "argv": plan["argv"],
+        "argv": redact_cli_values(plan["argv"]),
         "command_display": plan["command_display"],
-        "env_overrides": plan["env_overrides"],
+        "env_overrides": redact_environment(plan["env_overrides"]),
     }
 
 

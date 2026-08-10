@@ -1,0 +1,29 @@
+name: antibody_real_cpu_smoke
+task: antibody
+algorithm: ei
+mode: real
+description: One real API-backed AntBO proposal and Absolut evaluation on CPU.
+args:
+  config: resources/default_config.yaml
+  antigen: 1ADQ_A
+  seed: 42
+  n-trials: 1
+  budget: 1
+  batch-size: 1
+  n-init: 1
+  parallel-budget: 8
+  device: cpu
+  acq: ei
+  acq-xi: 0.001
+  absolut-path: null
+  llm-url: null
+  llm-model-name: null
+  llm-temperature: 0.25
+  llm-max-tokens: 1024
+  disable-thinking: true
+  timeout-s: 120
+  max-retries: 2
+  history-top-k: 10
+  include-antigen-context: true
+  fallback-random: false
+  out-dir: runs/antbo_real_cpu_smoke

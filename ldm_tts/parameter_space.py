@@ -315,7 +315,7 @@ def choice_values_equal(left: Any, right: Any) -> bool:
     if isinstance(right, str):
         return str(left) == right
     if isinstance(right, bool):
-        return bool(left) is right
+        return isinstance(left, bool) and left is right
     if isinstance(right, int) and not isinstance(right, bool):
         number = as_float(left)
         return number is not None and abs(number - int(right)) <= 1e-9

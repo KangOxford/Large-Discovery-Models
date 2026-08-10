@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "nanogpt",
+  "description": "Optimize nanoGPT training programs and hyperparameters.",
+  "dependency_checker": "tasks.nanogpt.ldm_task.dependencies:check_dependencies"
+}

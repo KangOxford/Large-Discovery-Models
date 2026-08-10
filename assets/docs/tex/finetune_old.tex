@@ -1,0 +1,81 @@
+% ============================================================
+\section{Training an LLM for Discovery}
+\label{sec:training}
+% ============================================================
+
+Everything so far treats $p_\theta$ as fixed and does the discovery work at inference time. The regret
+decomposition of \S\ref{thm:regret} shows the LLM enters through exactly two quantities, the
+search-suboptimality $\varepsilon_t$ (Assumption~\ref{ass:ucb-calibration}) and the reservoir coverage
+$\kappa_t(\varepsilon)$ of \eqref{eq:coverage}, so \emph{training for discovery} means improving both. The
+natural way to do so is to \emph{amortise} into the weights the very object the inference-time search
+approximates: the tilted distribution $\pi_t$ of \eqref{eq:core}, whose reward is the calibrated acquisition
+$\acq_t$. We sketch four routes, each a standard learning method specialised to this reward, and then the
+economics that make them practical.
+
+\subsection{Amortising the tilted policy}
+\label{sec:amortise}
+By Proposition~\ref{prop:gibbs}, $\pi_t\propto p_{\theta,\alpha}(\cdot\mid\C_t)\exp\{\eta\,\acq_t\}$ is the
+optimal policy of a KL-regularised reward-maximisation problem with reward $\acq_t$, the control-as-inference
+view of \citet{levine2018reinforcement}. Its fixed point is reached by reward-weighted regression: fine-tune on
+self-generated designs reweighted by the exponentiated acquisition,
+\begin{equation}
+\label{eq:amortize}
+\max_{\theta}\ \mathbb{E}_{x\sim p_{\theta_{\mathrm{old}}}(\cdot\mid\C_t)}\big[\,e^{\eta\,\acq_t(x)}\,\log p_\theta(x\mid\C_t)\,\big],
+\end{equation}
+the expectation-maximisation step that contracts $p_\theta$ onto $\pi_t$ \citep{peng2019advantage}.
+Equivalently, since $\pi_t$ is the closed-form optimum of KL-regularised policy optimisation, one may train
+toward it directly from pairs ranked by the acquisition, as in direct preference optimisation
+\citep{rafailov2023direct}, with $\acq_t$ supplying the preference signal in place of a human label. The reward
+is the \emph{full} acquisition, including the exploration bonus and the novelty term of
+\S\ref{sec:constrained}, not the posterior mean, so the amortised policy proposes high-value designs without
+search, lowering $\varepsilon_t$, while keeping mass on uncertain and novel regions.
+
+\subsection{Diversity-preserving training: coverage without collapse}
+\label{sec:gflownet}
+Plain reward maximisation concentrates $p_\theta$ on the current $\argmax$, which is the wrong objective for
+discovery: it drives $\kappa_t(\varepsilon)$ on the \emph{unseen} part of $S_\varepsilon$ to zero. Discovery
+needs a reservoir that samples \emph{proportionally} to value and covers many modes of the super-level set.
+Generative flow networks train exactly such a policy, sampling terminal objects with probability proportional
+to a reward $R(x)$ \citep{bengio2021flow}; taking $R(x)=\exp\{\eta\,\acq_t(x)\}$ makes the trained reservoir a
+multi-modal sampler for $\pi_t$ by construction, and the same recipe has produced diverse biological sequence
+designs \citep{jain2022biological}, the antibody and peptide setting of \S\ref{sec:cs-antibody-results}. A
+flow-network reservoir raises the near-optimal mass $\kappa_t(\varepsilon)$ while preserving the breadth that a
+temperature-sharpened or greedily fine-tuned model destroys, which is what keeps the discovery channel of
+\S\ref{sec:decomp} open after training.
+
+\subsection{Learning the self-improving property}
+\label{sec:metatrain}
+The adaptive condition \eqref{eq:adaptive}, that $\kappa_t(\varepsilon)$ \emph{rises} as $\C_t$ accumulates
+good exemplars, was assumed in \S\ref{thm:regret}; it can instead be \emph{trained}. Meta-train the
+LLM across many optimisation episodes whose context is a history of design--value pairs and whose target is the
+next high-value design: the model learns to improve its own proposals from history, which is in-context
+reinforcement learning by algorithm distillation \citep{laskin2022context} and its supervised-pretraining
+variants. After such training, conditioning on good exemplars sharpens the proposal by construction, so
+\eqref{eq:adaptive} holds as a learned property rather than an assumption, and the phase transition of
+\S\ref{thm:regret}, from slow to geometric discovery, is built into the weights. Episodes can be drawn
+cheaply from synthetic objectives, such as random draws of the GP prior or known benchmark families, with the
+expensive $f$ reserved for calibration.
+
+\subsection{Closing the loop: search as its own teacher}
+\label{sec:selfdistill}
+The inference-time search is a policy-improvement operator: it returns designs of higher acquisition than a
+single sample from $p_\theta$. Distilling those back into $p_\theta$, by fine-tuning on the search's
+high-acquisition outputs, is the expert-iteration recipe behind self-play agents \citep{silver2017mastering} in
+its language-model form, reinforced self-training \citep{gulcehre2023reinforced}, and is the weight-space
+counterpart of the inference-time self-refinement of \S\ref{sec:decomp}
+\citep{madaan2023selfrefine,shinn2023reflexion}. Each round makes the next search cheaper (lower
+$\varepsilon_t$) and the reservoir tighter (higher $\kappa_t$), so the loop bootstraps: every batch of
+discoveries becomes training data that makes the next batch easier, the self-improving regime of
+\S\ref{thm:regret} realised in the weights rather than only in context.
+
+\subsection{What is trained against what}
+\label{sec:trainecon}
+Real evaluations are scarce, so almost all of the training signal in \eqref{eq:amortize} and its variants is the
+\emph{surrogate} acquisition $\acq_t$, which is cheap and abundant, with the true $f$ reserved for recalibrating
+the surrogate and validating final designs. This is model-based training: improve the policy against the
+learned world model and touch the world sparingly, the training-time image of the model-based search of this
+paper and of Dyna-style reinforcement learning. The calibration that makes $\acq_t$ a trustworthy inference-time
+value (Assumption~\ref{ass:ucb-calibration}) is exactly what makes it a trustworthy training reward; an uncalibrated,
+self-judged reward would be reward-hacked, the failure the surrogate exists to prevent. In this light, the
+domain pretraining that \citet{3692070.3693095} require for a heavy near-optimal tail is simply the first
+stage of the pipeline, how the reservoir acquires a small tail exponent $\nu$ before any online search begins.

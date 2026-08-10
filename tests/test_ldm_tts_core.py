@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 import tempfile
 import unittest
 from argparse import Namespace
 from pathlib import Path
+from unittest.mock import patch
 
 from ldm_tts import (
     BOObservation,
@@ -28,7 +31,13 @@ from ldm_tts import (
     run_budgeted_search,
     validate_operation_payload,
 )
-from ldm_tts.dependency_checks import check_plan, cli_args_to_map, has_failures
+from ldm_tts.dependency_checks import (
+    check_plan,
+    check_reasyn,
+    check_vina,
+    cli_args_to_map,
+    has_failures,
+)
 from ldm_tts.runner import build_plan
 
 
@@ -150,12 +159,29 @@ class LDMTrajectoryTests(unittest.TestCase):
 
 
 class LDMRunnerConfigTests(unittest.TestCase):
+    def test_registered_tasks_resolve_under_unified_tasks_directory(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        expected_modules = {
+            "nanogpt": "tasks.nanogpt.ldm_task.procedure",
+            "small_molecule": "tasks.small_molecule.ldm_task.procedure",
+            "antibody": "tasks.antibody.ldm_task.procedure",
+        }
+
+        for task, module in expected_modules.items():
+            plan = build_plan(
+                {"name": f"{task}_layout", "task": task, "args": {}},
+                Path(f"config/{task}/layout.yaml"),
+            )
+
+            self.assertEqual(plan["module"], module)
+            self.assertEqual(Path(plan["cwd"]), repo_root / "tasks" / task)
+
     def test_args_can_reference_config_env_values(self) -> None:
         config = {
             "name": "small_molecule_env_refs",
             "task": "small_molecule",
             "env": {
-                "G12D": "small_molecule/activity_modeling/best_g12d_model.joblib",
+                "G12D": "tasks/small_molecule/resources/models/best_g12d_model.joblib",
                 "VINA_BIN": "/opt/vina/bin/vina",
             },
             "args": {
@@ -168,7 +194,11 @@ class LDMRunnerConfigTests(unittest.TestCase):
 
         self.assertIn("--nn-model-path", plan["argv"])
         nn_path_index = plan["argv"].index("--nn-model-path") + 1
-        self.assertTrue(plan["argv"][nn_path_index].endswith("small_molecule/activity_modeling/best_g12d_model.joblib"))
+        self.assertTrue(
+            plan["argv"][nn_path_index].endswith(
+                "tasks/small_molecule/resources/models/best_g12d_model.joblib"
+            )
+        )
         self.assertIn("--vina-bin", plan["argv"])
         self.assertEqual(plan["argv"][plan["argv"].index("--vina-bin") + 1], "/opt/vina/bin/vina")
 
@@ -248,6 +278,155 @@ class LDMDependencyCheckTests(unittest.TestCase):
         self.assertIn("Vina", failed)
         self.assertIn("G12D activity model", failed)
 
+    def test_skip_eval_nanogpt_plan_skips_optional_data_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            train_file = root / "train.py"
+            operation_schema = root / "operation-schema.json"
+            train_file.write_text("", encoding="utf-8")
+            operation_schema.write_text("{}", encoding="utf-8")
+            config = {
+                "name": "nanogpt_real_light_check",
+                "task": "nanogpt",
+                "mode": "real",
+                "args": {
+                    "train-file": str(train_file),
+                    "operation-schema": str(operation_schema),
+                    "generator": "operation_tool",
+                    "llm-url": "https://llm.example.test/v1",
+                    "llm-model-name": "served-model",
+                    "api-key": "test-key",
+                    "iterations": 0,
+                    "skip-eval": True,
+                },
+            }
+            plan = build_plan(config, Path("config/nanogpt/test.yaml"))
+
+            with (
+                patch("ldm_tts.dependency_checks.NANOGPT_DATA_DIR", root / "missing-data"),
+                patch("ldm_tts.dependency_checks.NANOGPT_TOKENIZER_DIR", root / "missing-tokenizer"),
+            ):
+                checks = check_plan(plan, include_optional=False)
+
+        by_name = {check.name: check for check in checks}
+        self.assertEqual(by_name["prepare.py data"].status, "skip")
+        self.assertEqual(by_name["prepare.py tokenizer"].status, "skip")
+        self.assertEqual(by_name["CUDA"].status, "skip")
+
+    def test_skip_eval_nanogpt_plan_checks_data_without_no_optional(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            train_file = root / "train.py"
+            operation_schema = root / "operation-schema.json"
+            train_file.write_text("", encoding="utf-8")
+            operation_schema.write_text("{}", encoding="utf-8")
+            config = {
+                "name": "nanogpt_real_strict_check",
+                "task": "nanogpt",
+                "mode": "real",
+                "args": {
+                    "train-file": str(train_file),
+                    "operation-schema": str(operation_schema),
+                    "generator": "operation_tool",
+                    "llm-url": "https://llm.example.test/v1",
+                    "llm-model-name": "served-model",
+                    "api-key": "test-key",
+                    "skip-eval": True,
+                },
+            }
+            plan = build_plan(config, Path("config/nanogpt/test.yaml"))
+
+            with (
+                patch("ldm_tts.dependency_checks.NANOGPT_DATA_DIR", root / "missing-data"),
+                patch("ldm_tts.dependency_checks.NANOGPT_TOKENIZER_DIR", root / "missing-tokenizer"),
+            ):
+                checks = check_plan(plan)
+
+        by_name = {check.name: check for check in checks}
+        self.assertEqual(by_name["prepare.py data"].status, "fail")
+        self.assertEqual(by_name["prepare.py tokenizer"].status, "fail")
+
+    def test_vina_check_rejects_executable_with_failing_help(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            vina = Path(tmp) / "vina"
+            vina.write_text("#!/bin/sh\necho broken >&2\nexit 2\n", encoding="utf-8")
+            vina.chmod(0o755)
+
+            check = check_vina("small_molecule", str(vina), {})
+
+        self.assertEqual(check.status, "fail")
+        self.assertIn("status 2", check.message)
+        self.assertIn("broken", check.detail)
+
+    def test_reasyn_check_probes_configured_interpreter_imports(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "ReaSyn"
+            (repo / "reasyn" / "chem").mkdir(parents=True)
+            (repo / "reasyn" / "sampler").mkdir(parents=True)
+            (repo / "data" / "trained_model").mkdir(parents=True)
+            for package in (
+                repo / "reasyn",
+                repo / "reasyn" / "chem",
+                repo / "reasyn" / "sampler",
+            ):
+                (package / "__init__.py").write_text("", encoding="utf-8")
+            (repo / "reasyn" / "chem" / "mol.py").write_text(
+                "class Molecule:\n    def __init__(self, smiles):\n        self.smiles = smiles\n",
+                encoding="utf-8",
+            )
+            (repo / "reasyn" / "sampler" / "parallel.py").write_text(
+                "READY = True\n", encoding="utf-8"
+            )
+            ar = repo / "data" / "trained_model" / "ar.ckpt"
+            eb = repo / "data" / "trained_model" / "eb.ckpt"
+            ar.write_text("ar", encoding="utf-8")
+            eb.write_text("eb", encoding="utf-8")
+
+            checks = check_reasyn(
+                {
+                    "reasyn-repo": str(repo),
+                    "reasyn-python": sys.executable,
+                    "reasyn-model-path": f"{ar},{eb}",
+                    "reasyn-devices": "",
+                },
+                dict(os.environ),
+                Path(tmp),
+            )
+
+        by_name = {check.name: check for check in checks}
+        self.assertEqual(by_name["ReaSyn repo"].status, "ok")
+        self.assertEqual(by_name["ReaSyn Python"].status, "ok")
+        self.assertEqual(by_name["ReaSyn import"].status, "ok")
+        self.assertEqual(by_name["ReaSyn checkpoints"].status, "ok")
+
+    def test_reasyn_check_reports_broken_runtime_import(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "ReaSyn"
+            (repo / "reasyn" / "chem").mkdir(parents=True)
+            (repo / "reasyn" / "sampler").mkdir(parents=True)
+            (repo / "reasyn" / "chem" / "mol.py").write_text(
+                "class Molecule:\n    pass\n", encoding="utf-8"
+            )
+            (repo / "reasyn" / "sampler" / "parallel.py").write_text(
+                "import dependency_that_is_not_installed\n", encoding="utf-8"
+            )
+
+            checks = check_reasyn(
+                {
+                    "reasyn-repo": str(repo),
+                    "reasyn-python": sys.executable,
+                    "reasyn-devices": "",
+                },
+                dict(os.environ),
+                Path(tmp),
+            )
+
+        import_check = next(
+            check for check in checks if check.name == "ReaSyn import"
+        )
+        self.assertEqual(import_check.status, "fail")
+        self.assertIn("dependency_that_is_not_installed", import_check.detail)
+
 
 class LDMResponseContractTests(unittest.TestCase):
     def test_json_object_loader_accepts_markdown_fenced_objects(self) -> None:
@@ -260,9 +439,9 @@ class LDMResponseContractTests(unittest.TestCase):
 
 class LDMOperationSpaceTests(unittest.TestCase):
     def test_shared_operation_schema_reports_full_and_active_dimensions(self) -> None:
-        project_root = Path(__file__).resolve().parents[1] / "nanogpt"
+        project_root = Path(__file__).resolve().parents[1] / "tasks" / "nanogpt"
         schema = load_operation_schema(
-            Path("ldm_task/operation_schema_mock_train.json"),
+            Path("resources/schemas/mock_operations.json"),
             project_root,
         )
         active_schema = initial_active_operation_schema(
@@ -281,9 +460,9 @@ class LDMOperationSpaceTests(unittest.TestCase):
         ])
 
     def test_shared_operation_payload_validation_canonicalizes_values(self) -> None:
-        project_root = Path(__file__).resolve().parents[1] / "nanogpt"
+        project_root = Path(__file__).resolve().parents[1] / "tasks" / "nanogpt"
         schema = load_operation_schema(
-            Path("ldm_task/operation_schema_mock_train.json"),
+            Path("resources/schemas/mock_operations.json"),
             project_root,
         )
 
@@ -362,22 +541,22 @@ class LDMBOTraceContractTests(unittest.TestCase):
 
 class LDMTaskSpecTests(unittest.TestCase):
     def test_nanogpt_operation_spec_reports_active_and_full_dimensions(self) -> None:
-        from nanogpt.ldm_task import procedure as nanogpt_procedure
+        from tasks.nanogpt.ldm_task import procedure as nanogpt_procedure
 
-        project_root = Path(__file__).resolve().parents[1] / "nanogpt"
+        project_root = Path(__file__).resolve().parents[1] / "tasks" / "nanogpt"
         args = nanogpt_procedure.parse_args([
             "--generator",
             "operation_mock",
             "--operation-schema",
-            "ldm_task/operation_schema_mock_train.json",
+            "resources/schemas/mock_operations.json",
             "--train-file",
-            "ldm_task/mock_train.py",
+            "resources/train/mock_train.py",
             "--method",
             "best_of_n",
         ])
         args.project_root = project_root
         schema = nanogpt_procedure.load_operation_schema(
-            Path("ldm_task/operation_schema_mock_train.json"),
+            Path("resources/schemas/mock_operations.json"),
             project_root,
         )
         active_schema = nanogpt_procedure.initial_active_operation_schema(schema, args)
@@ -396,9 +575,11 @@ class LDMTaskSpecTests(unittest.TestCase):
             "train_operations",
             {response_space.name for response_space in spec.response_spaces},
         )
+        self.assertEqual(spec.proposal_search.name, "best_of_n")
+        self.assertEqual(spec.proposal_search.breadth, 2)
 
     def test_small_molecule_spec_reports_two_objective_space(self) -> None:
-        from small_molecule.ldm_task import procedure as molecule_procedure
+        from tasks.small_molecule.ldm_task import procedure as molecule_procedure
 
         args = molecule_procedure.parse_args(["--mock"])
 
@@ -410,18 +591,23 @@ class LDMTaskSpecTests(unittest.TestCase):
             [("vina", "minimize"), ("activity", "maximize")],
         )
         self.assertEqual(spec.candidate_space.constraints["max_smiles_len"], 80)
+        self.assertEqual(spec.proposal_search.name, "single_turn")
 
     def test_antibody_spec_reports_categorical_sequence_space(self) -> None:
-        from antibody.ldm_task import procedure as antibody_procedure
+        from tasks.antibody.ldm_task import procedure as antibody_procedure
 
-        args = antibody_procedure.parse_args(["--mock", "--antigen", "SMOKE_ANTIGEN"])
+        args = antibody_procedure.parse_args(
+            ["--mock", "--antigen", "SMOKE_ANTIGEN", "--device", "cpu"]
+        )
 
         spec = antibody_procedure.describe_ldm_task(args, {"seq_len": 11}, ["SMOKE_ANTIGEN"])
 
+        self.assertEqual(args.device, "cpu")
         self.assertEqual(spec.task, "antibody")
         self.assertEqual(spec.candidate_space.dimension, 11)
         self.assertEqual(spec.candidate_space.constraints["alphabet_size"], 20)
         self.assertEqual(spec.objectives[0].direction, "minimize")
+        self.assertEqual(spec.proposal_search.name, "single_turn")
 
 
 if __name__ == "__main__":

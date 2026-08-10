@@ -1,0 +1,136 @@
+\section{Theoretical Analyses}
+\label{sec:theory-main}
+
+We now present theoretical analyses of the LDM. This section is self-contained; readers primarily interested in the empirical results may safely skip it. Let \(\X\) denote the design space, and let \(x^\star \in \argmax_{x \in \X} R(x)\) be a global maximiser of the unknown objective function. 
+Note that performance is measured with respect to the true objective \(R\), rather than the uncertainty-aware acquisition function. After \(T\) trials, the simple regret (no separate symbol beyond the per-round regret) is defined as
+\begin{equation}
+\regret_T = R(x^\star) - \max_{1 \le t \le T} R(x_t).
+\end{equation}
+
+At round \(t\), let \(p_\theta(\cdot\mid\C_t)\) denote the LLM reservoir distribution after applying the actual decoding restrictions of §method (top-\(k\) or top-\(p\) truncation, etc.). The corresponding temperature-adjusted proposal is
+\[
+p_{\theta,\alpha}(x\mid\C_t) \;:=\;
+\frac{p_\theta(x\mid\C_t)^\alpha}
+{\sum_{u \in \X} p_\theta(u\mid\C_t)^\alpha}\,,
+\]
+and its support (the LLM-controlled dynamic search domain of §\ref{sec:algo}) is
+\[
+A_t \;:=\; \operatorname{supp}\, p_{\theta,\alpha}(\cdot\mid\C_t) \;=\; \{x\in\X : p_{\theta,\alpha}(x\mid\C_t) > 0\}.
+\]
+
+The LDM then samples the next candidate \(x_t \sim \pi_t\), where
+\begin{equation}
+\label{eq:theory-pi}
+\pi_t(x) =
+\frac{\exp(\eta\,\acq_t(x))\,p_{\theta,\alpha}(x\mid\C_t)}
+{\sum_{u \in A_t} \exp(\eta\,\acq_t(u))\,p_{\theta,\alpha}(u\mid\C_t)}.
+\end{equation}
+Here, $\acq_t(x) = \mu_t(x) + \sqrt{\beta_t}\sigma_t(x)$ is the UCB acquisition function (matching the LDM convention of §method).
+
+To relate this performance criterion to the per-round behaviour of the algorithm, define the instantaneous regret at round \(t\) as $\regret_t = R(x^\star) - R(x_t)$. Here, \(t\) indexes evaluations under the true objective \(R\), rather than internal LLM interaction steps. Equivalently, the simple regret after \(T\) trials is $\regret_T = \min_{1 \le t \le T} \regret_t$. In the analysis below, we first study the cumulative behaviour of \(\{\regret_t\}_{t=1}^T\), from which a simple regret guarantee follows via the standard relation $\regret_T \le \frac{1}{T}\sum_{t=1}^T \regret_t$.
+
+\noindent\textbf{Instantaneous Regret Decomposition as Discovery Gap and Optimisation Regret.}
+For each round \(t\), define the best objective value attainable within the current reservoir support as $R_{t,A}^\star = \max_{x \in A_t} R(x)$. Then, the instantaneous regret admits the exact decomposition
+\begin{align}
+\regret_t
+&= R(x^\star) - R(x_t) \\
+&=
+\underbrace{R(x^\star) - R_{t,A}^\star}_{\regret_t^{\rm disc}}
++
+\underbrace{R_{t,A}^\star - R(x_t)}_{\regret_t^{\rm opt}} .
+\end{align}
+The first term, \(\regret_t^{\rm disc}\), is the \emph{discovery gap}: it measures the loss incurred because the current reservoir support \(A_t\) may not contain designs sufficiently close to the global optimum. This term is zero whenever \(x^\star \in A_t\). The second term, \(\regret_t^{\rm opt}\), is the \emph{optimisation regret} within the currently discovered region: it measures how far the sampled point \(x_t\) is from the best candidate available in \(A_t\).
+
+This decomposition separates the two roles of the LDM. The reservoir distribution controls whether high-quality regions are discovered at all, while the acquisition tilt controls how effectively the algorithm selects promising candidates among those currently reachable.
+
+Below, we will give the necessary assumptions and definitions to support the regret bound analysis. 
+\begin{assumption}[UCB calibration]
+\label{ass:ucb-calibration}
+For a non-decreasing sequence $(\beta_t)_{t\ge1}$, with probability at least $1-\delta_{\rm gp}$, simultaneously
+for all $t\le T$ and $x\in\X$,
+\[
+|R(x)-\mu_t(x)|
+\le
+\sqrt{\beta_t}\,\sigma_t(x).
+\]
+This event is implied by the standard kernel bandit conditions: $R(x)=m(x)+g(\phi(x))$ with $g\in\mathcal H_k$, bounded RKHS norm, bounded kernel diagonal, and conditionally sub-Gaussian observation noise \citep{srinivas2010gaussian,chowdhury2017kernelized}.
+\end{assumption}
+
+\begin{assumption}[Reservoir coverage and local regularity]
+\label{ass:coverage}
+Let $\mathrm d_\X$ be a distance on the design space and define the reservoir
+coverage radius $r_t^{\rm cov}=\inf_{x\in A_t}\mathrm d_\X(x,x^\star)$. The objective is one-sided H\"older around the optimum: there exist $L>0$ and $\chi\in(0,1]$ such that, for all
+$x\in\X$,
+\[
+R(x^\star)-R(x)\le L\,\mathrm d_\X(x,x^\star)^\chi.
+\]
+\end{assumption}
+Let $a_{t,A}^\star=\sup_{x\in A_t}\acq_t(x)$ be the maximum value of the acquisition function at $t$-th round. Then, for any tolerance $\zeta_t\ge0$, let $U_t(\zeta_t)=
+\{x\in A_t:\acq_t(x)\ge a_{t,A}^\star-\zeta_t\}$ be the set of candidates in the current reservoir support $A_t$ whose acquisition value is within $\zeta_t$ of the best acquisition value. We denote the reservoir probability mass assigned to this near-best set by
+\begin{equation}
+\label{eq:coverage}
+\kappa_t(\zeta_t)=p_{\theta,\alpha}\bigl(U_t(\zeta_t)\mid\C_t\bigr).
+\end{equation}
+The bound below depends on the size of $\kappa_t(\zeta_t)$: a small near-UCB mass means that the LLM reservoir makes high-acquisition designs hard to sample even after exponential tilting.
+
+\begin{equation}
+\label{eq:adaptive}
+\kappa_t(\zeta)\;\ge\;\kappa_0(\zeta)\;+\;\rho_\zeta\cdot N_t^{\rm good},
+\end{equation}
+where $N_t^{\rm good}:=|\{(x_i,r_i)\in\C_t : r_i \ge r^{\rm thresh}\}|$ counts high-reward exemplars in the
+context. Equation~\eqref{eq:adaptive} formalises the adaptive condition: the near-acquisition reservoir mass grows monotonically as good exemplars
+accumulate.
+
+\begin{lemma}[Gibbs near-UCB sampling]
+\label{lem:gibbs-near-ucb}
+Conditioned on the history \(\C_t\), fix any \(\zeta_t\ge 0\) such that the near-UCB set has reservoir mass \(\kappa_t(\zeta_t)\). Then, for any \(\rho_t\in(0,1)\), we have
+\begin{equation}
+ \mathbb P\!\left(
+a_{t,A}^\star-\acq_t(x_t)
+\le
+\zeta_t+\frac{1}{\eta}\log\frac{1}{\rho_t\kappa_t(\zeta_t)}
+\,\middle|\, \C_t
+\right)
+\ge
+1-\rho_t .
+\end{equation}
+
+\end{lemma}
+
+Let
+\[
+\gamma_T=
+\sup_{B\subset\X,\ |B|\le T}
+\frac12\log\det(I+\lambda^{-1}K_B),
+\qquad
+C_\lambda=\frac{2}{\log(1+\lambda^{-1})},
+\]
+where $K_B$ is the kernel matrix on $B$.
+
+\begin{theorem}[Simple regret of large discovery model]
+\label{thm:regret}
+Suppose Assumptions~\ref{ass:ucb-calibration} and~\ref{ass:coverage} hold. Fix $\delta_{\rm gp},\delta_{\rm samp}\in(0,1)$ and choose
+$\rho_t>0$ such that $\sum_{t=1}^T\rho_t\le\delta_{\rm samp}$. Then, for any $\zeta_t\ge0$ with
+$\kappa_t(\zeta_t)>0$, with probability at least $1-\delta_{\rm gp}-\delta_{\rm samp}$,
+\[
+  \boxed{
+  \frac{1}{T}\sum_{t=1}^T \regret_t
+  \le
+  \underbrace{\frac{L}{T}\sum_{t=1}^T(r_t^{\rm cov})^\chi}_{\text{discovery gap}}
+  +
+  \underbrace{2\sqrt{\frac{C_\lambda\beta_T\gamma_T}{T}}}_{\text{GP-UCB optimisation}}
+  +
+  \underbrace{
+  \frac1T\sum_{t=1}^T
+  \left[
+  \zeta_t+
+  \frac1\eta\log\frac1{\rho_t\kappa_t(\zeta_t)}
+  \right]
+  }_{\text{LDM sampling shortfall}} .
+  }
+\]
+\end{theorem}
+
+The first term is the gap of not yet having generated candidates near the true optimum. The second is the usual GP-UCB information-gain term within the covered region. The third is the cost of sampling from the tilted LDM distribution rather than exactly maximising UCB over $A_t$; it decreases when the acquisition tilt $\eta$ is sharper or when the near-UCB reservoir mass $\kappa_t(\zeta_t)$ is larger.
+
+The LLM affects the regret bound through the reservoir support \(A_t\) and its distribution \(p_{\theta,\alpha}(\cdot\mid\C_t)\). First, an informative LLM can propose candidates closer to the global optimum, thereby reducing the coverage radius \(r_t^{\rm cov}\) and hence the discovery-gap term. Second, it can assign substantial probability mass to candidates with high acquisition values, increasing \(\kappa_t(\zeta_t)\) and reducing the LDM sampling-shortfall term. Thus, the LLM provides a structured, history-dependent proposal distribution that can focus evaluations on semantically plausible and promising regions of the design space, rather than searching the entire space uniformly.

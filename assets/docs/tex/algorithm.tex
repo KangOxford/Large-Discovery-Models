@@ -1,0 +1,69 @@
+% ============================================================
+\section{The Algorithm}
+\label{sec:algo}
+% ============================================================
+
+\begin{algorithm}[t]
+\caption{The Large Discovery Model Loop}
+\label{alg:ldm_sequential}
+\begin{algorithmic}[1]
+\Require Reward function $R:\mathcal{X}\to\mathbb{R}$; prior mean $m(\cdot)$; kernel $k(\cdot,\cdot)$; initial dataset $\mathcal{D}_1$; initial context $\mathcal{C}_1$; evaluation budget $T$; batch size $b$; candidate pool size $N$.
+\For{$t = 1, \dots, T$}
+  \State Update the active decision domain: $A_t \gets \operatorname{supp}\,p_{\theta,\alpha}(\cdot\mid\C_t)$
+  \State Fit Gaussian-process surrogate over $A_t$ using data $\mathcal{D}_t$ to obtain the posterior $R \mid \mathcal{D}_t \sim \mathcal{GP}(\mu_t, k_t)$, given by Eqs.~\eqref{eq:postmean}, \eqref{eq:postvar} \Comment{Full derivation in Appendix~\ref{sec:llm-bo}.}
+  \State Construct acquisition function $\acq_t$ by combining $\{\mu_t, \sigma_t\}$ \Comment{e.g. Eq.~\eqref{eq:ucb} or \eqref{eq:ei}.}
+  \State Draw $B_t = \{x_{t,1},\dots,x_{t,b}\}$ from $\pi_t \propto p_{\theta,\alpha}(\cdot\mid\C_t)\exp\{\eta\,\acq_t\}$ using Algorithm~\ref{alg:its}
+  \State Observe black-box noisy rewards $r_{t,i} = R(x_{t,i}) + \epsilon_{t,i}$ for all $x_{t,i} \in B_t$
+  \State Update dataset: $\mathcal{D}_{t+1} \gets \mathcal{D}_t \cup \{(x_{t,i}, r_{t,i})\}_{i=1}^b$
+  \State Update context: $\mathcal{C}_{t+1} \gets \mathcal{C}_t \cup \{(x_{t,i}, r_{t,i})\}_{i=1}^b \cup \{\text{Reflection feedback (if applicable)}\}$
+\EndFor
+\State \Return $\argmax_{(x,r) \in \mathcal{D}_{T+1}} r$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[t]
+\caption{Acquisition-Guided Inference-time Sampling}
+\label{alg:its}
+\begin{algorithmic}[1]
+\Require LLM prior $p_{\theta,\alpha}(\cdot \mid \mathcal{C}_t)$; acquisition function $\acq_t$; tilt parameter $\eta$; pool size $N$; batch size $b$; selection mode $\in \{\text{deterministic}, \text{stochastic}\}$.
+\State Sample $N$ candidate designs from the LLM prior: $\{\hat{x}_{t,i}\}_{i=1}^N \sim p_{\theta, \alpha}(\cdot \mid \mathcal{C}_t)$
+\State Compute acquisition scores $s_i \gets \acq_t(\hat{x}_{t,i})$ for $i=1,\dots,N$
+\If{selection mode = deterministic}
+  \State Let $i_1,\dots,i_b$ be the indices of the $b$ largest scores $s_i$, and set $B_t \gets \{\hat{x}_{t,i_k}\}_{k=1}^{b}$ \Comment{Top-$b$ by acquisition.}
+\ElsIf{selection mode = stochastic}
+  \State Compute exponentiated-acquisition weights $w_i \gets \exp\{\eta\, s_i\}$ for $i=1,\dots,N$
+  \State Sample $B_t = \{\hat{x}_{t,i_k}\}_{k=1}^{b}$ from the weights $w_1,\dots,w_N$ via Gumbel-top-$b$ \Comment{See \S\ref{sec:batch}.}
+\EndIf
+\State \Return $B_t$
+\end{algorithmic}
+\end{algorithm}
+
+In this section, we present the algorithm to apply an LDM in sequential experimental designs for scientific discovery. As illustrated in Figure~\ref{fig:loop}, the LDM drives an iterative loop that tightly coordinates a generative foundation model with a data-driven verification surrogate. Each round constructs the tilted search policy, draws a batch of promising candidates, evaluates their with real experiments, and updates both the numeric results and the generative context with new observations.If the surrogate identifies a stale regime (cf.\ \S\ref{sec:eval}), the LLM is invoked to append a \emph{reflection feedback} summary to $\mathcal{C}_t$, thereby ensuring that subsequent proposals remain aligned with the most recent mechanistic understanding. This operation is orthogonal to the tilted-search core. The complete iterative procedure is formalised in Algorithm~\ref{alg:ldm_sequential}, while the inner inference-time sampling loop is specified in Algorithm~\ref{alg:its}.
+
+\subsection{Policy Construction and Realisation}
+
+We construct the approximate tilted policy by reweighting an LLM-derived base measure with the acquisition function. Depending on the design space, the base measure $p_{\theta,\alpha}(\cdot \mid \mathcal{C}_t)$ can be instantiated in two ways.
+\paragraph{Direct Generation.} The LLM directly generates complete candidate designs from its autoregressive decoding distribution. Invalid candidates can be removed by rejection sampling with a validity checker.
+\paragraph{Indirect Parameterisation.} When direct generation of valid designs is inefficient, the LLM instead specifies a parameterised search region, such as its centre, radius, or local bounds. An external sampler then generates candidates within this region. This decouples LLM inference from candidate generation and allows the pool size $N$ to be scaled more efficiently.
+
+Both paradigms integrate seamlessly with the inference-time sampling pipeline. The choice between deterministic top-$b$ selection and stochastic Gumbel sampling depends on the use case: deterministic selection maximises expected acquisition value for a given pool size, while stochastic sampling promotes structural diversity and reduces redundant evaluation in batch settings. The candidate pool size $N$ serves as the primary dial for test-time compute scaling, enabling a continuous trade-off between inference cost and search quality.
+
+\subsection{Surrogate on the Dynamic Support}
+\label{sec:dynamic-support}
+
+Under indirect parameterisation, the LLM defines not only candidate proposals but also the active search domain. We write this domain as
+\[
+A_t := \operatorname{supp}\, p_{\theta,\alpha}(\cdot\mid\C_t)\subseteq\X.
+\]
+Here, $\X$ may denote the full space of experimental designs, while $A_t$ is a lower-dimensional parameterised subspace selected by the LLM at round $t$, such as a set of schedule variables, architectural choices, or local search bounds.
+
+
+This restricted support simplifies both search and surrogate modelling. Rather than modelling the full space $\X$, the GP is defined over $A_t$ and can be fit using historical observations whose designs lie in the current support:
+$\mathcal D_t|_{A_t}=
+\{(x,r)\in\mathcal D_t : x\in A_t\}$,
+where $r$ denotes the observed reward associated with design $x$. Because $A_t$ is explicitly parameterised, the GP kernel and mean function can be defined directly in this reduced space. As the LLM changes or expands the active search domain across rounds, the surrogate is updated accordingly on the new $A_t$.
+
+\subsection{Practical Implementation}
+
+
+The framework supports several extensions commonly needed in scientific discovery: (1) \emph{constrained and cost-aware acquisition}, where feasibility constraints and heterogeneous evaluation costs are incorporated through constrained expected improvement or cost-normalised acquisition functions; (2) \emph{decomposed acquisition feedback}, where surrogate outputs such as predictive mean, epistemic uncertainty, constraint slack, and estimated cost are provided separately to the LLM to support more targeted proposal updates; (3) \emph{multi-objective optimisation}, where the scalar acquisition function is replaced by Expected Hypervolume Improvement (EHVI) for vector-valued objectives; and (4) \emph{batch selection}, where, for parallel evaluations with $b>1$, candidates are sampled without replacement from the finite-pool tilted distribution using Gumbel-top-$b$ sampling (see \S\ref{sec:batch}). Technical details are provided in Appendix~\ref{sec:impl-details}.

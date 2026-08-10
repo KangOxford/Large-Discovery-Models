@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from ldm_tts.data_collection import (
+from ldm_tts.data import (
     DataCollectionSink,
     LDMDataCollectionError,
     dataset_info_payload,
@@ -96,6 +96,20 @@ def test_sink_writes_ir_sft_and_keeps_provenance_out_of_prompt(tmp_path):
     assert "private-run-marker" not in sft_rows[0]["instruction"]
     assert "collection" not in sft_rows[0]["instruction"]
     assert dataset_info == dataset_info_payload("ldm_sft.jsonl")
+
+
+def test_json_renderer_keeps_collection_metadata_out_of_prompt():
+    ir = _example_ir()
+    ir["collection"] = {
+        "provenance": {"run_id": "private-run-marker"},
+        "augmentation": {"expert": "private-model-marker"},
+    }
+
+    row = render_record(ir, mode="json")
+
+    assert "collection" not in row["instruction"]
+    assert "private-run-marker" not in row["instruction"]
+    assert "private-model-marker" not in row["instruction"]
 
 
 def test_validate_rejects_action_not_allowed():

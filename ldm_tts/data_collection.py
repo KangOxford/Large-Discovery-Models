@@ -279,7 +279,11 @@ def render_record(
         raise LDMDataCollectionError(f"unsupported render mode {mode!r}")
     task_id = normalize_task_id(str(ir["task"]["id"]))
     if mode == "json":
-        shown = {key: value for key, value in ir.items() if key != "action"}
+        shown = {
+            key: value
+            for key, value in ir.items()
+            if key not in {"action", "collection"}
+        }
         instruction = jdump(shown, indent=1)
     else:
         instruction = render_prose(ir, include_parent_artifact=include_parent_artifact)
@@ -653,7 +657,8 @@ def smallmol_ir_from_prompt_response(
     """Convert one accepted M1 direct-SMILES LLM call into ldm-2.0 IR.
 
     This adapter is intentionally narrow: it handles the direct SMILES proposal
-    prompt used by ``strbo_v1.ldm_tilted_case2.prompts.build_m1_prompt``. Seed
+    prompt used by
+    ``tasks.small_molecule.core.ldm_tilted_case2.prompts.build_m1_prompt``. Seed
     planning and non-M1 prompts should use their own adapters rather than being
     forced through this schema.
     """

@@ -2,18 +2,28 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
+import re
 import shutil
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from ldm_tts.task_registry import (
+    REPOSITORY_RELATIVE_PREFIXES,
+    TaskRegistrationError,
+    get_task_definition,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-REPO_RELATIVE_PREFIXES = ("small_molecule", "nanogpt", "antibody", "config", "ldm_tts", "scripts")
-NANOGPT_CACHE_DIR = Path("/mnt/data0/hf_data/autoresearch")
+NANOGPT_CACHE_DIR = Path(
+    os.environ.get("AUTORESEARCH_CACHE_DIR", "~/.cache/autoresearch")
+).expanduser().resolve()
 NANOGPT_DATA_DIR = NANOGPT_CACHE_DIR / "data"
 NANOGPT_TOKENIZER_DIR = NANOGPT_CACHE_DIR / "tokenizer"
 REASYN_ENTRYPOINT_REL = Path("reasyn") / "sampler" / "parallel.py"
@@ -21,6 +31,7 @@ DEFAULT_REASYN_MODEL_PATHS = (
     "data/trained_model/nv-reasyn-ar-166m-v2.ckpt",
     "data/trained_model/nv-reasyn-eb-174m-v2.ckpt",
 )
+REASYN_IMPORT_TIMEOUT_SECONDS = 30
 
 
 @dataclass(frozen=True)
@@ -54,7 +65,54 @@ def skip(task: str, name: str, message: str, detail: str = "") -> DependencyChec
 
 
 def check_plan(plan: dict[str, Any], *, include_optional: bool = True) -> list[DependencyCheck]:
-    """Run dependency checks for one runner plan."""
+    """Run the dependency hook declared by a registered task manifest."""
+
+    task = str(plan.get("task", "")).strip()
+    try:
+        definition = get_task_definition(task)
+    except KeyError:
+        return [warn(task or "unknown", "task", f"No registered task {task!r}.")]
+    except TaskRegistrationError as exc:
+        return [fail(task or "unknown", "task registration", str(exc))]
+    if not definition.dependency_checker:
+        return [
+            warn(
+                task,
+                "task",
+                "No dependency checker is declared in the task manifest.",
+            )
+        ]
+    try:
+        module_name, function_name = definition.dependency_checker.split(":", 1)
+        module = importlib.import_module(module_name)
+        checker = getattr(module, function_name)
+    except (ImportError, AttributeError, ValueError) as exc:
+        return [
+            fail(
+                task,
+                "dependency checker",
+                f"Could not load {definition.dependency_checker!r}: {exc}",
+            )
+        ]
+    checks = checker(plan, include_optional=include_optional)
+    if not isinstance(checks, list) or not all(
+        isinstance(check, DependencyCheck) for check in checks
+    ):
+        return [
+            fail(
+                task,
+                "dependency checker",
+                "Dependency checker must return list[DependencyCheck].",
+                definition.dependency_checker,
+            )
+        ]
+    return checks
+
+
+def plan_check_context(
+    plan: dict[str, Any],
+) -> tuple[str, dict[str, Any], dict[str, str], Path, str]:
+    """Normalize the runner-plan fields consumed by dependency hooks."""
 
     task = str(plan.get("task", ""))
     argv = [str(item) for item in plan.get("argv", [])]
@@ -62,14 +120,7 @@ def check_plan(plan: dict[str, Any], *, include_optional: bool = True) -> list[D
     env = {**os.environ, **{str(k): str(v) for k, v in (plan.get("env_overrides") or {}).items()}}
     cwd = Path(str(plan.get("cwd") or REPO_ROOT)).resolve()
     mode = str(plan.get("mode") or "").lower()
-
-    if task == "nanogpt":
-        return check_nanogpt(args, env, cwd, mode=mode)
-    if task == "small_molecule":
-        return check_small_molecule(args, env, cwd, mode=mode, include_optional=include_optional)
-    if task == "antibody":
-        return check_antibody(args, env, cwd, mode=mode)
-    return [warn(task or "unknown", "task", f"No dependency checks registered for task {task!r}.")]
+    return task, args, env, cwd, mode
 
 
 def cli_args_to_map(argv: list[str]) -> dict[str, Any]:
@@ -128,7 +179,10 @@ def resolve_task_path(raw: str | None, cwd: Path) -> Path | None:
     if path.is_absolute():
         return path
     normalized = str(path).replace("\\", "/")
-    if any(normalized == prefix or normalized.startswith(prefix + "/") for prefix in REPO_RELATIVE_PREFIXES):
+    if any(
+        normalized == prefix or normalized.startswith(prefix + "/")
+        for prefix in REPOSITORY_RELATIVE_PREFIXES
+    ):
         return REPO_ROOT / path
     return cwd / path
 
@@ -139,6 +193,7 @@ def check_nanogpt(
     cwd: Path,
     *,
     mode: str = "",
+    include_optional: bool = True,
 ) -> list[DependencyCheck]:
     task = "nanogpt"
     real = mode == "real" or arg_value(args, "generator") not in {"mock", "operation_mock"}
@@ -166,9 +221,27 @@ def check_nanogpt(
         else:
             checks.append(fail(task, label, f"{label} does not exist.", str(path)))
 
-    if real:
+    if real and not (bool_arg(args, "skip-eval") and not include_optional):
         checks.extend(check_nanogpt_data())
         checks.append(check_cuda_visibility(task, "CUDA", requested_device="cuda", env=env))
+    elif real:
+        checks.extend([
+            skip(
+                task,
+                "prepare.py data",
+                "Data check omitted for a --skip-eval run because --no-optional was requested.",
+            ),
+            skip(
+                task,
+                "prepare.py tokenizer",
+                "Tokenizer check omitted for a --skip-eval run because --no-optional was requested.",
+            ),
+        ])
+        checks.append(skip(
+            task,
+            "CUDA",
+            "CUDA check omitted because the resolved plan uses --skip-eval.",
+        ))
     else:
         checks.append(skip(task, "nanoGPT data", "Mock nanoGPT runs do not need prepare.py data."))
     return checks
@@ -184,7 +257,8 @@ def check_nanogpt_data() -> list[DependencyCheck]:
         checks.append(fail(
             task,
             "prepare.py data",
-            "No parquet shards found. Run `cd nanogpt && uv run python prepare.py` first.",
+            "No parquet shards found. Run `uv run --locked --group train --project tasks/nanogpt "
+            "python tasks/nanogpt/scripts/prepare.py` first.",
             str(NANOGPT_DATA_DIR),
         ))
     tokenizer = NANOGPT_TOKENIZER_DIR / "tokenizer.pkl"
@@ -196,7 +270,8 @@ def check_nanogpt_data() -> list[DependencyCheck]:
         checks.append(fail(
             task,
             "prepare.py tokenizer",
-            "Tokenizer artifacts are missing. Run `cd nanogpt && uv run python prepare.py` first.",
+            "Tokenizer artifacts are missing. Run `uv run --locked --group train --project tasks/nanogpt "
+            "python tasks/nanogpt/scripts/prepare.py` first.",
             ", ".join(missing),
         ))
     return checks
@@ -242,7 +317,10 @@ def check_small_molecule(
 
     checks.append(check_vina(task, arg_value(args, "vina-bin", default=env.get("VINA_BIN", "")), env))
 
-    nn_model = resolve_task_path(arg_value(args, "nn-model-path", default="activity_modeling/best_g12d_model.joblib"), cwd)
+    nn_model = resolve_task_path(
+        arg_value(args, "nn-model-path", default="resources/models/best_g12d_model.joblib"),
+        cwd,
+    )
     if nn_model is not None and nn_model.exists():
         checks.append(ok(task, "G12D activity model", "Activity model artifact exists.", str(nn_model)))
     else:
@@ -274,7 +352,7 @@ def check_vina(task: str, explicit: str, env: dict[str, str]) -> DependencyCheck
     if not os.access(path, os.X_OK):
         return fail(task, "Vina", "AutoDock Vina path is not executable.", str(path))
     try:
-        subprocess.run(
+        proc = subprocess.run(
             [str(path), "--help"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -282,8 +360,28 @@ def check_vina(task: str, explicit: str, env: dict[str, str]) -> DependencyCheck
             timeout=10,
             check=False,
         )
-    except Exception as exc:  # pragma: no cover - platform-specific subprocess errors
-        return fail(task, "Vina", f"AutoDock Vina could not be executed: {exc}", str(path))
+    except subprocess.TimeoutExpired:
+        return fail(
+            task,
+            "Vina",
+            "AutoDock Vina --help timed out after 10 seconds.",
+            str(path),
+        )
+    except OSError as exc:  # pragma: no cover - platform-specific subprocess errors
+        return fail(
+            task,
+            "Vina",
+            f"AutoDock Vina could not be executed: {exc}",
+            str(path),
+        )
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()[-500:]
+        return fail(
+            task,
+            "Vina",
+            f"AutoDock Vina --help exited with status {proc.returncode}.",
+            detail or str(path),
+        )
     return ok(task, "Vina", "AutoDock Vina executable responds to --help.", str(path))
 
 
@@ -298,18 +396,49 @@ def check_reasyn(args: dict[str, Any], env: dict[str, str], cwd: Path) -> list[D
         checks.append(fail(task, "ReaSyn repo", "Missing ReaSyn repo. Set REASYN_HOME, REASYN_REPO, or args.reasyn-repo."))
         return checks
     entrypoint = repo / REASYN_ENTRYPOINT_REL
-    if entrypoint.exists():
+    repo_ready = entrypoint.is_file()
+    if repo_ready:
         checks.append(ok(task, "ReaSyn repo", "ReaSyn checkout contains reasyn/sampler/parallel.py.", str(repo)))
     else:
         checks.append(fail(task, "ReaSyn repo", "ReaSyn checkout is missing reasyn/sampler/parallel.py.", str(entrypoint)))
 
     python_bin = resolve_reasyn_python(arg_value(args, "reasyn-python", default=env.get("REASYN_PYTHON") or env.get("REASYN_BIN", "")), repo)
+    python_ready = False
     if python_bin is None:
-        checks.append(warn(task, "ReaSyn Python", "No dedicated ReaSyn interpreter found; the current small_molecule environment will be used."))
-    elif python_bin.exists():
-        checks.append(ok(task, "ReaSyn Python", "ReaSyn Python interpreter exists.", str(python_bin)))
+        python_bin = Path(sys.executable)
+        python_ready = python_bin.is_file() and os.access(python_bin, os.X_OK)
+        checks.append(warn(
+            task,
+            "ReaSyn Python",
+            "No dedicated ReaSyn interpreter found; probing the current interpreter.",
+            str(python_bin),
+        ))
+    elif not python_bin.exists():
+        checks.append(fail(
+            task,
+            "ReaSyn Python",
+            "ReaSyn Python interpreter does not exist.",
+            str(python_bin),
+        ))
+    elif not python_bin.is_file() or not os.access(python_bin, os.X_OK):
+        checks.append(fail(
+            task,
+            "ReaSyn Python",
+            "ReaSyn Python path is not an executable file.",
+            str(python_bin),
+        ))
     else:
-        checks.append(fail(task, "ReaSyn Python", "ReaSyn Python interpreter does not exist.", str(python_bin)))
+        python_ready = True
+        checks.append(ok(task, "ReaSyn Python", "ReaSyn Python interpreter is executable.", str(python_bin)))
+
+    if repo_ready and python_ready:
+        checks.append(check_reasyn_import(task, repo, python_bin, env))
+    else:
+        checks.append(skip(
+            task,
+            "ReaSyn import",
+            "Import probe requires a valid checkout and Python interpreter.",
+        ))
 
     model_path = arg_value(args, "reasyn-model-path", default=env.get("REASYN_MODEL_PATH", ""))
     model_parts = [part.strip() for part in model_path.split(",") if part.strip()] if model_path else list(DEFAULT_REASYN_MODEL_PATHS)
@@ -318,12 +447,17 @@ def check_reasyn(args: dict[str, Any], env: dict[str, str], cwd: Path) -> list[D
         path = Path(item).expanduser()
         if not path.is_absolute():
             path = repo / path
-        if not path.exists():
+        if not path.is_file() or path.stat().st_size == 0:
             missing_models.append(str(path))
     if len(model_parts) != 2:
         checks.append(fail(task, "ReaSyn checkpoints", "ReaSyn model path must resolve to exactly two checkpoints.", ",".join(model_parts)))
     elif missing_models:
-        checks.append(fail(task, "ReaSyn checkpoints", "Missing ReaSyn AR/Edit Bridge checkpoint(s).", ", ".join(missing_models)))
+        checks.append(fail(
+            task,
+            "ReaSyn checkpoints",
+            "Missing or empty ReaSyn AR/Edit Bridge checkpoint(s).",
+            ", ".join(missing_models),
+        ))
     else:
         checks.append(ok(task, "ReaSyn checkpoints", "ReaSyn AR/Edit Bridge checkpoints exist.", ", ".join(model_parts)))
 
@@ -335,6 +469,63 @@ def check_reasyn(args: dict[str, Any], env: dict[str, str], cwd: Path) -> list[D
         env=env,
     ))
     return checks
+
+
+def check_reasyn_import(
+    task: str,
+    repo: Path,
+    python_bin: Path,
+    env: dict[str, str],
+) -> DependencyCheck:
+    """Probe the imports used by the ReaSyn bridge without loading checkpoints."""
+
+    probe = (
+        "import sys; "
+        "sys.path.insert(0, sys.argv[1]); "
+        "from reasyn.chem.mol import Molecule; "
+        "import reasyn.sampler.parallel; "
+        "Molecule('CCO'); "
+        "print('ReaSyn import OK')"
+    )
+    try:
+        proc = subprocess.run(
+            [str(python_bin), "-c", probe, str(repo)],
+            cwd=str(repo),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=REASYN_IMPORT_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return fail(
+            task,
+            "ReaSyn import",
+            f"ReaSyn import probe timed out after {REASYN_IMPORT_TIMEOUT_SECONDS} seconds.",
+            str(python_bin),
+        )
+    except OSError as exc:  # pragma: no cover - platform-specific subprocess errors
+        return fail(
+            task,
+            "ReaSyn import",
+            f"Could not start ReaSyn Python: {exc}",
+            str(python_bin),
+        )
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()[-1000:]
+        return fail(
+            task,
+            "ReaSyn import",
+            "Configured interpreter cannot import the ReaSyn runtime.",
+            detail or str(python_bin),
+        )
+    return ok(
+        task,
+        "ReaSyn import",
+        "Configured interpreter imports ReaSyn chemistry and sampler modules.",
+        str(python_bin),
+    )
 
 
 def resolve_reasyn_python(raw: str, repo: Path) -> Path | None:
@@ -391,7 +582,9 @@ def check_antibody(
     else:
         checks.append(fail(task, "antigen input", "Provide --antigen or --antigens-file."))
 
-    bo_config = resolve_task_path(arg_value(args, "config", default="bo/config.yaml"), cwd)
+    bo_config = resolve_task_path(
+        arg_value(args, "config", default="resources/default_config.yaml"), cwd
+    )
     config_data: dict[str, Any] = {}
     if bo_config is not None and bo_config.exists():
         checks.append(ok(task, "AntBO config", "AntBO config exists.", str(bo_config)))
@@ -399,18 +592,30 @@ def check_antibody(
     else:
         checks.append(fail(task, "AntBO config", "AntBO config does not exist.", str(bo_config or "")))
 
-    device = "cpu" if mock else str(config_data.get("device") or "cuda")
+    device = "cpu" if mock else str(arg_value(args, "device") or config_data.get("device") or "cuda")
     checks.append(check_cuda_visibility(task, "AntBO device", requested_device=device, env=env))
 
     if mock:
         checks.append(skip(task, "Absolut", "Mock antibody runs do not need Absolut."))
     else:
         bbox = config_data.get("bbox") if isinstance(config_data.get("bbox"), dict) else {}
-        absolut = resolve_task_path(str(bbox.get("path") or ""), cwd)
-        if absolut is not None and absolut.exists():
-            checks.append(ok(task, "Absolut", "Absolut path exists.", str(absolut)))
+        absolut_value = (
+            arg_value(args, "absolut-path")
+            or configured_value(env.get("ABSOLUT_PATH", ""))
+            or bbox.get("path")
+            or ""
+        )
+        absolut = resolve_task_path(str(absolut_value), cwd)
+        executable = absolut / "src" / "bin" / "Absolut" if absolut is not None else None
+        if executable is not None and executable.is_file() and os.access(executable, os.X_OK):
+            checks.append(ok(task, "Absolut", "Absolut executable is available.", str(executable)))
         else:
-            checks.append(fail(task, "Absolut", "Absolut path is missing. Update bbox.path in antibody/bo/config.yaml.", str(absolut or "")))
+            checks.append(fail(
+                task,
+                "Absolut",
+                "Absolut executable is missing or not executable. Set --absolut-path, ABSOLUT_PATH, or bbox.path to the installation root.",
+                str(executable or ""),
+            ))
     return checks
 
 
@@ -428,9 +633,9 @@ def check_llm_settings(
     required: bool,
 ) -> list[DependencyCheck]:
     checks: list[DependencyCheck] = []
-    url = arg_value(args, url_arg) or first_env(env, url_env)
-    model = arg_value(args, model_arg) or first_env(env, model_env)
-    api_key = arg_value(args, api_arg) or first_env(env, api_env)
+    url = configured_value(arg_value(args, url_arg) or first_env(env, url_env))
+    model = configured_value(arg_value(args, model_arg) or first_env(env, model_env))
+    api_key = configured_value(arg_value(args, api_arg) or first_env(env, api_env))
 
     if url:
         checks.append(ok(task, "LLM URL", "LLM base URL is configured.", url))
@@ -457,6 +662,13 @@ def check_llm_settings(
     return checks
 
 
+def configured_value(value: str) -> str:
+    text = str(value or "").strip()
+    if re.fullmatch(r"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?", text):
+        return ""
+    return text
+
+
 def first_env(env: dict[str, str], keys: tuple[str, ...]) -> str:
     for key in keys:
         value = env.get(key)
@@ -473,9 +685,7 @@ def is_local_url(url: str) -> bool:
 def mask_secret(value: str) -> str:
     if value == "EMPTY":
         return "EMPTY"
-    if len(value) <= 8:
-        return "***"
-    return value[:4] + "..." + value[-4:]
+    return "***"
 
 
 def parse_device_ids(raw: str) -> list[int]:
@@ -502,8 +712,16 @@ def check_cuda_visibility(
     device_text = str(requested_device or "").lower()
     if "cuda" not in device_text and not requested_devices:
         return skip(task, name, f"CUDA is not requested ({requested_device or 'cpu'}).")
+    cuda_visible_is_set = "CUDA_VISIBLE_DEVICES" in env
+    cuda_visible = env.get("CUDA_VISIBLE_DEVICES", "").strip()
+    if cuda_visible_is_set and cuda_visible in {"", "-1"}:
+        return fail(
+            task,
+            name,
+            "CUDA was requested, but CUDA_VISIBLE_DEVICES hides all GPUs.",
+            "CUDA_VISIBLE_DEVICES=<empty>" if not cuda_visible else f"CUDA_VISIBLE_DEVICES={cuda_visible}",
+        )
     visible = query_visible_gpu_ids()
-    cuda_visible = env.get("CUDA_VISIBLE_DEVICES", "")
     if visible is None:
         return warn(task, name, "CUDA was requested, but nvidia-smi is not available for preflight.", f"CUDA_VISIBLE_DEVICES={cuda_visible or '<unset>'}")
     if not visible:

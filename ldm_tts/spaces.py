@@ -1,8 +1,8 @@
 """Shared descriptions of LDM task spaces.
 
 These dataclasses are intentionally lightweight. They describe the shape of a
-task's candidate domain, LLM response contract, objectives, and acquisition
-rule without importing task-specific GP, chemistry, or antibody dependencies.
+task's candidate domain, LLM response contract, objectives, proposal-search
+topology, and acquisition rule without importing task-specific dependencies.
 """
 
 from __future__ import annotations
@@ -58,6 +58,19 @@ class AcquisitionSpec:
 
 
 @dataclass(frozen=True)
+class ProposalSearchSpec:
+    """Topology used to traverse LLM proposal states within one search round."""
+
+    name: str = "single_turn"
+    breadth: int = 1
+    depth: int = 1
+    beam_width: int = 1
+    evaluation_policy: str = "terminal"
+    parameters: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class LDMTaskSpec:
     """Complete semantic description for one task workflow."""
 
@@ -66,6 +79,7 @@ class LDMTaskSpec:
     objectives: tuple[ObjectiveSpec, ...]
     response_spaces: tuple[ResponseSpaceSpec, ...]
     acquisition: AcquisitionSpec
+    proposal_search: ProposalSearchSpec = field(default_factory=ProposalSearchSpec)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
