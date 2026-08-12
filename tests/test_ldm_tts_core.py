@@ -39,7 +39,11 @@ from ldm_tts.registration.dependencies import (
     has_failures,
 )
 from ldm_tts.cli.runner import build_plan
-from tasks.small_molecule.core.dependencies import check_reasyn, check_vina
+from tasks.small_molecule.core.dependencies import (
+    check_model_artifact,
+    check_reasyn,
+    check_vina,
+)
 
 
 class LDMScoringTests(unittest.TestCase):
@@ -358,6 +362,35 @@ class LDMDependencyCheckTests(unittest.TestCase):
         self.assertEqual(check.status, "fail")
         self.assertIn("status 2", check.message)
         self.assertIn("broken", check.detail)
+
+    def test_model_artifact_check_verifies_declared_digest(self) -> None:
+        import hashlib
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model = Path(tmp) / "model.joblib"
+            metadata = Path(tmp) / "model_metadata.json"
+            model.write_bytes(b"trusted model bytes")
+            digest = hashlib.sha256(model.read_bytes()).hexdigest()
+            metadata.write_text(
+                json.dumps({"artifact": {"sha256": digest}}),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(check_model_artifact("small_molecule", model).status, "ok")
+            model.write_bytes(b"tampered model bytes")
+            failed = check_model_artifact("small_molecule", model)
+
+        self.assertEqual(failed.status, "fail")
+        self.assertIn("checksum mismatch", failed.message)
+
+    def test_model_artifact_check_warns_without_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = Path(tmp) / "custom.joblib"
+            model.write_bytes(b"caller-trusted")
+            check = check_model_artifact("small_molecule", model)
+
+        self.assertEqual(check.status, "warn")
+        self.assertIn("caller's responsibility", check.message)
 
     def test_reasyn_check_probes_configured_interpreter_imports(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

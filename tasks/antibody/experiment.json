@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "task_id": "antibody",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/yzailab/Large-Discovery-Models",
+    "source_commit": "unqualified",
+    "task_path": "tasks/antibody"
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "absolut_energy",
+        "direction": "minimize",
+        "description": "Absolut antigen-binding energy."
+      }
+    ],
+    "optimized": [
+      {
+        "name": "absolut_energy",
+        "direction": "minimize",
+        "description": "Primary search objective; lower is better."
+      }
+    ],
+    "diagnostic": []
+  },
+  "evaluation": {
+    "datasets": [
+      "Absolut antigen 1ADQ_A"
+    ],
+    "settings": {
+      "antigen": "1ADQ_A",
+      "evaluator": "external Absolut executable",
+      "device": "cpu"
+    },
+    "per_candidate_limits": {}
+  },
+  "budget": {
+    "expensive_evaluation_attempts": 1,
+    "initial_evaluations": 1,
+    "parallel_candidate_limit": 8
+  },
+  "profiles": {
+    "real_cpu_smoke": {
+      "description": "Committed one-evaluation CPU smoke campaign.",
+      "budget": {
+        "expensive_evaluation_attempts": 1,
+        "initial_evaluations": 1,
+        "parallel_candidate_limit": 8
+      },
+      "locked_args": {
+        "budget": 1,
+        "n-init": 1,
+        "parallel-budget": 8,
+        "device": "cpu"
+      }
+    }
+  }
+}

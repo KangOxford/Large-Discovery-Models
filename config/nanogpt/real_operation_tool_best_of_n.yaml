@@ -2,6 +2,7 @@ name: nanogpt_real_operation_tool_best_of_n
 task: nanogpt
 algorithm: best_of_n
 mode: real
+contract_profile: real_operation_tool_best_of_n
 description: nanoGPT operation-tool LDM-TTS run against an OpenAI-compatible endpoint.
 args:
   train-file: resources/train/real_train.py

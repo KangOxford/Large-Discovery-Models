@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import ldm_tts.cli.runner as runner_module
 from ldm_tts.engine.run_store import BudgetExceededError, BudgetLedger, CampaignStatus
 from ldm_tts.transport.openai import (
     EndpointCircuitBreaker,
@@ -18,24 +20,52 @@ from ldm_tts.registration.experiment import (
     snapshot_experiment_contract,
     validate_profile_args,
 )
-from ldm_tts.cli.runner import build_plan
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-PROTEIN_CONTRACT = REPO_ROOT / "tasks" / "protein_inverse_folding" / "experiment.json"
+def _write_qualified_contract(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "task_id": "contract_test",
+        "qualification": "qualified",
+        "benchmark": {
+            "source_url": "https://example.test/benchmark",
+            "source_commit": "0123456789abcdef",
+        },
+        "metrics": {
+            "reported": [{"name": "objective", "direction": "maximize"}],
+            "optimized": [{"name": "search_score", "direction": "maximize"}],
+            "diagnostic": [],
+        },
+        "evaluation": {
+            "datasets": ["validation"],
+            "settings": {"epochs": 100},
+            "per_candidate_limits": {"training_hours": 1},
+        },
+        "budget": {"epochs_per_evaluation": 100},
+        "profiles": {
+            "official": {
+                "description": "Pinned test profile.",
+                "budget": {"expensive_evaluation_attempts": 2},
+                "locked_args": {"epochs": 100},
+            }
+        },
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
 
 
-def test_qualified_contract_exposes_metric_roles_and_pinned_source() -> None:
-    contract = load_experiment_contract(PROTEIN_CONTRACT)
+def test_qualified_contract_exposes_metric_roles_and_pinned_source(tmp_path: Path) -> None:
+    contract = load_experiment_contract(
+        _write_qualified_contract(tmp_path / "experiment.json")
+    )
 
-    assert contract.task_id == "protein_inverse_folding"
+    assert contract.task_id == "contract_test"
     assert contract.qualification == "qualified"
-    assert contract.benchmark["source_commit"] == "da06dffcc79826dc3d22dec53ead310c430b6535"
-    assert [item["name"] for item in contract.metrics["reported"]] == ["aggregate_score"]
+    assert contract.benchmark["source_commit"] == "0123456789abcdef"
+    assert [item["name"] for item in contract.metrics["reported"]] == ["objective"]
     assert [item["name"] for item in contract.metrics["optimized"]] == ["search_score"]
-    assert contract.profile("gp_ucb_n4h4_20").budget["expensive_evaluation_attempts"] == 20
-    assert contract.profile("official_benchmark").locked_args["iterations"] == 10
-    assert contract.profile("official_benchmark").locked_args["breadth"] == 2
+    assert contract.profile("official").budget["expensive_evaluation_attempts"] == 2
 
 
 @pytest.mark.parametrize(
@@ -51,7 +81,8 @@ def test_qualified_contract_requires_qualification_evidence(
     invalid_field: str,
     error_pattern: str,
 ) -> None:
-    payload = json.loads(PROTEIN_CONTRACT.read_text(encoding="utf-8"))
+    contract_path = _write_qualified_contract(tmp_path / "source" / "experiment.json")
+    payload = json.loads(contract_path.read_text(encoding="utf-8"))
     if invalid_field == "source_commit":
         payload["benchmark"]["source_commit"] = "unqualified"
     elif invalid_field == "per_candidate_limits":
@@ -65,9 +96,11 @@ def test_qualified_contract_requires_qualification_evidence(
         load_experiment_contract(path)
 
 
-def test_contract_profile_rejects_training_budget_drift() -> None:
-    contract = load_experiment_contract(PROTEIN_CONTRACT)
-    profile = contract.profile("gp_ucb_n4h4_20")
+def test_contract_profile_rejects_training_budget_drift(tmp_path: Path) -> None:
+    contract = load_experiment_contract(
+        _write_qualified_contract(tmp_path / "experiment.json")
+    )
+    profile = contract.profile("official")
     args = dict(profile.locked_args)
     args["epochs"] = 99
 
@@ -75,37 +108,53 @@ def test_contract_profile_rejects_training_budget_drift() -> None:
         validate_profile_args(contract, profile.name, args)
 
 
-def test_runner_enforces_selected_contract_profile() -> None:
-    contract = load_experiment_contract(PROTEIN_CONTRACT)
-    profile = contract.profile("gp_ucb_n4h4_20")
+def test_runner_enforces_selected_contract_profile(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    relative_contract = Path("tasks/contract_test/experiment.json")
+    contract_path = _write_qualified_contract(tmp_path / relative_contract)
+    contract = load_experiment_contract(contract_path)
+    profile = contract.profile("official")
+    definition = SimpleNamespace(
+        relative_root=Path("tasks/contract_test"),
+        module="tasks.contract_test.ldm_task.procedure",
+        experiment_contract_path=relative_contract,
+    )
+    monkeypatch.setattr(runner_module, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(runner_module, "get_task_definition", lambda task_id: definition)
     config = {
         "name": "contract_test",
-        "task": "protein_inverse_folding",
+        "task": "contract_test",
         "algorithm": "gp_ucb",
         "mode": "real",
         "contract_profile": profile.name,
         "args": dict(profile.locked_args),
     }
-    config_path = REPO_ROOT / "config" / "protein_inverse_folding" / "real_gp_ucb_n4h4_20.yaml"
+    config_path = tmp_path / "config/contract_test/real.yaml"
 
-    plan = build_plan(config, config_path)
+    plan = runner_module.build_plan(config, config_path)
     assert plan["contract_profile"] == profile.name
     assert plan["contract_sha256"] == contract.digest
 
     config["args"]["epochs"] = 10
     with pytest.raises(SystemExit, match="violates experiment contract profile"):
-        build_plan(config, config_path)
+        runner_module.build_plan(config, config_path)
 
 
 def test_contract_snapshot_records_digest_and_profile(tmp_path: Path) -> None:
-    contract = load_experiment_contract(PROTEIN_CONTRACT)
+    contract = load_experiment_contract(
+        _write_qualified_contract(tmp_path / "experiment.json")
+    )
+    snapshot_dir = tmp_path / "snapshot"
+    snapshot_dir.mkdir()
     destination = snapshot_experiment_contract(
-        contract, tmp_path, profile="gp_ucb_n4h4_20"
+        contract, snapshot_dir, profile="official"
     )
     payload = json.loads(destination.read_text(encoding="utf-8"))
 
     assert payload["snapshot"]["sha256"] == contract.digest
-    assert payload["snapshot"]["profile"] == "gp_ucb_n4h4_20"
+    assert payload["snapshot"]["profile"] == "official"
 
 
 def test_budget_ledger_persists_and_prevents_overflow(tmp_path: Path) -> None:

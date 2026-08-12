@@ -20,15 +20,22 @@ from ldm_tts.registration.experiment import (
     load_experiment_contract,
     validate_profile_args,
 )
+from ldm_tts.registration.dependencies import (
+    DependencyCheck,
+    check_plan,
+    format_checks,
+    has_failures,
+)
 from ldm_tts.registration.registry import (
     REPOSITORY_RELATIVE_PREFIXES,
     TASK_DEFINITIONS,
     TaskRegistrationError,
     get_task_definition,
 )
+from ldm_tts.repository import resolve_repository_root
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = resolve_repository_root(source_file=Path(__file__))
 ENV_VAR_PATTERN = re.compile(r"\$(?P<brace>\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)\})|\$(?P<plain>[A-Za-z_][A-Za-z0-9_]*)")
 SENSITIVE_NAME_SUFFIXES = ("api-key", "password", "secret", "access-token", "auth-token")
 
@@ -63,6 +70,8 @@ def main(argv: list[str] | None = None) -> int:
 
     failures: list[tuple[str, int]] = []
     for plan in plans:
+        if not args.skip_preflight:
+            preflight_plan(plan)
         print(f"[ldm-tts] {plan['name']}: {plan['command_display']}")
         return_code = run_plan(plan)
         if return_code != 0:
@@ -83,6 +92,11 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("config", nargs="?", help="YAML/JSON experiment config, or suite config.")
     parser.add_argument("--dry-run", action="store_true", help="Print procedure calls without running them.")
     parser.add_argument("--list", action="store_true", help="List available configs under config/.")
+    parser.add_argument(
+        "--skip-preflight",
+        action="store_true",
+        help="Skip the automatic dependency preflight for advanced diagnostics only.",
+    )
     parser.add_argument(
         "--set",
         action="append",
@@ -290,6 +304,23 @@ def run_plan(plan: dict[str, Any]) -> int:
             raise SystemExit(f"Task module {plan['module']} has no main(argv) function.")
         result = main_func(list(plan["argv"]))
     return 0 if result is None else int(result)
+
+
+def preflight_plan(plan: dict[str, Any]) -> list[DependencyCheck]:
+    """Block non-mock execution when a declared dependency check fails."""
+    if str(plan.get("mode", "")).strip().lower() in {"", "mock"}:
+        return []
+    checks = check_plan(plan)
+    report = format_checks(checks)
+    if report:
+        print(report)
+    if has_failures(checks):
+        raise SystemExit(
+            f"Dependency preflight failed for {plan.get('name', plan.get('task', 'task'))}. "
+            "Resolve every FAIL before running, or use --skip-preflight only for "
+            "controlled diagnostics."
+        )
+    return checks
 
 
 @contextmanager

@@ -71,7 +71,7 @@ from ldm_tts.contracts import (
 from ldm_tts.registration.dependencies import format_checks, has_failures
 from tasks.small_molecule.core.dependencies import check_small_molecule
 
-DEFAULT_NN_MODEL_PATH = "resources/models/best_g12d_model.joblib"
+DEFAULT_NN_MODEL_PATH = ""
 QWEN35_DEFAULT_SAMPLING = {
     "top_p": 0.95,
     "top_k": 20,
@@ -341,7 +341,11 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         action="store_true",
         help="Allow docking against a receptor marked as debug/non-production.",
     )
-    parser.add_argument("--nn-model-path", default=DEFAULT_NN_MODEL_PATH)
+    parser.add_argument(
+        "--nn-model-path",
+        default=os.environ.get("G12D", DEFAULT_NN_MODEL_PATH),
+        help="Trusted joblib activity-model path. Required for real runs; may also be set with G12D.",
+    )
     parser.add_argument("--reasyn-repo", default=os.environ.get("REASYN_HOME", os.environ.get("REASYN_REPO", "")))
     parser.add_argument("--reasyn-python", default=os.environ.get("REASYN_PYTHON", os.environ.get("REASYN_BIN", "")))
     parser.add_argument("--reasyn-model-path", default=os.environ.get("REASYN_MODEL_PATH", ""))

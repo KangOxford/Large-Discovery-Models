@@ -2,6 +2,7 @@ name: small_molecule_real_m1_direct_llm
 task: small_molecule
 algorithm: m1_stratified_direct_llm_oversample_sir
 mode: real
+contract_profile: real_m1_seed_analog
 description: Small-molecule LDM-TTS run with stratified direct-LLM proposal and Vina+NN scoring.
 args:
   mock: false
@@ -66,7 +67,7 @@ args:
   vina-no-cache: false
   vina-allow-zero-charge-fallback: false
   vina-allow-debug-receptor: false
-  nn-model-path: resources/models/best_g12d_model.joblib
+  nn-model-path: null
   reasyn-repo: null
   reasyn-python: null
   reasyn-model-path: null

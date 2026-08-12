@@ -113,7 +113,7 @@ python data/verify.py alpaca \
   --sft data/generated/my_campaign/ldm_sft_augmented.jsonl
 ```
 
-See [`../DATA_COLLECTION.md`](../DATA_COLLECTION.md) for task hooks and detailed
+See the [data-collection guide](../docs/data-collection.md) for task hooks and detailed
 quality rules. See [`SCHEMA.md`](SCHEMA.md) for the IR fields.
 
 ## Invariants

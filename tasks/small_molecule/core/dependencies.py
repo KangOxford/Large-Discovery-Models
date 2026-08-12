@@ -22,6 +22,12 @@ from ldm_tts.registration.dependencies import (
     skip,
     warn,
 )
+from tasks.small_molecule.core.model_artifact import (
+    ArtifactIntegrityError,
+    find_metadata_path,
+    load_metadata_file,
+    verify_declared_sha256,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -74,13 +80,18 @@ def check_small_molecule(
     checks.append(check_vina(task, arg_value(args, "vina-bin", default=env.get("VINA_BIN", "")), env))
 
     nn_model = resolve_task_path(
-        arg_value(args, "nn-model-path", default="resources/models/best_g12d_model.joblib"),
+        arg_value(args, "nn-model-path", default=env.get("G12D", "")),
         cwd,
     )
-    if nn_model is not None and nn_model.exists():
-        checks.append(ok(task, "G12D activity model", "Activity model artifact exists.", str(nn_model)))
+    if nn_model is not None and nn_model.is_file():
+        checks.append(check_model_artifact(task, nn_model))
     else:
-        checks.append(fail(task, "G12D activity model", "Activity model artifact is missing.", str(nn_model or "")))
+        checks.append(fail(
+            task,
+            "G12D activity model",
+            "Activity model artifact is missing. Set G12D or args.nn-model-path to a trusted downloaded or locally trained joblib file.",
+            str(nn_model or ""),
+        ))
 
     method = arg_value(args, "method")
     reasyn_requested = "analog" in method or bool(arg_value(args, "reasyn-repo", default=env.get("REASYN_HOME") or env.get("REASYN_REPO", "")))
@@ -89,6 +100,41 @@ def check_small_molecule(
     else:
         checks.append(skip(task, "ReaSyn", "This method/config does not request ReaSyn analog generation."))
     return checks
+
+
+def check_model_artifact(task: str, model_path: Path) -> DependencyCheck:
+    """Verify a model digest when its metadata sidecar declares one."""
+    metadata_path = find_metadata_path(model_path)
+    if metadata_path is None:
+        return warn(
+            task,
+            "G12D activity model",
+            "Custom activity model has no checksum metadata; trust is the caller's responsibility.",
+            str(model_path),
+        )
+    try:
+        metadata = load_metadata_file(metadata_path)
+        digest = verify_declared_sha256(model_path, metadata)
+    except (ArtifactIntegrityError, OSError, ValueError) as exc:
+        return fail(
+            task,
+            "G12D activity model",
+            f"Activity model integrity verification failed: {exc}",
+            str(model_path),
+        )
+    if digest is None:
+        return warn(
+            task,
+            "G12D activity model",
+            "Activity model metadata does not declare a checksum; trust is the caller's responsibility.",
+            str(metadata_path),
+        )
+    return ok(
+        task,
+        "G12D activity model",
+        "Activity model checksum matches its metadata.",
+        digest,
+    )
 
 
 def check_vina(task: str, explicit: str, env: dict[str, str]) -> DependencyCheck:
@@ -302,4 +348,3 @@ def resolve_reasyn_python(raw: str, repo: Path) -> Path | None:
         if candidate.exists() or raw:
             return candidate
     return None
-

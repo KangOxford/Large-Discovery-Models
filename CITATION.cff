@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "Large Discovery Models (LDM v0.1): Empirically-grounded Model-Based Open-Ended Search"
+type: software
+version: 0.1.0
+authors:
+  - family-names: Yu
+    given-names: Zhongwei
+  - family-names: Song
+    given-names: Yan
+  - family-names: Yan
+    given-names: Xue
+  - family-names: Liu
+    given-names: Anjie
+  - family-names: Lu
+    given-names: Xingyu
+  - family-names: Chen
+    given-names: Yihang
+  - family-names: Zhou
+    given-names: Huichi
+  - family-names: Guo
+    given-names: Siyuan
+  - family-names: Sun
+    given-names: Luoyang
+  - family-names: Chen
+    given-names: Sihan
+  - family-names: Yu
+    given-names: Xiangning
+  - family-names: Wang
+    given-names: Jun
+    email: jun.wang@ucl.ac.uk
+repository-code: "https://github.com/yzailab/Large-Discovery-Models"
+url: "https://largediscovery.net/en/"
+license: MIT

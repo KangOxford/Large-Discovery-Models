@@ -34,7 +34,7 @@ and real evaluator checks support `qualified`.
 
 ## Implement Registration
 
-1. Inspect `tasks/README.md`, `ldm_tts/task_registry.py`, the closest task, and
+1. Inspect `tasks/README.md`, `ldm_tts/registration/registry.py`, the closest task, and
    the domain benchmark.
 2. Select a lowercase Python `task_id`. Confirm `tasks/<task_id>/` and
    `config/<task_id>/` do not already exist.
@@ -112,7 +112,7 @@ than a standalone benchmark agent.
 ## Interface Rules
 
 - Register only through `task.json`; do not add a central task-name branch.
-- Use the canonical terms in `CONTEXT.md`: candidate domain, reservoir,
+- Use the canonical terms in `docs/concepts.md`: candidate domain, reservoir,
   reservoir expansion, expansion schema, and surrogate representation.
 - Keep `experiment.json` versioned, strict, secret-free, and source-pinned.
 - Put task CLI options under config `args`, environment values under `env`, and

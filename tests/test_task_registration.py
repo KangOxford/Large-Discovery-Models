@@ -21,7 +21,6 @@ def test_builtin_tasks_are_discovered_from_manifests() -> None:
     assert set(TASK_DEFINITIONS) == {
         "antibody",
         "nanogpt",
-        "protein_inverse_folding",
         "small_molecule",
     }
     for task_id, definition in TASK_DEFINITIONS.items():
@@ -29,9 +28,6 @@ def test_builtin_tasks_are_discovered_from_manifests() -> None:
         assert definition.module == f"tasks.{task_id}.ldm_task.procedure"
         assert definition.manifest_path == Path("tasks") / task_id / "task.json"
         assert definition.dependency_checker
-    assert TASK_DEFINITIONS["protein_inverse_folding"].experiment_contract_path == Path(
-        "tasks/protein_inverse_folding/experiment.json"
-    )
 
 
 def test_builtin_task_layouts_have_no_validation_errors() -> None:
@@ -100,16 +96,6 @@ def test_qualification_gate_allows_drafts_only_in_normal_validation(
     ) == 1
     output = capsys.readouterr().out
     assert "[ERROR] custom: Experiment contract is draft" in output
-
-
-def test_qualification_gate_accepts_qualified_protein_task() -> None:
-    rows = validate_tasks_script.validate_registered_tasks(
-        "protein_inverse_folding",
-        require_qualified=True,
-    )
-
-    assert not any(row["level"] == "error" for row in rows)
-    assert any(row["message"] == "Experiment contract is qualified." for row in rows)
 
 
 def test_layout_rejects_implementation_inside_adapter(tmp_path: Path) -> None:

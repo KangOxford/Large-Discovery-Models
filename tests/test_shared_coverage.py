@@ -27,6 +27,8 @@ from ldm_tts.registration.dependencies import (
     mask_secret,
     parse_device_ids,
     query_visible_gpu_ids,
+    fail,
+    ok,
 )
 from tasks.antibody.core.dependencies import check_antibody
 from tasks.nanogpt.core.dependencies import check_nanogpt
@@ -77,6 +79,7 @@ from ldm_tts.cli.runner import (
     parse_override_value,
     patched_env,
     plan_for_json,
+    preflight_plan,
     pushd,
     resolve_child_config_path,
     resolve_config_path,
@@ -114,9 +117,16 @@ def _schema() -> OperationSchema:
 
 class TestRunnerHelpers:
     def test_parse_args_defaults_and_options(self) -> None:
-        args = parse_args(["config.json", "--dry-run", "--keep-going", "--set", "args.x=2"])
+        args = parse_args([
+            "config.json",
+            "--dry-run",
+            "--keep-going",
+            "--skip-preflight",
+            "--set",
+            "args.x=2",
+        ])
         assert args.config == "config.json"
-        assert args.dry_run and args.keep_going
+        assert args.dry_run and args.keep_going and args.skip_preflight
         assert args.set == ["args.x=2"]
 
     def test_load_config_supports_json_and_yaml_and_rejects_non_objects(self, tmp_path: Path) -> None:
@@ -201,7 +211,11 @@ class TestRunnerHelpers:
         plan = build_plan(config, Path("config/test.json"))
 
         assert plan["module"] == "custom.nanogpt"
-        assert plan["env_overrides"] == {"FIRST": "one", "SECOND": "one/two"}
+        assert plan["env_overrides"]["FIRST"] == "one"
+        assert plan["env_overrides"]["SECOND"] == "one/two"
+        assert plan["env_overrides"]["LDM_EXPERIMENT_CONTRACT_PATH"].endswith(
+            "tasks/nanogpt/experiment.json"
+        )
         assert "--enabled" in plan["argv"]
         assert "--disabled" not in plan["argv"]
         assert "--no-allow-early-stop" in plan["argv"]
@@ -238,10 +252,11 @@ class TestRunnerHelpers:
         assert "cli-secret" in plan["argv"]
         assert "cli-secret" not in plan["command_display"]
         assert "extra-secret" not in plan["command_display"]
-        assert public_plan["env_overrides"] == {
-            "LLM_API_KEY": "***",
-            "PUBLIC_SETTING": "visible",
-        }
+        assert public_plan["env_overrides"]["LLM_API_KEY"] == "***"
+        assert public_plan["env_overrides"]["PUBLIC_SETTING"] == "visible"
+        assert public_plan["env_overrides"]["LDM_EXPERIMENT_CONTRACT_PATH"].endswith(
+            "tasks/nanogpt/experiment.json"
+        )
         assert "cli-secret" not in json.dumps(public_plan)
         assert "extra-secret" not in json.dumps(public_plan)
 
@@ -297,6 +312,26 @@ class TestRunnerHelpers:
             with pytest.raises(SystemExit, match="has no main"):
                 run_plan(plan)
 
+    def test_preflight_skips_mock_plans(self) -> None:
+        with patch("ldm_tts.cli.runner.check_plan") as check_plan_mock:
+            assert preflight_plan({"task": "nanogpt", "mode": "mock"}) == []
+        check_plan_mock.assert_not_called()
+
+    def test_preflight_prints_successful_checks(self, capsys: pytest.CaptureFixture[str]) -> None:
+        checks = [ok("nanogpt", "training data", "Ready.")]
+        with patch("ldm_tts.cli.runner.check_plan", return_value=checks):
+            assert preflight_plan({"name": "real", "task": "nanogpt", "mode": "real"}) == checks
+        assert "[OK] nanogpt: training data: Ready." in capsys.readouterr().out
+
+    def test_preflight_blocks_failed_checks(self, capsys: pytest.CaptureFixture[str]) -> None:
+        checks = [fail("small_molecule", "G12D activity model", "Missing.")]
+        with (
+            patch("ldm_tts.cli.runner.check_plan", return_value=checks),
+            pytest.raises(SystemExit, match="Dependency preflight failed"),
+        ):
+            preflight_plan({"name": "real", "task": "small_molecule", "mode": "real"})
+        assert "[FAIL] small_molecule: G12D activity model: Missing." in capsys.readouterr().out
+
     def test_list_configs_skips_invalid_files(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         config_dir = tmp_path / "config"
         config_dir.mkdir()
@@ -321,8 +356,10 @@ class TestRunnerHelpers:
             patch("ldm_tts.cli.runner.load_config", return_value={"task": "nanogpt"}),
             patch("ldm_tts.cli.runner.expand_experiments", return_value=[({"task": "nanogpt"}, Path("x"))]),
             patch("ldm_tts.cli.runner.build_plan", return_value=plan),
+            patch("ldm_tts.cli.runner.preflight_plan") as preflight,
         ):
             assert main(["x", "--dry-run"]) == 0
+        preflight.assert_not_called()
         assert json.loads(capsys.readouterr().out)[0]["name"] == "p"
 
         with (
@@ -335,6 +372,17 @@ class TestRunnerHelpers:
             assert main(["x", "--keep-going"]) == 3
         output = capsys.readouterr()
         assert '"failed"' in output.err
+
+        with (
+            patch("ldm_tts.cli.runner.resolve_config_path", return_value=Path("x")),
+            patch("ldm_tts.cli.runner.load_config", return_value={}),
+            patch("ldm_tts.cli.runner.expand_experiments", return_value=[({}, Path("x"))]),
+            patch("ldm_tts.cli.runner.build_plan", return_value=dict(plan, mode="real")),
+            patch("ldm_tts.cli.runner.preflight_plan") as preflight,
+            patch("ldm_tts.cli.runner.run_plan", return_value=0),
+        ):
+            assert main(["x", "--skip-preflight"]) == 0
+        preflight.assert_not_called()
 
 
 class TestResponseValidation:

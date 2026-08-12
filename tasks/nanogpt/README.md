@@ -19,7 +19,7 @@ tests/      task-local unit and integration tests
 runs/       generated run artifacts (Git-ignored)
 ```
 
-Proposal-search algorithms are shared in `ldm_tts/search_methods/`, not owned
+Proposal-search algorithms are shared in `ldm_tts/optimization/search/`, not owned
 by this task. NanoGPT supplies the code-state engine and GP-surrogate scoring
 adapter used by `single_turn`, best-of-N, tree, beam, and MCTS traversal.
 
@@ -149,6 +149,7 @@ real configurations below.
    ```bash
    uv run --locked --project tasks/nanogpt python scripts/check_task_dependencies.py \
      config/nanogpt/real_operation_tool_best_of_n.yaml \
+     --set contract_profile= \
      --set args.iterations=0 \
      --set args.warmup=0 \
      --set args.skip-eval=true \
@@ -161,6 +162,7 @@ real configurations below.
    ```bash
    uv run --locked --project tasks/nanogpt python scripts/run_ldm_tts.py \
      config/nanogpt/real_operation_tool_best_of_n.yaml \
+     --set contract_profile= \
      --set args.iterations=0 \
      --set args.warmup=0 \
      --set args.skip-eval=true \
@@ -173,6 +175,7 @@ real configurations below.
    ```bash
    uv run --locked --project tasks/nanogpt python scripts/check_task_dependencies.py \
      config/nanogpt/real_operation_tool_best_of_n.yaml \
+     --set contract_profile= \
      --set args.iterations=1 \
      --set args.warmup=0 \
      --set args.breadth=1 \
@@ -180,6 +183,7 @@ real configurations below.
 
    uv run --locked --project tasks/nanogpt python scripts/run_ldm_tts.py \
      config/nanogpt/real_operation_tool_best_of_n.yaml \
+     --set contract_profile= \
      --set args.iterations=1 \
      --set args.warmup=0 \
      --set args.breadth=1 \

@@ -1,5 +1,5 @@
 {
-  "output_dir": "/Users/yansong/Desktop/code/My/infra/LDM_merge/assets/examples/real_100_20260812_interim",
+  "output_dir": "assets/examples/real_100_20260812_interim",
   "antibody_evaluations": 57,
   "molecule_evaluations": 24,
   "nanogpt_finite_evaluations": 4,

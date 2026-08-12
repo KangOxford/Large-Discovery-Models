@@ -1,6 +1,0 @@
-{
-  "schema_version": 1,
-  "task_id": "protein_inverse_folding",
-  "description": "Optimize GNN structure encoders for protein inverse folding on CATH and TS50.",
-  "dependency_checker": "tasks.protein_inverse_folding.ldm_task.dependencies:check_dependencies"
-}

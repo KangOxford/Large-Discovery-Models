@@ -82,7 +82,7 @@ def describe_ldm_task(...) -> LDMTaskSpec:
     ...
 ```
 
-`describe_ldm_task` must use the vocabulary in `CONTEXT.md` and separately
+`describe_ldm_task` must use the vocabulary in `docs/concepts.md` and separately
 declare:
 
 - the candidate domain and validation rules;

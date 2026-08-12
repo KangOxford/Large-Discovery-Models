@@ -2,10 +2,10 @@
 branch = True
 include =
     ldm_tts/*
-    tasks/nanogpt/ldm_task/mock_train.py
-    tasks/nanogpt/ldm_task/search_core.py
-    tasks/nanogpt/ldm_task/search_methods/*
-    tasks/nanogpt/ldm_task/single_search.py
+    tasks/nanogpt/core/expansion_schema.py
+    tasks/nanogpt/core/search_core.py
+    tasks/nanogpt/core/single_search.py
+    tasks/nanogpt/resources/train/mock_train.py
 
 [report]
 fail_under = 80

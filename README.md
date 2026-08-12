@@ -38,13 +38,14 @@ in evidence rather than model confidence alone.
 
 ### Updates
 
-- **August 2026 - LDM v0.1 released!** The initial release includes end-to-end
+- **August 2026 - LDM v0.1 release candidate.** The release candidate includes end-to-end
   LDM workflows for language-model training, small-molecule discovery, and
   antibody design, plus a manifest-driven interface for user-defined tasks.
 
 ## Contents
 
 - [Repository Scope](#repository-scope)
+- [Versioning And API Stability](#versioning-and-api-stability)
 - [The Research Loop](#the-research-loop)
 - [Real Campaign Examples](#real-campaign-examples)
 - [Quick Start](#quick-start)
@@ -75,12 +76,33 @@ examples below additionally cover real GPU nanoGPT training, Vina plus G12D
 scoring, and Absolut evaluation. Run the documented commands from the
 repository root.
 
+Task registration and conventional layout validation pass for all three
+built-ins. Each ships a `draft` `experiment.json` that records metric roles,
+evaluator settings, budgets, and named real-config profiles. Their provenance
+is still explicitly unqualified, so they should be treated as runnable,
+evaluator-backed examples, not benchmark-qualified or production-qualified
+implementations. The plots below demonstrate observed progress in specific
+runs; they do not close that qualification gap.
+
 Task authors can add a manifest-registered adapter without editing the shared
 runner. See [Registering LDM Tasks](tasks/README.md) or use the repository-local
 agent workflows cataloged under [`skills/`](skills/README.md):
 
 - `register-ldm-task` scaffolds and implements a new task.
 - `run-ldm-task` validates and progressively executes an existing task.
+
+## Versioning And API Stability
+
+LDM v0.1 is a pre-1.0 release candidate. Imports from focused packages such as
+`ldm_tts.engine`, `ldm_tts.registration`, `ldm_tts.optimization`, and
+`ldm_tts.data` are canonical. Internal module paths may change before 1.0, and
+package-root aliases that remain available should be considered transitional.
+The refactored package does not preserve every historical module path; pin a
+version and review the changelog when integrating it as a library.
+
+The `ldm-tts` console command is checkout-oriented because task packages,
+configs, and scientific assets remain outside the shared wheel. Run it from a
+repository root or set `LDM_REPO_ROOT=/path/to/checkout` explicitly.
 
 ## The Research Loop
 
@@ -117,7 +139,7 @@ evidence of optimization progress, not a controlled causal estimate of the LDM
 component. Establishing an LDM advantage requires multiple seeds and matched
 random, pure-LLM, BO-only, and acquisition-ablation baselines.
 
-Use [`AGENT_README.md`](AGENT_README.md) for the machine-oriented execution,
+Use the [agent execution guide](docs/agent-execution.md) for the machine-oriented execution,
 validation, resume, plotting, and safety checklist. Use
 [`scripts/plot_campaigns.py`](scripts/plot_campaigns.py) to regenerate the
 three trajectory views from persisted artifacts.
@@ -130,9 +152,11 @@ Start from the repository root:
 cd /path/to/LDM_merge
 ```
 
-Install the task environments you plan to use:
+Install the locked shared development environment, then the task environments
+you plan to use:
 
 ```bash
+uv sync --locked --group dev
 uv sync --locked --project tasks/nanogpt
 uv sync --locked --project tasks/small_molecule
 uv sync --locked --project tasks/antibody
@@ -141,8 +165,9 @@ uv sync --locked --project tasks/antibody
 List configs and preview the mock suite:
 
 ```bash
-python scripts/run_ldm_tts.py --list
-python scripts/run_ldm_tts.py config/suites/mock_all.yaml --dry-run
+uv run --locked python scripts/validate_tasks.py
+uv run --locked python scripts/run_ldm_tts.py --list
+uv run --locked python scripts/run_ldm_tts.py config/suites/mock_all.yaml --dry-run
 ```
 
 Run fast mock experiments:
@@ -220,10 +245,18 @@ Small-molecule real runs need additional task dependency paths:
 
 ```bash
 export VINA_BIN=/path/to/vina
-export G12D=tasks/small_molecule/resources/models/best_g12d_model.joblib
+export G12D=/trusted/path/best_g12d_model.joblib
 export REASYN_REPO=/path/to/ReaSyn
 export REASYN_PYTHON=/path/to/ReaSyn/.venv/bin/python
 ```
+
+The G12D joblib artifact is not distributed in Git, and this project does not
+currently document a public download URL. Obtain a compatible artifact from a
+trusted project maintainer or train and validate one locally. The conventional
+ignored location is
+`tasks/small_molecule/resources/models/best_g12d_model.joblib`, but `G12D` may
+point anywhere. See the [model trust and checksum instructions](tasks/small_molecule/resources/README.md)
+before loading it.
 
 Antibody real runs require an external Absolut installation. Prefer
 `ABSOLUT_PATH=/path/to/Absolut` or `--absolut-path` instead of editing the
@@ -277,8 +310,11 @@ uv run --locked --project tasks/small_molecule \
   --set args.vina-bin=/path/to/vina
 ```
 
-The small-molecule real workflow also performs an early runtime preflight for
-Vina and the activity model before starting a search.
+The shared runner automatically performs the manifest-declared dependency
+preflight before every non-mock execution and blocks on `FAIL`. The standalone
+checker remains useful for an earlier report and supports `--no-optional`.
+`scripts/run_ldm_tts.py --skip-preflight` is reserved for controlled
+diagnostics; it should not be used to launch a real campaign.
 
 ## Config-Driven Runs
 
@@ -292,13 +328,10 @@ name: small_molecule_mock_m1
 task: small_molecule
 algorithm: m1_stratified_direct_llm_oversample_sir
 mode: mock
-env:
-  G12D: tasks/small_molecule/resources/models/best_g12d_model.joblib
 args:
   mock: true
   budget: 8
   batch-size: 1
-  nn-model-path: ${G12D}
 ```
 
 Important fields:
@@ -309,6 +342,7 @@ Important fields:
 | `task` | One of `nanogpt`, `small_molecule`, or `antibody`. |
 | `algorithm` | Bookkeeping label for the run style. |
 | `mode` | Usually `mock` or `real`. |
+| `contract_profile` | Optional named `experiment.json` profile whose locked arguments the runner enforces. |
 | `env` | Environment variables set for the run. |
 | `args` | CLI options passed to the task workflow, without the leading `--`. |
 | `runner` | Optional task module or working-directory override. |
@@ -350,7 +384,7 @@ domain evaluator. The shared layer provides config dispatch, proposal
 traversal, acquisition scoring, validation, budget, and trajectory utilities.
 Adapters own domain validation, surrogate encoding, and evaluation.
 
-The canonical terminology is defined in `CONTEXT.md`. In particular, the
+The canonical terminology is defined in [LDM discovery concepts](docs/concepts.md). In particular, the
 candidate domain is the complete set of valid solutions, the reservoir is the
 finite set available for selection in one discovery step, reservoir expansion
 is how LDM adds to that set, and the surrogate representation is what the GP or
@@ -373,12 +407,10 @@ flowchart TB
     R --> N["nanoGPT adapter<br/>train.py operations"]
     R --> M["Small-molecule adapter<br/>SMILES candidates"]
     R --> B["Antibody adapter<br/>CDRH3 sequences"]
-    R --> I["Protein inverse-folding adapter<br/>encoder programs"]
 
     N --> S["Shared LDM contract<br/>candidate domain + reservoir expansion<br/>surrogate + objectives + acquisition"]
     M --> S
     B --> S
-    I --> S
 
     S --> P
 
@@ -395,14 +427,13 @@ flowchart TB
     H --> O["Trajectory, task spec,<br/>summary, and best result"]
 ```
 
-The four adapters instantiate the same roles with different domain objects:
+The three adapters instantiate the same roles with different domain objects:
 
 | Task | Candidate domain | Reservoir expansion | Surrogate representation | External evaluation |
 | --- | --- | --- | --- | --- |
 | `nanogpt` | Valid `train.py` programs. | Code edits or structured parameter edits; the expansion schema may activate additional parameters. | Fixed code hash vector, fixed operation vector, or evolving operation vector. | Run the generated training program and optimize `val_bpb` or another configured metric. |
 | `small_molecule` | Valid canonical SMILES. | Direct SMILES emission or seed-conditioned analogue generation. | Fixed molecular fingerprint or implicit SMILES string kernel; direct-only modes use none. | Minimize AutoDock Vina score while maximizing predicted KRAS G12D activity. |
 | `antibody` | Valid fixed-length CDRH3 sequences. | Direct sequence emission or DSL-policy-guided sequence generation. | Fixed categorical sequence representation; direct-only modes use none. | Minimize Absolut binding energy for the selected antigen. |
-| `protein_inverse_folding` | Valid editable-region encoder programs. | Direct complete-program emission followed by AST and runtime validation. | Fixed AST/configuration/hash vector for GP-UCB; best-observed mode uses none. | Train and score on CATH4.2, CATH4.3, and TS50. |
 
 The shared code keeps orchestration, config loading, task-space specs, response
 parsing, trajectory metadata, and common tests in one place. Task adapters keep
@@ -535,7 +566,7 @@ then augmented with expert justification and rendered for LlamaFactory through
 the shared `ldm_tts.data` interface. The compact [data pipeline](data/README.md)
 keeps the schema, examples, offline tools, and training configuration together,
 while generated campaigns use one ignored directory each. See
-[DATA_COLLECTION.md](DATA_COLLECTION.md) for the task hooks, quality rules, and
+[data-collection guide](docs/data-collection.md) for the task hooks, quality rules, and
 full CLI workflow.
 
 ## Fine-Tuning The Proposal Model
@@ -613,6 +644,10 @@ python scripts/validate_tasks.py --task protein_design
 See [Registering LDM Tasks](tasks/README.md) for the complete manifest,
 procedure, config, dependency-hook, data-collection, mock-run, and verification
 contracts.
+
+The [documentation index](docs/README.md) links the architecture terminology,
+testing lanes, data-collection contract, agent execution guide, and project
+policies.
 
 See the task guides for domain-specific customization:
 

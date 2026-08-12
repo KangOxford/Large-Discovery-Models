@@ -55,6 +55,7 @@ results.tsv
 /tasks/antibody/temp/
 /tasks/small_molecule/output/
 /tasks/small_molecule/runs/
+/tasks/small_molecule/resources/models/best_g12d_model.joblib
 
 .vscode
 .DS_Store

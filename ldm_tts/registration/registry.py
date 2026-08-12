@@ -13,9 +13,10 @@ from ldm_tts.registration.experiment import (
     ExperimentContractError,
     load_experiment_contract,
 )
+from ldm_tts.repository import resolve_repository_root
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = resolve_repository_root(source_file=Path(__file__))
 TASK_MANIFEST_NAME = "task.json"
 TASK_MANIFEST_SCHEMA_VERSION = 1
 TASK_ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
