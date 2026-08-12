@@ -9,6 +9,7 @@ no shared Python registry or dependency-check dispatch table needs editing.
 ```text
 tasks/<task_id>/
 ├── task.json                 # registration manifest
+├── experiment.json           # benchmark, metrics, evaluator, and budget contract
 ├── README.md                 # domain setup and run tutorial
 ├── QUICKSTART.md             # validated clean-room workflow
 ├── pyproject.toml            # isolated task dependencies
@@ -90,6 +91,26 @@ Rules:
 The runner discovers manifests when a process starts. Adding the directory and
 manifest is sufficient to make a task ID available to configs.
 
+## Experiment Contract
+
+New tasks also carry `experiment.json`. `task.json` answers "what adapter is
+registered?" while `experiment.json` answers "what scientific and operational
+claim does this run enforce?" The contract records immutable benchmark
+provenance, reported/optimized/diagnostic metric roles, official evaluator
+settings, per-candidate limits, and named campaign profiles.
+
+Scaffolds begin at `qualification: draft`. Change this to `qualified` only after
+one official-budget seed evaluation and a tiny LDM-selected real evaluation pass.
+Real configs select a profile at top level:
+
+```yaml
+contract_profile: official_campaign
+```
+
+The shared runner validates the profile's locked arguments before importing the
+task procedure. Qualified procedures snapshot the active contract into the run
+directory and use `ldm_tts.engine.run_store` for durable `budget.json` and `status.json`.
+
 ## Procedure Interface
 
 `ldm_task/procedure.py` must define:
@@ -106,6 +127,20 @@ and result exit status. Candidate generation, model calls, surrogate fitting,
 acquisition, and evaluators belong in `core/`. Versioned schemas and seed
 inputs belong in `resources/`.
 
+New tasks should implement mock and real campaigns through
+`ldm_tts.engine.LDMEngine`. The generated `core/mock_engine.py` demonstrates the
+minimum behavioral adapters: `ReservoirExpander`, `CandidateDomainAdapter`, and
+`CandidateEvaluator`. Add `SurrogateEncoder` plus `AcquisitionSelector` only
+when the task uses surrogate-guided selection. Keep the procedure adapter
+limited to CLI parsing, `LDMTaskSpec` construction, dependency preparation, and
+engine dispatch.
+
+The engine creates authoritative `Candidate`, `EvaluationResult`, and
+`Observation` records. Do not introduce task-local equivalents unless the task
+payload needs a private intermediate record behind an engine adapter. Use
+`CampaignRuntime` for run identity, contract snapshots, budgets, events,
+checkpoints, status, and final summaries.
+
 For consistency and inspectability, also define:
 
 ```python
@@ -117,9 +152,12 @@ def describe_ldm_task(...) -> LDMTaskSpec:
 ```
 
 `describe_ldm_task` is task-internal and may accept domain-specific prepared
-objects. It must describe the candidate space, measured objectives, model
-response contract, and acquisition rule using the shared `ldm_tts.spaces`
-types. Keep domain dependencies and encodings inside the task implementation.
+objects. It must describe the candidate domain, reservoir-expansion actions,
+surrogate representation, measured objectives, model response contracts, and
+acquisition rule using the shared `ldm_tts.contracts` types. Every reservoir
+expansion must reference a declared response space, and at least one expansion
+must produce candidates. Keep domain dependencies and encodings inside the task
+implementation.
 
 Every task must provide a deterministic `mode: mock` config that avoids remote
 models, external evaluators, GPUs, and large datasets. This is the contract test
@@ -133,7 +171,7 @@ shared `DependencyCheck` records:
 ```python
 from typing import Any
 
-from ldm_tts.dependency_checks import (
+from ldm_tts.registration.dependencies import (
     DependencyCheck,
     ok,
     plan_check_context,
@@ -199,6 +237,9 @@ literal positional arguments under `extra_args`. A config normally does not
 need `runner.cwd` or `runner.module`; those escape hatches are intended for
 temporary experiments, not registration.
 
+Use `contract_profile` for real configs whose evaluator/search budgets must not
+drift. Do not select a qualified profile from a mock config.
+
 ## Required Verification
 
 Run these checks in order:
@@ -219,15 +260,19 @@ dry contract run, then a tiny evaluated run.
 ## Registration Checklist
 
 - The manifest validates without warnings or errors.
+- `experiment.json` identifies metric roles and honestly reports `draft` or
+  `qualified` status.
 - `main(argv)` runs through the shared runner rather than a separate launcher.
 - `ldm_task/` contains only the adapter files accepted by task validation.
 - Importable implementation lives under `core/`; versioned inputs live under `resources/`.
 - Every generated file is written beneath `runs/` or another explicitly ignored temporary path.
 - `describe_ldm_task` matches actual candidates, objectives, response parsing,
   and acquisition behavior.
-- Acquisition scoring uses `ldm_tts.acquisition` unless a documented domain
+- Acquisition scoring uses `ldm_tts.optimization.acquisition` unless a documented domain
   algorithm requires additional task-local behavior.
 - Mock tests cross the same procedure interface as real runs.
 - Secrets are supplied through environment variables or ignored local files.
 - Generated runs, caches, model downloads, and virtual environments remain
   untracked.
+- Qualified runs snapshot the contract, enforce a budget ledger, emit status
+  heartbeats, and preflight remote model endpoints before iteration 1.

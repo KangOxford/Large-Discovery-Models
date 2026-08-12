@@ -145,6 +145,7 @@ uv run --locked --project tasks/antibody \
   --set args.method=policy_max \
   --set args.acq=ucb \
   --set args.acq-beta=2.0 \
+  --set args.device=cpu \
   --set args.budget=100 \
   --set args.n-init=20 \
   --set args.parallel-budget=300 \
@@ -154,6 +155,8 @@ uv run --locked --project tasks/antibody \
 
 `fallback-random=true` is required for robustness when the LLM repeats an
 already evaluated sequence and deduplication empties the proposed batch.
+The example keeps GP/acquisition fitting on CPU so it also runs with task
+environments whose CUDA build does not support the deployment GPU.
 
 ### Small Molecule: 100 Evaluations, EHVI
 

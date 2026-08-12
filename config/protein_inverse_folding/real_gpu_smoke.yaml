@@ -1,0 +1,16 @@
+name: protein_inverse_folding_real_gpu_smoke
+task: protein_inverse_folding
+algorithm: best_observed
+mode: real
+contract_profile: gpu_contract_smoke
+description: Validate one accepted encoder on each requested CUDA device without datasets.
+args:
+  generator: mock
+  evaluator: gpu_smoke
+  iterations: 1
+  breadth: 1
+  seed-file: "{task_dir}/resources/seed_design.py"
+  out-dir: "{task_dir}/runs"
+  run-name: "{name}"
+  gpu-device: [4, 5, 6, 7]
+  eval-timeout: 300

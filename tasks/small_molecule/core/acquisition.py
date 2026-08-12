@@ -1,11 +1,11 @@
 """Compatibility facade for the shared LDM-TTS acquisition module.
 
-Acquisition behavior is implemented in :mod:`ldm_tts.acquisition`; this module
+Acquisition behavior is implemented in :mod:`ldm_tts.optimization.acquisition`; this module
 keeps the historical ``tasks.small_molecule.core.acquisition`` import path for callers and saved
 experiments.
 """
 
-from ldm_tts.acquisition import (
+from ldm_tts.optimization.acquisition import (
     AcquisitionConfig,
     AcquisitionFunction,
     PosteriorAcquisition,

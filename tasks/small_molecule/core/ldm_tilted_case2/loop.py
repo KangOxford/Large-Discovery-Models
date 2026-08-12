@@ -15,9 +15,9 @@ _WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
 if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
 
-from ldm_tts.loop import LDMSearchRoundResult, run_budgeted_search
-from ldm_tts.scoring import finite_or_none, is_finite_number
-from ldm_tts.trajectory import load_jsonl
+from ldm_tts.engine.runtime import LDMSearchRoundResult, run_budgeted_search
+from ldm_tts.contracts.evaluation import finite_or_none, is_finite_number
+from ldm_tts.engine.run_store import load_jsonl
 from tasks.small_molecule.core.ldm_tilted_case2.base_measure import q0_effective_support, q0_entropy
 from tasks.small_molecule.core.ldm_tilted_case2.canonicalize import canonicalize_smiles
 from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config

@@ -1,103 +1,138 @@
 ---
 name: register-ldm-task
-description: Scaffold, implement, register, and verify a new domain task under this repository's tasks/ directory. Use when adding a new LDM task, domain adapter, task manifest, task-specific dependency checker, mock/real experiment configs, or when making an existing task conform to the manifest-driven task contract.
+description: Scaffold, implement, register, scientifically qualify, and production-check an LDM domain task in this repository. Use when adding or repairing a task adapter, task manifest, experiment.json benchmark contract, metric roles, official evaluation budget, campaign profile, dependency checker, mock/real config, GP-guided search, endpoint preflight, durable budget/status reporting, or staged real-run qualification.
 ---
 
-# Register An LDM Task
+# Register And Qualify An LDM Task
 
-Add a domain adapter through the repository's manifest-driven task seam. Keep
-the runner interface small and domain implementation local to the task.
+Build a domain adapter through the manifest-driven task seam, then qualify its
+scientific and operational contract before calling it production-ready.
 
 Read [references/task-contract.md](references/task-contract.md) before editing.
-Treat `tasks/README.md` as the authoritative human-facing contract when it is
-present in the repository.
+Read [references/qualification.md](references/qualification.md) before adding a
+real config or launching an external evaluator. Treat `tasks/README.md` as the
+authoritative human-facing repository contract when present.
 
-## Workflow
+## Establish The Contract
 
-1. Inspect `tasks/README.md`, `ldm_tts/task_registry.py`, the closest existing
-   task, and the user's domain requirements.
-2. Select a lowercase Python identifier for `task_id`. Confirm the directory
-   and `config/<task_id>/` do not already exist.
+Before scaffolding, discover or ask for:
+
+- the candidate domain and its parser/validator boundary;
+- each reservoir-expansion action and whether it emits candidates, configures a
+  generator, edits a candidate, or updates the expansion schema;
+- the surrogate representation, dimension policy, encoder, and version;
+- the benchmark source URL, immutable commit, and task path;
+- reported, optimized, and diagnostic metrics with directions;
+- one expensive evaluation and its official per-candidate limits;
+- search, LLM-attempt, expensive-evaluation, and baseline budgets;
+- required datasets, artifacts, binaries, accelerators, and seed observations;
+- resume expectations, comparison axis, and required run artifacts.
+
+Do not infer an official budget from a smoke run. Record unknowns explicitly and
+keep `experiment.json` at `qualification: draft` until primary-source evidence
+and real evaluator checks support `qualified`.
+
+## Implement Registration
+
+1. Inspect `tasks/README.md`, `ldm_tts/task_registry.py`, the closest task, and
+   the domain benchmark.
+2. Select a lowercase Python `task_id`. Confirm `tasks/<task_id>/` and
+   `config/<task_id>/` do not already exist.
 3. Run the non-overwriting scaffolder:
 
    ```bash
    python scripts/scaffold_task.py <task_id> --description "<one-line description>"
    ```
 
-4. Replace every generated semantic placeholder. Keep
-   `tasks/<task_id>/ldm_task/procedure.py` as the stable adapter and implement
-   candidate generation, objectives, model calls, acquisition, evaluation, and
-   mock control flow under `tasks/<task_id>/core/`. Do not report completion
-   while any `replace_me` or "Replace with" placeholder remains.
-5. Keep importable domain code in `core/`, versioned inputs in `resources/`,
-   auxiliary CLIs in `scripts/`, optional external environment specs in
-   `environments/`, and generated artifacts in ignored `runs/`. Use shared
-   `ldm_tts` modules for runner contracts, acquisition scoring, task-space
-   descriptions, response parsing, trajectory records, and generic search-loop
-   behavior.
-6. Define the task's fine-tuning collection boundary. When the runtime produces
-   validated model actions, create `DataCollectionSink.from_env` with a
-   run-local `runs/.../ldm_data` default and append canonical `ldm-2.0` IR only
-   after parsing/validation succeeds. Keep provenance and evaluator outcomes in
-   `collection`, never in model-visible state. Do not collect rejected attempts,
-   random fallbacks, or task actions whose inference contract differs from the
-   training target. If the task cannot produce trainable actions yet, document
-   that decision in its README and tests.
-7. Add a task-local `dependencies.py` hook only when the task has meaningful
-   model, binary, artifact, dataset, accelerator, or evaluator prerequisites.
-   Declare it in `task.json`. Keep its module imports lightweight so it can
-   diagnose missing optional packages. Omit the hook for dependency-free tasks.
-8. Finish the mock config and tests first. Mock execution must avoid remote
-   models, external evaluators, GPUs, large downloads, and secrets.
-9. Add real configs only after mock execution passes. Put endpoint URLs, model
-   names, and non-secret defaults in config; source credentials from environment
-   variables. Document a staged first real run in the task README.
-10. Run the required verification sequence from the repository root:
+4. Replace every semantic placeholder. Keep `ldm_task/procedure.py` shallow;
+   put candidate, prompt, reservoir-expansion, surrogate-adapter, and evaluator
+   code in `core/`, versioned inputs in `resources/`, and outputs in ignored
+   `runs/`.
+5. Complete `experiment.json`. Keep registration identity in `task.json`; keep
+   scientific provenance, metric roles, evaluator settings, limits, and named
+   runner-enforced campaign profiles in `experiment.json`.
+6. Implement the campaign through `ldm_tts.engine.LDMEngine`. Supply task-owned
+   `ReservoirExpander`, `CandidateDomainAdapter`, and `CandidateEvaluator`
+   adapters. Add `SurrogateEncoder` and `AcquisitionSelector` only for
+   surrogate-guided methods. Use `CampaignRuntime` for budgets, events,
+   checkpoints, status, and summaries; use `ProposalClient` for model transport.
+   Reuse `ldm_tts.optimization.search`, `ldm_tts.optimization.gp`, and
+   `ldm_tts.optimization.acquisition`
+   behind those adapters before adding task-local infrastructure.
+7. Define the fine-tuning collection boundary after response parsing and
+   validation. Append canonical `ldm-2.0` IR through
+   `DataCollectionSink.from_env`; keep provenance/outcomes out of model-visible
+   state and never collect rejected attempts or incompatible fallback actions.
+8. Add a lightweight `dependencies.py` hook only for meaningful external
+   prerequisites. Never import optional heavy dependencies at module import.
 
-   ```bash
-   python scripts/validate_tasks.py --task <task_id>
-   uv run --locked --project tasks/<task_id> python -m pytest tasks/<task_id>/tests
-   python scripts/check_task_dependencies.py config/<task_id>/mock.yaml --no-optional
-   python scripts/run_ldm_tts.py config/<task_id>/mock.yaml --dry-run
-   python scripts/run_ldm_tts.py config/<task_id>/mock.yaml
-   python -m pytest -q tests
-   git diff --check
-   ```
+## Qualify In Stages
 
-11. Scan for the task ID in shared dispatch conditionals. Registration must not
-    require a new task-name branch in `ldm_tts.runner` or
-    `ldm_tts.dependency_checks`.
+Finish each stage before starting the next:
+
+1. `registered`: manifest, layout, draft experiment contract, and imports.
+2. `mock_verified`: deterministic mock run and collection test.
+3. `contract_verified`: candidate parser plus CPU/GPU tensor, parameter, and
+   evaluator assembly checks.
+4. `seed_evaluated`: one official-budget seed evaluation with source commit,
+   metrics, and artifacts recorded.
+5. `ldm_tiny_verified`: endpoint preflight, one generated reservoir, one
+   acquisition-selected candidate, and one real evaluation.
+6. `campaign_qualified`: named contract profile, durable resume, budget/status
+   files, comparison budget, and monitored detached launch.
+
+Use the exact gates and expected artifacts in
+[references/qualification.md](references/qualification.md). Registration is not
+the same as campaign qualification; report both states explicitly.
+
+## Required Verification
+
+Run from the repository root:
+
+```bash
+python scripts/validate_tasks.py --task <task_id>
+uv run --locked --project tasks/<task_id> python -m pytest tasks/<task_id>/tests
+python scripts/check_task_dependencies.py config/<task_id>/mock.yaml --no-optional
+python scripts/run_ldm_tts.py config/<task_id>/mock.yaml --dry-run
+python scripts/run_ldm_tts.py config/<task_id>/mock.yaml
+python -m pytest -q tests
+git diff --check
+```
+
+After the seed and tiny LDM gates justify changing the contract to `qualified`,
+also run `python scripts/validate_tasks.py --task <task_id> --require-qualified`.
+The normal validator accepts honest draft scaffolds; the strict form is the
+campaign-readiness gate.
+
+Before a real launch, also verify the selected `contract_profile` appears in the
+runner dry run, endpoint preflight succeeds, `status.json` and `budget.json` are
+created, and the first selected candidate enters the intended evaluator rather
+than a standalone benchmark agent.
 
 ## Interface Rules
 
-- Register through `tasks/<task_id>/task.json`; do not edit a central task map.
-- Keep the conventional module at
-  `tasks.<task_id>.ldm_task.procedure` and define `main(argv)`.
-- Keep the conventional module shallow: it delegates into `core/` and does not
-  contain the task implementation.
-- Define `parse_args` and `describe_ldm_task` for consistency and inspection.
-- Keep `describe_ldm_task` faithful to runtime behavior; it is not decorative
-  metadata.
-- Exercise mock and real execution through the shared config runner, not a
-  parallel task-specific launcher.
-- Prefer `ldm_tts.acquisition` for Mean, EI, LCB, UCB, and EHVI scoring. Add
-  task-local acquisition behavior only when the domain algorithm requires more
-  than posterior scoring, and document that distinction.
-- Import collection APIs from `ldm_tts.data`. Instantiate the sink once per run
-  or recorder, and use the run directory's `ldm_data/` child as the default.
-- Build IR from the accepted parsed action, not the raw first response. Preserve
-  stable run/task provenance so `finetune/prepare_dataset.py` can group related
-  records and prevent train/evaluation leakage.
-- Add a mock integration test with `LDM_DATA_COLLECTION_ENABLED=1` that validates
-  the emitted IR and confirms private provenance/outcomes do not enter the
-  rendered instruction.
-- Never put API keys, tokens, credentials, downloaded models, run outputs, or
-  virtual environments into tracked files.
+- Register only through `task.json`; do not add a central task-name branch.
+- Use the canonical terms in `CONTEXT.md`: candidate domain, reservoir,
+  reservoir expansion, expansion schema, and surrogate representation.
+- Keep `experiment.json` versioned, strict, secret-free, and source-pinned.
+- Put task CLI options under config `args`, environment values under `env`, and
+  select enforced production settings with top-level `contract_profile`.
+- Define `main(argv)`, `parse_args`, and a runtime-faithful `describe_ldm_task`.
+- Make the deterministic mock execute at least one complete `LDMEngine` round
+  and assert that `events.jsonl`, `checkpoint.json`, and `summary.json` exist.
+- Count LLM calls, valid search states, selected candidates, expensive attempts,
+  successful evaluations, benchmark jobs, and outer iterations separately.
+- Use expensive evaluations, not wall time or generated states, as the default
+  fair-comparison x-axis unless the benchmark specifies otherwise.
+- Snapshot the active experiment contract into every qualified run.
+- Preflight real model endpoints before iteration 1. Pause resumably when the
+  circuit opens; do not exhaust the candidate budget on identical timeouts.
+- Keep credentials in environment variables or ignored protected files. Never
+  write them to configs, logs, manifests, prompts, or command arguments.
 
 ## Existing Task Repair
 
-When making an existing task conform, run `python scripts/validate_tasks.py`
-first. Fix missing manifest fields, package markers, procedure functions,
-tests, configs, and dependency-hook references in place. Preserve the task's
-stable ID and user-facing config paths unless the user explicitly requests a
-breaking migration.
+Run validation first. Preserve the stable task ID and config paths. Add
+`experiment.json` without changing schema-version-1 `task.json`, migrate generic
+GP/budget/endpoint behavior to shared modules where practical, and retain
+compatibility exports when callers already import task-local names.

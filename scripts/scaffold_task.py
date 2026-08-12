@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from ldm_tts.task_scaffold import TaskScaffoldError, scaffold_task
+from ldm_tts.registration.scaffold import TaskScaffoldError, scaffold_task
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

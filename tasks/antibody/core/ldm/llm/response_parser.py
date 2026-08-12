@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ldm_tts.response import load_json_object, require_allowed_keys
+from ldm_tts.transport.parsing import load_json_object, require_allowed_keys
 
 
 @dataclass

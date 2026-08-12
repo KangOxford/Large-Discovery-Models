@@ -1,0 +1,55 @@
+"""Stable, dependency-light records shared by LDM tasks and the engine."""
+
+from ldm_tts.contracts.candidate import (
+    Candidate,
+    CandidateAdmission,
+    CandidateDomainAdapter,
+    CandidateRejection,
+    RawProposal,
+    ReservoirBuildResult,
+    ReservoirBuilder,
+)
+from ldm_tts.contracts.evaluation import (
+    CallableCandidateEvaluator,
+    CandidateEvaluator,
+    EvaluationResult,
+    EvaluationStatus,
+    ObjectiveSet,
+    Observation,
+)
+from ldm_tts.contracts.task import (
+    AcquisitionSpec,
+    CandidateDomainSpec,
+    LDMTaskSpec,
+    ObjectiveSpec,
+    ProposalSearchSpec,
+    ReservoirExpansionSpec,
+    ReservoirSpec,
+    ResponseSpaceSpec,
+    SurrogateSpaceSpec,
+)
+
+__all__ = [
+    "AcquisitionSpec",
+    "CallableCandidateEvaluator",
+    "Candidate",
+    "CandidateAdmission",
+    "CandidateDomainAdapter",
+    "CandidateDomainSpec",
+    "CandidateEvaluator",
+    "CandidateRejection",
+    "EvaluationResult",
+    "EvaluationStatus",
+    "LDMTaskSpec",
+    "ObjectiveSet",
+    "ObjectiveSpec",
+    "Observation",
+    "ProposalSearchSpec",
+    "RawProposal",
+    "ReservoirBuildResult",
+    "ReservoirBuilder",
+    "ReservoirExpansionSpec",
+    "ReservoirSpec",
+    "ResponseSpaceSpec",
+    "SurrogateSpaceSpec",
+]

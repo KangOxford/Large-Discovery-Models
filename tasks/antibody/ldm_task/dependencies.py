@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from ldm_tts.dependency_checks import (
+from ldm_tts.registration.dependencies import (
     DependencyCheck,
-    check_antibody,
     plan_check_context,
 )
+from tasks.antibody.core.dependencies import check_antibody
 
 
 def check_dependencies(

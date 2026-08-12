@@ -1,0 +1,12 @@
+name: protein_inverse_folding_mock
+task: protein_inverse_folding
+algorithm: best_observed
+mode: mock
+description: Service-free code-proposal and evaluator contract smoke.
+args:
+  mock: true
+  iterations: 1
+  breadth: 2
+  seed-file: "{task_dir}/resources/seed_design.py"
+  out-dir: "{task_dir}/runs"
+  run-name: "{name}"

@@ -7,7 +7,7 @@ from typing import Any, Iterable
 
 import numpy as np
 
-from ldm_tts.response import load_json_object
+from ldm_tts.transport.parsing import load_json_object
 from tasks.antibody.core.ldm.dsl.bias import BiasAtom
 from tasks.antibody.core.ldm.dsl.sandbox import safe_exec_dsl
 from tasks.antibody.core.ldm.dsl.search_space import (

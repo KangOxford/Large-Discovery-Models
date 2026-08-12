@@ -341,13 +341,21 @@ sequentially.
 
 ## LDM Algorithm Abstraction
 
-LDM-TTS treats LDM as a task-neutral, closed-loop search contract rather than
-one domain-specific optimizer. Each task adapter describes its candidate space,
-objectives, structured LLM response, proposal-search topology, and acquisition
-rule through an `LDMTaskSpec`, then supplies the domain evaluator. The shared
-layer provides config dispatch, proposal traversal, acquisition scoring,
-validation, budget, and trajectory utilities. Adapters own candidate encoding,
-surrogate fitting, and domain evaluation.
+LDM-TTS treats LDM as a task-neutral, closed-loop discovery contract rather
+than one domain-specific optimizer. Each task adapter describes its candidate
+domain, finite reservoir, reservoir-expansion actions, surrogate
+representation, objectives, structured LLM responses, proposal-search
+topology, and acquisition rule through an `LDMTaskSpec`, then supplies the
+domain evaluator. The shared layer provides config dispatch, proposal
+traversal, acquisition scoring, validation, budget, and trajectory utilities.
+Adapters own domain validation, surrogate encoding, and evaluation.
+
+The canonical terminology is defined in `CONTEXT.md`. In particular, the
+candidate domain is the complete set of valid solutions, the reservoir is the
+finite set available for selection in one discovery step, reservoir expansion
+is how LDM adds to that set, and the surrogate representation is what the GP or
+other surrogate consumes. Candidate flexibility and surrogate dimension are
+therefore independent properties.
 
 The ideal LDM policy is an acquisition-tilted version of the structured
 generative prior:
@@ -365,16 +373,18 @@ flowchart TB
     R --> N["nanoGPT adapter<br/>train.py operations"]
     R --> M["Small-molecule adapter<br/>SMILES candidates"]
     R --> B["Antibody adapter<br/>CDRH3 sequences"]
+    R --> I["Protein inverse-folding adapter<br/>encoder programs"]
 
-    N --> S["Shared LDM contract<br/>candidate space + objectives<br/>response + proposal search + acquisition"]
+    N --> S["Shared LDM contract<br/>candidate domain + reservoir expansion<br/>surrogate + objectives + acquisition"]
     M --> S
     B --> S
+    I --> S
 
     S --> P
 
     subgraph L["Conceptual LDM search loop"]
         T["Proposal-search topology<br/>single turn, best-of-N, tree, beam, or MCTS"]
-        P["LLM proposes structured candidates"]
+        P["LDM expands the candidate reservoir"]
         V["Parse, validate, and filter"]
         A["Surrogate and acquisition<br/>rank or sample candidates"]
         E["Domain evaluator scores<br/>selected candidates"]
@@ -385,24 +395,63 @@ flowchart TB
     H --> O["Trajectory, task spec,<br/>summary, and best result"]
 ```
 
-The three adapters instantiate the same roles with different domain objects:
+The four adapters instantiate the same roles with different domain objects:
 
-| Task | LLM candidate | Proposal search | Acquisition or selection | External evaluation |
+| Task | Candidate domain | Reservoir expansion | Surrogate representation | External evaluation |
 | --- | --- | --- | --- | --- |
-| `nanogpt` | Structured `train.py` operations or code edits. | Configurable `single_turn`, best-of-N, tree, beam, or direct-search MCTS traversal. | LCB, UCB, EI, or posterior mean from the inner GP surrogate. | Run the generated training program and optimize `val_bpb` or another configured metric. |
-| `small_molecule` | Direct SMILES or seed plans for analog generation. | `single_turn` proposal batches within each outer optimization round. | Base-measure sampling tilted by EHVI or weighted posterior mean. | Minimize AutoDock Vina score while maximizing predicted KRAS G12D activity. |
-| `antibody` | CDRH3 pool selections and search-space DSL updates. | `single_turn` proposal/update within each outer optimization round. | EI, LCB, UCB, or posterior mean over a GP-scored candidate pool. | Minimize Absolut binding energy for the selected antigen. |
+| `nanogpt` | Valid `train.py` programs. | Code edits or structured parameter edits; the expansion schema may activate additional parameters. | Fixed code hash vector, fixed operation vector, or evolving operation vector. | Run the generated training program and optimize `val_bpb` or another configured metric. |
+| `small_molecule` | Valid canonical SMILES. | Direct SMILES emission or seed-conditioned analogue generation. | Fixed molecular fingerprint or implicit SMILES string kernel; direct-only modes use none. | Minimize AutoDock Vina score while maximizing predicted KRAS G12D activity. |
+| `antibody` | Valid fixed-length CDRH3 sequences. | Direct sequence emission or DSL-policy-guided sequence generation. | Fixed categorical sequence representation; direct-only modes use none. | Minimize Absolut binding energy for the selected antigen. |
+| `protein_inverse_folding` | Valid editable-region encoder programs. | Direct complete-program emission followed by AST and runtime validation. | Fixed AST/configuration/hash vector for GP-UCB; best-observed mode uses none. | Train and score on CATH4.2, CATH4.3, and TS50. |
 
 The shared code keeps orchestration, config loading, task-space specs, response
 parsing, trajectory metadata, and common tests in one place. Task adapters keep
 domain-specific dependencies such as training data, Vina, ReaSyn, and Absolut
 behind task boundaries.
 
+### LDM Engine
+
+`ldm_tts.engine.LDMEngine` is the task-neutral runtime counterpart to
+`LDMTaskSpec`. It executes the lifecycle declared by the task contract:
+
+```text
+reservoir expansion
+  -> candidate admission and deduplication
+  -> surrogate/acquisition selection
+  -> external evaluation
+  -> authoritative observation
+  -> durable campaign checkpoint
+```
+
+The engine owns lifecycle policy, budget enforcement, failure classification,
+event recording, checkpoints, and summaries. A task supplies adapters at the
+scientific seams:
+
+| Interface | Task-owned responsibility | Shared implementation |
+| --- | --- | --- |
+| `ReservoirExpander` | Turn history and expansion schema into raw proposals. | Expansion request/result records and direct-emission adapter. |
+| `CandidateDomainAdapter` | Canonicalize and scientifically validate one proposal. | History exclusion, deduplication, capacity, and rejection accounting. |
+| `SurrogateEncoder` | Encode an admitted candidate. | Versioned surrogate vectors and shared GP-UCB selector. |
+| `CandidateEvaluator` | Run the external scientific measurement. | Status classification, objective validation, observation records, and budgets. |
+| `ProposalClient` | Provide model transport without scientific behavior. | OpenAI-compatible retries, circuit breaking, timing, usage, text, and tool calls. |
+
+`CampaignRuntime` writes a common `campaign.json`, `budget.json`, `status.json`,
+`events.jsonl`, `checkpoint.json`, `ldm_task_spec.json`, and `summary.json`
+contract. New task scaffolds execute their deterministic mock through this
+engine. Existing workflows remain supported and can migrate adapter by adapter
+without changing their registered task IDs or historical artifacts.
+
+The declarative and behavioral layers deliberately stay separate:
+`ReservoirExpansionSpec` describes what a task permits, while a
+`ReservoirExpander` performs it. The engine does not own scientific payloads,
+prompt contents, domain validation, evaluator internals, or specialized
+surrogate backends.
+
 ### Proposal Search
 
 Proposal search controls how LLM-generated candidate states are traversed
 within one optimization round. The implementations live in
-`ldm_tts.search_methods` behind a task-neutral engine protocol. `single_turn` is
+`ldm_tts.optimization.search` behind a task-neutral engine protocol. `single_turn` is
 the one-level special case; `best_of_n`, `tree_search`, `beam_search`, and
 `mcts` support deeper state traversal. Public aliases such as `beam` and `tree`
 resolve through the shared registry.
@@ -416,7 +465,7 @@ therefore iterative even though their `proposal_search` is `single_turn`.
 ### Acquisition Configuration
 
 Acquisition functions are selected in experiment YAML under `args`. The shared
-`ldm_tts.acquisition.PosteriorAcquisition` implementation always returns a
+`ldm_tts.optimization.acquisition.PosteriorAcquisition` implementation always returns a
 larger-is-better score and applies the configured objective direction.
 
 | Task | Config key | Supported values | Related parameters |
@@ -435,25 +484,26 @@ The codebase has four layers:
 
 | Layer | Where | Responsibility |
 | --- | --- | --- |
-| Shared runner | `ldm_tts.runner`, `scripts/run_ldm_tts.py` | Load configs, build commands, run suites, and provide dry-runs. |
+| Shared runner | `ldm_tts.cli.runner`, `scripts/run_ldm_tts.py` | Load configs, build commands, run suites, and provide dry-runs. |
 | Shared algorithms | `ldm_tts/` | Describe task spaces, traverse proposal states, implement acquisition scoring and budgets, parse responses, and serialize traces. |
 | Task adapters | `tasks/<task>/ldm_task/procedure.py` | Provide a thin, stable entry point for the shared runner. |
-| Task implementations | `tasks/<task>/core/` | Own prompts, LLM/provider calls, candidate encoding, surrogate adapters, domain scoring, resume behavior, and output writing. |
+| Task implementations | `tasks/<task>/core/` | Own prompts, LLM/provider calls, reservoir expansion adapters, surrogate representations, domain scoring, resume behavior, and output writing. |
 
-Key shared modules:
+Key shared packages:
 
 | Module | Purpose |
 | --- | --- |
-| `ldm_tts.spaces` | `LDMTaskSpec`, candidate spaces, objectives, response spaces, proposal-search specs, and acquisition specs. |
-| `ldm_tts.search_methods` | Shared `single_turn`, best-of-N, tree, beam, and MCTS proposal traversal behind a generic engine protocol and registry. |
-| `ldm_tts.acquisition` | Shared `mean`, `EI`, `LCB`, `UCB`, and two-objective `EHVI` implementation behind one posterior-scoring interface. |
-| `ldm_tts.response` | Shared LLM JSON extraction and validation helpers. |
-| `ldm_tts.parameter_space` | nanoGPT operation-schema primitives and validators. |
-| `ldm_tts.bo` | Lightweight BO records and protocols. |
-| `ldm_tts.trace_schema` | Task-neutral candidate and round trace shapes. |
-| `ldm_tts.trajectory` | Atomic JSON and JSONL trajectory writers. |
-| `ldm_tts.dependency_checks` | Config-aware preflight checks for task dependencies. |
-| `ldm_tts.data` | Runtime collection, ldm-2.0 rendering, and expert-justification augmentation. |
+| `ldm_tts.contracts` | `LDMTaskSpec`, candidate domains, reservoirs, reservoir-expansion actions, surrogate representations, objectives, response spaces, proposal-search specs, and acquisition specs. |
+| `ldm_tts.optimization.search` | Shared `single_turn`, best-of-N, tree, beam, and MCTS proposal traversal behind a generic engine protocol and registry. |
+| `ldm_tts.optimization.acquisition` | Shared `mean`, `EI`, `LCB`, `UCB`, and two-objective `EHVI` implementation behind one posterior-scoring interface. |
+| `ldm_tts.transport.parsing` | Shared LLM JSON extraction and validation helpers. |
+| `tasks.nanogpt.core.expansion_schema` | Structured expansion-schema parameters, surrogate representation dimensions, and compatibility helpers. |
+| `ldm_tts.optimization.records` | Lightweight BO records and protocols. |
+| `ldm_tts.engine` | Campaign orchestration, reservoir expansion, budgets, events, checkpoints, and run artifacts. |
+| `ldm_tts.transport` | Proposal transport interface, OpenAI-compatible adapter, and response parsing. |
+| `ldm_tts.registration` | Manifest discovery, experiment contracts, scaffolding, and generic dependency-check primitives. |
+| `ldm_tts.data` | Runtime collection, ldm-2.0 intermediate records, rendering, and expert augmentation. |
+| `ldm_tts.cli` | Configuration expansion and command-line campaign execution. |
 
 The shared package should remain dependency-light. Heavy domain dependencies
 such as RDKit, torch, gpytorch, Vina, ReaSyn, and Absolut should stay inside

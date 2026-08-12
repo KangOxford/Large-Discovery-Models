@@ -19,7 +19,7 @@ if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
 
 from tasks.nanogpt.core.search_core import DEFAULT_TASK_CONTEXT, SearchConfig, SearchEngine
-from ldm_tts.search_methods import SEARCH_METHOD_ALIASES, run_search_method
+from ldm_tts.optimization.search import SEARCH_METHOD_ALIASES, run_search_method
 
 
 METHODS = dict(SEARCH_METHOD_ALIASES)

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from ldm_tts.search_methods import (
+from ldm_tts.optimization.search import (
     SEARCH_METHOD_ALIASES,
     beam_search,
     best_of_n,

@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "task_id": "protein_inverse_folding",
+  "qualification": "qualified",
+  "benchmark": {
+    "source_url": "https://github.com/Imbernoulli/MLS-Bench",
+    "source_commit": "da06dffcc79826dc3d22dec53ead310c430b6535",
+    "task_path": "tasks/ai4bio-protein-inverse-folding"
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "aggregate_score",
+        "direction": "maximize",
+        "description": "Official MLS-Bench aggregate across CATH4.2, CATH4.3, and TS50."
+      }
+    ],
+    "optimized": [
+      {
+        "name": "search_score",
+        "direction": "maximize",
+        "description": "Continuous baseline-normalized recovery and perplexity score used by the GP."
+      }
+    ],
+    "diagnostic": [
+      {
+        "name": "recovery",
+        "direction": "maximize",
+        "description": "Native amino-acid recovery for each benchmark."
+      },
+      {
+        "name": "perplexity",
+        "direction": "minimize",
+        "description": "Per-residue sequence perplexity for each benchmark."
+      }
+    ]
+  },
+  "evaluation": {
+    "datasets": [
+      "CATH4.2",
+      "CATH4.3",
+      "TS50"
+    ],
+    "settings": {
+      "epochs": 100,
+      "batch_size": 32,
+      "learning_rate": 0.001,
+      "hidden_dim": 128,
+      "num_encoder_layers": 3,
+      "k_neighbors": 30,
+      "dropout": 0.1,
+      "seed": 42,
+      "checkpoint_selection": "best_validation_recovery"
+    },
+    "per_candidate_limits": {
+      "parameter_count": 4491989,
+      "CATH4.2_training_hours": 3.0,
+      "CATH4.3_training_hours": 3.0,
+      "TS50_training_hours": 6.5,
+      "CATH_job_seconds": 14400,
+      "TS50_job_seconds": 28800
+    }
+  },
+  "budget": {
+    "epochs_per_benchmark": 100,
+    "benchmarks_per_evaluation": 3,
+    "parameter_count": 4491989
+  },
+  "profiles": {
+    "official_benchmark": {
+      "description": "MLS-Bench official per-candidate evaluation settings.",
+      "budget": {
+        "outer_iterations": 10,
+        "selected_candidates": 20,
+        "expensive_evaluation_attempts": 20,
+        "benchmark_jobs": 60
+      },
+      "locked_args": {
+        "generator": "openai",
+        "evaluator": "benchmark",
+        "iterations": 10,
+        "breadth": 2,
+        "benchmark": [
+          "CATH4.2",
+          "CATH4.3",
+          "TS50"
+        ],
+        "epochs": 100,
+        "batch-size": 32,
+        "cath-max-train-hours": 3.0,
+        "ts-max-train-hours": 6.5,
+        "parallel-benchmarks": true
+      }
+    },
+    "gp_ucb_n4h4_20": {
+      "description": "Twenty selected evaluations with N4H4 TTS and GP-UCB reranking.",
+      "budget": {
+        "outer_iterations": 20,
+        "llm_requests": 960,
+        "valid_search_candidates": 320,
+        "selected_candidates": 20,
+        "expensive_evaluation_attempts": 20,
+        "benchmark_jobs": 60
+      },
+      "locked_args": {
+        "generator": "openai",
+        "evaluator": "benchmark",
+        "method": "best_of_n",
+        "iterations": 20,
+        "breadth": 4,
+        "depth": 4,
+        "select-from": "all",
+        "max-real-evaluations": 20,
+        "proposal-retries": 2,
+        "score-key": "search_score",
+        "surrogate-mode": "ucb",
+        "gp-beta": 1.0,
+        "benchmark": [
+          "CATH4.2",
+          "CATH4.3",
+          "TS50"
+        ],
+        "gpu-device": [
+          4,
+          5,
+          6
+        ],
+        "epochs": 100,
+        "batch-size": 32,
+        "cath-max-train-hours": 3.0,
+        "ts-max-train-hours": 6.5,
+        "cath-job-timeout": 14400,
+        "ts-job-timeout": 28800,
+        "parallel-benchmarks": true
+      }
+    },
+    "gpu_contract_smoke": {
+      "description": "Single-candidate tensor, parameter, and multi-GPU contract check.",
+      "budget": {
+        "outer_iterations": 1,
+        "selected_candidates": 1,
+        "expensive_evaluation_attempts": 1
+      },
+      "locked_args": {
+        "generator": "mock",
+        "evaluator": "gpu_smoke",
+        "iterations": 1,
+        "breadth": 1,
+        "gpu-device": [
+          4,
+          5,
+          6,
+          7
+        ]
+      }
+    }
+  }
+}

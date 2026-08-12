@@ -1,0 +1,47 @@
+diff --git a/PInvBench/src/datasets/__init__.py b/PInvBench/src/datasets/__init__.py
+index 1c34cd2..7c2ee2a 100644
+--- a/PInvBench/src/datasets/__init__.py
++++ b/PInvBench/src/datasets/__init__.py
+@@ -1,17 +1,8 @@
+ # Copyright (c) CAIRI AI Lab. All rights reserved
+ 
+-from .alphafold_dataset import AlphaFoldDataset
+ from .cath_dataset import CATHDataset
+-from .protein_rna_dataset import Protein_RNA_Dataset
+-from .dataloader import load_data
+-from .featurizer import (featurize_AF, featurize_GTrans, featurize_GVP,
+-                         featurize_ProteinMPNN, featurize_Inversefolding)
+ from .ts_dataset import TSDataset
+-from .deploy_utils import parsePDB
+-__all__ = [
+-    'AlphaFoldDataset', 'CATHDataset', 'TSDataset',
+-    'load_data',
+-    'featurize_AF', 'featurize_GTrans', 'featurize_GVP',
+-    'featurize_ProteinMPNN', 'featurize_Inversefolding','parsePDB',
+-    'Protein_RNA_Dataset'
+-]
++
++# The MLS-Bench scaffold imports only these two loaders. Keeping this package
++# initializer narrow avoids importing optional model stacks such as PyG.
++__all__ = ['CATHDataset', 'TSDataset']
+diff --git a/PInvBench/src/datasets/cath_dataset.py b/PInvBench/src/datasets/cath_dataset.py
+index 50b85f1..796126a 100644
+--- a/PInvBench/src/datasets/cath_dataset.py
++++ b/PInvBench/src/datasets/cath_dataset.py
+@@ -4,7 +4,6 @@ import numpy as np
+ from tqdm import tqdm
+ import random
+ import torch.utils.data as data
+ from .utils import cached_property
+-from transformers import AutoTokenizer
+ 
+ class CATHDataset(data.Dataset):
+@@ -23,8 +22,6 @@ class CATHDataset(data.Dataset):
+         else:
+             self.data = data
+         
+-        self.tokenizer = AutoTokenizer.from_pretrained("facebook/esm2_t33_650M_UR50D", cache_dir="/gaozhangyang/model_zoom/transformers")
+-    
+     @cached_property
+     def cache_data(self):
+         alphabet='ACDEFGHIKLMNPQRSTVWY'

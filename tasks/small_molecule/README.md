@@ -264,7 +264,7 @@ Acquisition selection is configured with `args.acq`: use `ehvi` for expected
 hypervolume improvement or `mean` for a weighted posterior mean. For `mean`,
 set `args.acq-weights` to a comma-separated Vina/activity pair such as
 `0.5,0.5`. Both modes use the task-independent implementation in
-`ldm_tts.acquisition`.
+`ldm_tts.optimization.acquisition`.
 
 Important Vina fields:
 

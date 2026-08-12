@@ -1,0 +1,47 @@
+name: protein_inverse_folding_gp_ucb_n4h4_20
+task: protein_inverse_folding
+algorithm: gp_ucb
+mode: real
+contract_profile: gp_ucb_n4h4_20
+description: Twenty-iteration GP-UCB N4H4 search under the official MLS-Bench training contract.
+args:
+  generator: openai
+  evaluator: benchmark
+  method: best_of_n
+  iterations: 20
+  breadth: 4
+  depth: 4
+  select-from: all
+  max-real-evaluations: 20
+  proposal-retries: 2
+  score-key: search_score
+  surrogate-mode: ucb
+  gp-beta: 1.0
+  gp-lengthscale: 1.5
+  gp-noise: 0.0001
+  gp-prior-mean: 0.0
+  gp-prior-std: 0.25
+  initial-observation: null
+  validate-tts-candidates: true
+  tts-gpu-device: 7
+  seed-file: "{task_dir}/resources/seed_design.py"
+  out-dir: "{task_dir}/runs"
+  run-name: "{name}"
+  llm-url: null
+  llm-model-name: null
+  api-key: null
+  temperature: 0.7
+  max-tokens: 12000
+  request-timeout: 300
+  scaffold-path: null
+  data-root: null
+  benchmark: [CATH4.2, CATH4.3, TS50]
+  gpu-device: [4, 5, 6]
+  epochs: 100
+  batch-size: 32
+  cath-max-train-hours: 3.0
+  ts-max-train-hours: 6.5
+  cath-job-timeout: 14400
+  ts-job-timeout: 28800
+  eval-timeout: 28800
+  parallel-benchmarks: true

@@ -1,0 +1,27 @@
+name: protein_inverse_folding_real
+task: protein_inverse_folding
+algorithm: best_observed
+mode: real
+contract_profile: official_benchmark
+description: Full MLS-Bench encoder search over CATH4.2, CATH4.3, and TS50.
+args:
+  generator: openai
+  evaluator: benchmark
+  iterations: 10
+  breadth: 2
+  seed-file: "{task_dir}/resources/seed_design.py"
+  out-dir: "{task_dir}/runs"
+  run-name: "{name}"
+  llm-url: null
+  llm-model-name: null
+  api-key: null
+  scaffold-path: null
+  data-root: null
+  benchmark: [CATH4.2, CATH4.3, TS50]
+  gpu-device: [4, 5, 6]
+  epochs: 100
+  batch-size: 32
+  cath-max-train-hours: 3.0
+  ts-max-train-hours: 6.5
+  eval-timeout: 28800
+  parallel-benchmarks: true

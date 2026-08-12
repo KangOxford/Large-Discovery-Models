@@ -37,18 +37,21 @@ WORKSPACE_ROOT = ROOT.parent.parent
 if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
-from ldm_tts.trajectory import JsonlTrajectoryRecorder
-from ldm_tts.acquisition import SINGLE_OBJECTIVE_ACQUISITIONS, make_acquisition
+from ldm_tts.engine.run_store import JsonlTrajectoryRecorder
+from ldm_tts.optimization.acquisition import SINGLE_OBJECTIVE_ACQUISITIONS, make_acquisition
 from ldm_tts.data import DataCollectionSink, make_complete_design_ir
-from ldm_tts.spaces import (
+from ldm_tts.contracts import (
     AcquisitionSpec,
-    CandidateSpaceSpec,
+    CandidateDomainSpec,
     LDMTaskSpec,
     ObjectiveSpec,
+    ReservoirExpansionSpec,
+    ReservoirSpec,
     ResponseSpaceSpec,
     ProposalSearchSpec,
+    SurrogateSpaceSpec,
 )
-from ldm_tts.response import load_json_object
+from ldm_tts.transport.parsing import load_json_object
 from tasks.antibody.core.ldm_light.methods import (
     METHOD_CHOICES,
     METHOD_SPECS,
@@ -771,7 +774,7 @@ def describe_ldm_task(
     method_spec = METHOD_SPECS[method]
     return LDMTaskSpec(
         task="antibody",
-        candidate_space=CandidateSpaceSpec(
+        candidate_domain=CandidateDomainSpec(
             name="cdrh3_sequence",
             kind="categorical_sequence",
             dimension=seq_len,
@@ -805,7 +808,7 @@ def describe_ldm_task(
                 name="candidate_pool_selection",
                 output_kind="json",
                 parser="tasks.antibody.core.ldm_light.ldm_acq.parse_selected",
-                description="Warmup LLM selects sequence ids from a supplied candidate pool.",
+                description="Warmup LLM selects sequence ids from a supplied candidate reservoir.",
             ),
             ResponseSpaceSpec(
                 name="direct_sequence_generation",
@@ -839,6 +842,45 @@ def describe_ldm_task(
                 "gen_m": int(getattr(args, "gen_m", 5)),
                 "n_strategies": int(getattr(args, "n_strategies", 5)),
             },
+        ),
+        reservoir=ReservoirSpec(
+            name="cdrh3_candidate_reservoir",
+            expansions=(
+                ReservoirExpansionSpec(
+                    name="direct_sequence_generation",
+                    action_kind="emit_candidate",
+                    response_space="direct_sequence_generation",
+                    produces_candidates=True,
+                    description="Emit valid CDRH3 candidates directly.",
+                ),
+                ReservoirExpansionSpec(
+                    name="policy_guided_generation",
+                    action_kind="configure_generator",
+                    response_space="dsl_update",
+                    produces_candidates=True,
+                    description="Update the DSL policy used to generate a candidate reservoir.",
+                ),
+            ),
+            candidate_validator="CDRH3 length, alphabet, and biochemical constraint checks",
+            deduplication_key="amino-acid sequence",
+            max_size=int(args.parallel_budget),
+            metadata={"base_measure": method_spec["base_measure"]},
+        ),
+        surrogate=SurrogateSpaceSpec(
+            kind="vector" if method_spec["uses_acquisition"] else "none",
+            representation=(
+                "fixed-length categorical CDRH3 indices"
+                if method_spec["uses_acquisition"]
+                else "not used by direct LLM selection"
+            ),
+            dimension_policy="fixed" if method_spec["uses_acquisition"] else "none",
+            dimension=seq_len if method_spec["uses_acquisition"] else None,
+            encoder=(
+                "tasks.antibody.core.antbo.bo.custom_init.StandardTransform"
+                if method_spec["uses_acquisition"]
+                else ""
+            ),
+            version="antbo_categorical_sequence_v1" if method_spec["uses_acquisition"] else "",
         ),
         proposal_search=ProposalSearchSpec(
             name="single_turn",
@@ -1038,7 +1080,7 @@ def run_one(config: dict[str, Any], antigen: str, seed: int, args: argparse.Name
     if method == "legacy_policy_max" and candidate_library:
         print(f"[llm-acq] Loaded candidate library: {len(candidate_library)} sequences from {pool_csv}")
     elif method == "legacy_policy_max":
-        print("[llm-acq] No candidate library provided; using random temporary candidate pools.")
+        print("[llm-acq] No candidate library provided; using random temporary candidate reservoirs.")
     llm = make_llm_client()
     evaluator, bbox = make_evaluator(config, antigen, run_id)
 
