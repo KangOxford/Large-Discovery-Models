@@ -5,12 +5,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ldm_tts.acquisition import (
+from ldm_tts.optimization.acquisition import (
     MULTI_OBJECTIVE_ACQUISITIONS,
     SINGLE_OBJECTIVE_ACQUISITIONS,
     make_acquisition,
 )
-from ldm_tts.runner import apply_override, build_plan, load_config
+from ldm_tts.cli.runner import apply_override, build_plan, load_config
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

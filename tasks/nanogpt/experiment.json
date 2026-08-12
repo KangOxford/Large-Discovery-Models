@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "task_id": "nanogpt",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/yzailab/Large-Discovery-Models",
+    "source_commit": "unqualified",
+    "task_path": "tasks/nanogpt"
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "val_bpb",
+        "direction": "minimize",
+        "description": "Validation bits per byte reported by the training evaluator."
+      }
+    ],
+    "optimized": [
+      {
+        "name": "val_bpb",
+        "direction": "minimize",
+        "description": "Primary search objective; lower is better."
+      }
+    ],
+    "diagnostic": []
+  },
+  "evaluation": {
+    "datasets": [
+      "nanoGPT task-local training and validation data prepared under tasks/nanogpt/resources"
+    ],
+    "settings": {
+      "score_key": "val_bpb",
+      "evaluation_command": "config-defined task-local train.py execution"
+    },
+    "per_candidate_limits": {}
+  },
+  "budget": {
+    "outer_iterations": 100,
+    "warmup_evaluations": 20
+  },
+  "profiles": {
+    "real_operation_tool_best_of_n": {
+      "description": "Committed operation-tool best-of-N campaign configuration.",
+      "budget": {
+        "outer_iterations": 100,
+        "warmup_evaluations": 20
+      },
+      "locked_args": {
+        "method": "best_of_n",
+        "iterations": 100,
+        "warmup": 20
+      }
+    }
+  }
+}

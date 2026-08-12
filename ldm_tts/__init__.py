@@ -1,160 +1,32 @@
-"""Shared primitives for Large Discovery Model test-time search.
+"""Large Discovery Model test-time search.
 
-The task folders keep their domain-specific generators, scorers, and prompts.
-This package holds the pieces that should be common across tasks: proposal
-search, acquisition, budgeted loop control, trajectory writing, and scoring.
+Import from focused package interfaces such as :mod:`ldm_tts.contracts` or
+the module that owns the required behavior. The package root intentionally
+performs no eager imports, so task discovery does not require optimization,
+transport, or training dependencies.
 """
 
-from ldm_tts.acquisition import (
-    AcquisitionConfig,
-    AcquisitionFunction,
-    PosteriorAcquisition,
-    make_acquisition,
-)
-from ldm_tts.bo import BOObservation, BOPrediction, BOSelectionResult, FeatureVector
-from ldm_tts.data import (
-    AugmentationReport,
-    DataCollectionPaths,
-    DataCollectionSink,
-    EXPERT_JUSTIFICATION_SYSTEM_PROMPT,
-    ExpertJustificationPipeline,
-    ExpertJustifier,
-    JustificationRequest,
-    LDMDataCollectionError,
-    OpenAICompatibleExpert,
-    dataset_info_payload,
-    make_complete_design_ir,
-    make_parameter_edit_ir,
-    normalize_task_id,
-    render_prose,
-    render_record,
-    smallmol_ir_from_prompt_response,
-    smallmol_irs_from_round_record,
-    validate_ir_record,
-)
-from ldm_tts.loop import LDMSearchLoopResult, LDMSearchRoundResult, run_budgeted_search
-from ldm_tts.parameter_space import (
-    OperationParameter,
-    OperationSchema,
-    ValidatedOperation,
-    canonical_name,
-    choice_values_equal,
-    initial_active_operation_schema,
-    initial_operation_feature_names,
-    load_operation_schema,
-    normalize_operation_numeric,
-    normalize_operation_parameter,
-    operation_feature_dim,
-    operation_feature_version,
-    operation_parameter_from_payload,
-    operation_parameter_to_json,
-    operation_schema_signature,
-    operation_schema_to_json,
-    replace_operation_schema,
-    validate_operation_payload,
-    validate_operation_value,
-)
-from ldm_tts.response import (
-    extract_json_object_text,
-    load_json_object,
-    reject_keys,
-    require_allowed_keys,
-    require_list,
-    require_nonnegative_int,
-    require_number,
-    require_str,
-    strip_json_fence,
-)
-from ldm_tts.scoring import (
-    as_float,
-    best_item,
-    finite_or_none,
-    is_finite_number,
-    ranked_items,
-)
-from ldm_tts.spaces import (
-    AcquisitionSpec,
-    CandidateSpaceSpec,
-    LDMTaskSpec,
-    ObjectiveSpec,
-    ResponseSpaceSpec,
-    ProposalSearchSpec,
-)
-from ldm_tts.trajectory import AtomicJsonLog, JsonlTrajectoryRecorder, load_jsonl
-from ldm_tts.trace_schema import CandidateTraceRecord, LDMRoundTrace
+from __future__ import annotations
 
-__all__ = [
-    "AcquisitionConfig",
-    "AcquisitionFunction",
-    "AcquisitionSpec",
-    "AtomicJsonLog",
-    "AugmentationReport",
-    "BOObservation",
-    "BOPrediction",
-    "BOSelectionResult",
-    "CandidateTraceRecord",
-    "CandidateSpaceSpec",
-    "DataCollectionPaths",
-    "DataCollectionSink",
-    "EXPERT_JUSTIFICATION_SYSTEM_PROMPT",
-    "ExpertJustificationPipeline",
-    "ExpertJustifier",
-    "FeatureVector",
-    "JsonlTrajectoryRecorder",
-    "JustificationRequest",
-    "LDMDataCollectionError",
-    "LDMRoundTrace",
-    "LDMSearchLoopResult",
-    "LDMSearchRoundResult",
-    "LDMTaskSpec",
-    "ObjectiveSpec",
-    "OperationParameter",
-    "OperationSchema",
-    "OpenAICompatibleExpert",
-    "PosteriorAcquisition",
-    "ResponseSpaceSpec",
-    "ProposalSearchSpec",
-    "ValidatedOperation",
-    "as_float",
-    "best_item",
-    "canonical_name",
-    "choice_values_equal",
-    "dataset_info_payload",
-    "extract_json_object_text",
-    "finite_or_none",
-    "initial_active_operation_schema",
-    "initial_operation_feature_names",
-    "is_finite_number",
-    "load_json_object",
-    "load_jsonl",
-    "load_operation_schema",
-    "make_complete_design_ir",
-    "make_acquisition",
-    "make_parameter_edit_ir",
-    "normalize_task_id",
-    "normalize_operation_numeric",
-    "normalize_operation_parameter",
-    "operation_feature_dim",
-    "operation_feature_version",
-    "operation_parameter_from_payload",
-    "operation_parameter_to_json",
-    "operation_schema_signature",
-    "operation_schema_to_json",
-    "ranked_items",
-    "reject_keys",
-    "render_prose",
-    "render_record",
-    "smallmol_ir_from_prompt_response",
-    "smallmol_irs_from_round_record",
-    "replace_operation_schema",
-    "require_allowed_keys",
-    "require_list",
-    "require_nonnegative_int",
-    "require_number",
-    "require_str",
-    "run_budgeted_search",
-    "strip_json_fence",
-    "validate_ir_record",
-    "validate_operation_payload",
-    "validate_operation_value",
-]
+from typing import Any
+
+__all__: tuple[str, ...] = ()
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve historical root exports lazily during the migration."""
+
+    from ldm_tts.compat import resolve
+
+    try:
+        value = resolve(name)
+    except AttributeError as exc:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    from ldm_tts.compat import COMPAT_EXPORTS
+
+    return sorted(set(globals()) | COMPAT_EXPORTS)

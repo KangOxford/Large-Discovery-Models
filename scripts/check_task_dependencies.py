@@ -12,8 +12,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from ldm_tts.dependency_checks import checks_to_json, format_checks, has_failures, check_plan
-from ldm_tts.runner import apply_override, build_plan, expand_experiments, load_config, resolve_config_path
+from ldm_tts.registration.dependencies import checks_to_json, format_checks, has_failures, check_plan
+from ldm_tts.cli.runner import apply_override, build_plan, expand_experiments, load_config, resolve_config_path
 
 
 def main(argv: list[str] | None = None) -> int:

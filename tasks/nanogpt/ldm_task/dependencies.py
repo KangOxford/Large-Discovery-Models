@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from ldm_tts.dependency_checks import (
+from ldm_tts.registration.dependencies import (
     DependencyCheck,
-    check_nanogpt,
     plan_check_context,
 )
+from tasks.nanogpt.core.dependencies import check_nanogpt
 
 
 def check_dependencies(

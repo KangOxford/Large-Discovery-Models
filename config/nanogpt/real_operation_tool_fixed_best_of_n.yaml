@@ -14,10 +14,10 @@ args:
   warmup: 20
   seed-policy: best
   buffer: runs/ablation_buffer/fixed_exp1/gp_warmup.jsonl
-  initial-operation-features: all
-  max-active-operation-features: 0
-  disable-feature-expansion: true
-  allow-new-feature-specs: false
+  initial-expansion-parameters: all
+  max-expansion-parameters: 0
+  disable-expansion-schema-updates: true
+  allow-new-expansion-parameters: false
   surrogate-mode: lcb
   gp-beta: 1.0
   gp-xi: 0.001

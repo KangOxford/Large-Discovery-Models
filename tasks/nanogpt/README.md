@@ -1,8 +1,9 @@
 # nanoGPT Task Guide
 
-The nanoGPT task searches over code or structured operation edits for a
-training script. Mock runs use a tiny deterministic target. Real runs evaluate
-candidate training code and optimize the reported validation BPB.
+The nanoGPT task expands a reservoir of candidate training programs through
+code edits or structured parameter operations. Mock runs use a tiny
+deterministic target. Real runs evaluate candidate training code and optimize
+the reported validation BPB.
 
 ## Directory Architecture
 
@@ -18,7 +19,7 @@ tests/      task-local unit and integration tests
 runs/       generated run artifacts (Git-ignored)
 ```
 
-Proposal-search algorithms are shared in `ldm_tts/search_methods/`, not owned
+Proposal-search algorithms are shared in `ldm_tts/optimization/search/`, not owned
 by this task. NanoGPT supplies the code-state engine and GP-surrogate scoring
 adapter used by `single_turn`, best-of-N, tree, beam, and MCTS traversal.
 
@@ -148,6 +149,7 @@ real configurations below.
    ```bash
    uv run --locked --project tasks/nanogpt python scripts/check_task_dependencies.py \
      config/nanogpt/real_operation_tool_best_of_n.yaml \
+     --set contract_profile= \
      --set args.iterations=0 \
      --set args.warmup=0 \
      --set args.skip-eval=true \
@@ -160,6 +162,7 @@ real configurations below.
    ```bash
    uv run --locked --project tasks/nanogpt python scripts/run_ldm_tts.py \
      config/nanogpt/real_operation_tool_best_of_n.yaml \
+     --set contract_profile= \
      --set args.iterations=0 \
      --set args.warmup=0 \
      --set args.skip-eval=true \
@@ -172,6 +175,7 @@ real configurations below.
    ```bash
    uv run --locked --project tasks/nanogpt python scripts/check_task_dependencies.py \
      config/nanogpt/real_operation_tool_best_of_n.yaml \
+     --set contract_profile= \
      --set args.iterations=1 \
      --set args.warmup=0 \
      --set args.breadth=1 \
@@ -179,6 +183,7 @@ real configurations below.
 
    uv run --locked --project tasks/nanogpt python scripts/run_ldm_tts.py \
      config/nanogpt/real_operation_tool_best_of_n.yaml \
+     --set contract_profile= \
      --set args.iterations=1 \
      --set args.warmup=0 \
      --set args.breadth=1 \
@@ -211,27 +216,29 @@ uv run --locked --project tasks/nanogpt \
   python scripts/run_ldm_tts.py config/nanogpt/real_operation_tool_fixed_best_of_n.yaml
 ```
 
-Use `real_operation_tool_best_of_n.yaml` for dynamically expanded operation
-features. Use `real_operation_tool_fixed_best_of_n.yaml` for the fixed full
-operation schema.
+Use `real_operation_tool_best_of_n.yaml` for an evolving reservoir expansion
+schema. Use `real_operation_tool_fixed_best_of_n.yaml` for a fixed expansion
+schema containing every declared operation parameter.
 
 ## Customization
 
-Operation schemas live under `tasks/nanogpt/ldm_task/`. The shared
-`ldm_tts.parameter_space` module validates operation payloads, computes feature
-dimensions, serializes schemas, and builds active feature subsets. For real
-train-code search, keep the operation schema aligned with top-level assignments
-in the target `train.py`.
+Operation schemas live under `tasks/nanogpt/resources/schemas/`. The shared
+`tasks.nanogpt.core.expansion_schema` validates operation payloads, computes
+surrogate representation dimensions, serializes schemas, and builds active
+expansion-schema parameter subsets. For real train-code discovery, keep the
+operation schema aligned with top-level assignments in the target `train.py`.
 
 Useful config fields:
 
 | Field | Meaning |
 | --- | --- |
 | `args.train-file` | Seed training script to edit. |
-| `args.operation-schema` | Structured operation space. |
+| `args.operation-schema` | Full reservoir expansion schema. |
 | `args.generator` | `operation_mock`, `operation_tool`, or another generator. |
-| `args.initial-operation-features` | Initial active operation-feature subset. |
-| `args.max-active-operation-features` | Maximum active features after expansion; `0` means all. |
+| `args.initial-expansion-parameters` | Initial active expansion-schema parameters. |
+| `args.max-expansion-parameters` | Maximum active expansion parameters; `0` means the full schema. |
+| `args.disable-expansion-schema-updates` | Keep the initial expansion schema fixed. |
+| `args.allow-new-expansion-parameters` | Permit validated parameters not declared in the initial schema. |
 | `args.eval-command` | Command used to evaluate a generated candidate. |
 | `args.surrogate-mode` | Shared acquisition: `lcb`, `ucb`, `ei`, or `mean`. |
 | `args.gp-beta` / `args.gp-xi` | Confidence-bound exploration coefficient / EI margin. |

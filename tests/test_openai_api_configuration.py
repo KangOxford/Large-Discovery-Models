@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ldm_tts.runner import build_plan, load_config
+from ldm_tts.cli.runner import build_plan, load_config
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

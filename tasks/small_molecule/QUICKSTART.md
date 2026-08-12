@@ -3,7 +3,7 @@
 This guide reproduces the validated CPU-only direct-LLM smoke path from a new
 checkout. It builds the task environment, runs the mock workflow, provisions
 AutoDock Vina, checks an OpenAI-compatible model, and evaluates one real
-molecule with Vina and the bundled KRAS G12D activity model.
+molecule with Vina and a caller-supplied KRAS G12D activity model.
 
 Run every command from the repository root. The first real run deliberately
 does not use ReaSyn, so no GPU or ReaSyn checkout is required.
@@ -13,14 +13,13 @@ does not use ReaSyn, so no GPU or ReaSyn checkout is required.
 - `uv` is installed.
 - Conda is available if Vina is not already installed.
 - An OpenAI-compatible model URL, model name, and API key are available.
-- The repository contains `tasks/small_molecule/uv.lock` and the G12D model
-  artifact.
+- A trusted, compatible G12D joblib model is available outside Git.
 
 ## 1. Verify The Checkout
 
 ```bash
 test -f tasks/small_molecule/uv.lock
-test -s tasks/small_molecule/resources/models/best_g12d_model.joblib
+test -f tasks/small_molecule/resources/models/best_g12d_model_metadata.json
 python scripts/validate_tasks.py --task small_molecule
 ```
 
@@ -83,6 +82,11 @@ conda env update -n markush-dock \
 Use environment variables so credentials do not appear in YAML, dry-run
 output, or process arguments:
 
+The joblib model is not distributed in Git, and no public download URL is
+currently documented. Obtain a compatible artifact from a trusted project
+maintainer or train and validate one locally. Store it at the conventional
+ignored path below or set `G12D` to any external path:
+
 ```bash
 export CUDA_VISIBLE_DEVICES=''
 export G12D="$PWD/tasks/small_molecule/resources/models/best_g12d_model.joblib"
@@ -90,6 +94,14 @@ export LLM_BASE_URL=https://your-model-host.example/v1
 export LLM_API_KEY=your-api-key
 export LLM_MODEL_NAME=your-served-model
 ```
+
+For the published artifact, keep the tracked
+`best_g12d_model_metadata.json` beside the joblib file and verify SHA-256
+`a4c15c1124eced2e8dc80a18fdf94752da106168209d804002b0defbf63986ed`.
+For an external location, copy the metadata sidecar next to the model if you
+want the scorer and preflight to enforce that checksum. Joblib uses
+pickle-compatible deserialization and can execute code, so never load an
+artifact from an untrusted source.
 
 When credentials are supplied as a protected JSON file with `url`, `key`, and
 `model` fields, load them without copying the file into the checkout:
@@ -143,6 +155,8 @@ CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/small_molecule \
 ```
 
 Resolve every `FAIL` before running a real evaluation.
+The shared runner repeats the manifest-declared preflight automatically before
+non-mock execution.
 
 ## 8. Run The Task Contract Dry-Run
 
@@ -153,6 +167,8 @@ evaluators:
 CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/small_molecule \
   python scripts/run_ldm_tts.py \
   config/small_molecule/real_m1_seed_analog.yaml \
+  --skip-preflight \
+  --set contract_profile= \
   --set args.dry-run=true \
   --set args.budget=1 \
   --set args.init-size=1 \
@@ -167,6 +183,7 @@ Confirm the resolved plan is CPU-only and contains no API key.
 CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/small_molecule \
   python scripts/run_ldm_tts.py \
   config/small_molecule/real_m1_seed_analog.yaml \
+  --set contract_profile= \
   --set args.budget=1 \
   --set args.init-size=1 \
   --set args.batch-size=1 \

@@ -2,6 +2,7 @@ name: antibody_real_cpu_smoke
 task: antibody
 algorithm: ei
 mode: real
+contract_profile: real_cpu_smoke
 description: One real API-backed AntBO proposal and Absolut evaluation on CPU.
 args:
   config: resources/default_config.yaml

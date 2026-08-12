@@ -9,36 +9,41 @@ from argparse import Namespace
 from pathlib import Path
 from unittest.mock import patch
 
-from ldm_tts import (
+from ldm_tts.optimization.records import (
     BOObservation,
     BOPrediction,
     BOSelectionResult,
-    CandidateTraceRecord,
     FeatureVector,
-    JsonlTrajectoryRecorder,
-    LDMRoundTrace,
-    LDMSearchRoundResult,
-    best_item,
-    finite_or_none,
+    SurrogateVector,
+)
+from ldm_tts.engine.runtime import LDMSearchRoundResult, run_budgeted_search
+from tasks.nanogpt.core.expansion_schema import (
     initial_active_operation_schema,
-    is_finite_number,
-    load_json_object,
-    load_jsonl,
     load_operation_schema,
     operation_feature_dim,
-    ranked_items,
-    reject_keys,
-    run_budgeted_search,
+    operation_representation_dimension,
     validate_operation_payload,
 )
-from ldm_tts.dependency_checks import (
+from ldm_tts.transport.parsing import load_json_object, reject_keys
+from ldm_tts.contracts.evaluation import (
+    best_item,
+    finite_or_none,
+    is_finite_number,
+    ranked_items,
+)
+from ldm_tts.engine.run_store import CandidateTraceRecord, LDMRoundTrace
+from ldm_tts.engine.run_store import JsonlTrajectoryRecorder, load_jsonl
+from ldm_tts.registration.dependencies import (
     check_plan,
-    check_reasyn,
-    check_vina,
     cli_args_to_map,
     has_failures,
 )
-from ldm_tts.runner import build_plan
+from ldm_tts.cli.runner import build_plan
+from tasks.small_molecule.core.dependencies import (
+    check_model_artifact,
+    check_reasyn,
+    check_vina,
+)
 
 
 class LDMScoringTests(unittest.TestCase):
@@ -303,8 +308,8 @@ class LDMDependencyCheckTests(unittest.TestCase):
             plan = build_plan(config, Path("config/nanogpt/test.yaml"))
 
             with (
-                patch("ldm_tts.dependency_checks.NANOGPT_DATA_DIR", root / "missing-data"),
-                patch("ldm_tts.dependency_checks.NANOGPT_TOKENIZER_DIR", root / "missing-tokenizer"),
+                patch("tasks.nanogpt.core.dependencies.NANOGPT_DATA_DIR", root / "missing-data"),
+                patch("tasks.nanogpt.core.dependencies.NANOGPT_TOKENIZER_DIR", root / "missing-tokenizer"),
             ):
                 checks = check_plan(plan, include_optional=False)
 
@@ -337,8 +342,8 @@ class LDMDependencyCheckTests(unittest.TestCase):
             plan = build_plan(config, Path("config/nanogpt/test.yaml"))
 
             with (
-                patch("ldm_tts.dependency_checks.NANOGPT_DATA_DIR", root / "missing-data"),
-                patch("ldm_tts.dependency_checks.NANOGPT_TOKENIZER_DIR", root / "missing-tokenizer"),
+                patch("tasks.nanogpt.core.dependencies.NANOGPT_DATA_DIR", root / "missing-data"),
+                patch("tasks.nanogpt.core.dependencies.NANOGPT_TOKENIZER_DIR", root / "missing-tokenizer"),
             ):
                 checks = check_plan(plan)
 
@@ -357,6 +362,35 @@ class LDMDependencyCheckTests(unittest.TestCase):
         self.assertEqual(check.status, "fail")
         self.assertIn("status 2", check.message)
         self.assertIn("broken", check.detail)
+
+    def test_model_artifact_check_verifies_declared_digest(self) -> None:
+        import hashlib
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model = Path(tmp) / "model.joblib"
+            metadata = Path(tmp) / "model_metadata.json"
+            model.write_bytes(b"trusted model bytes")
+            digest = hashlib.sha256(model.read_bytes()).hexdigest()
+            metadata.write_text(
+                json.dumps({"artifact": {"sha256": digest}}),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(check_model_artifact("small_molecule", model).status, "ok")
+            model.write_bytes(b"tampered model bytes")
+            failed = check_model_artifact("small_molecule", model)
+
+        self.assertEqual(failed.status, "fail")
+        self.assertIn("checksum mismatch", failed.message)
+
+    def test_model_artifact_check_warns_without_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = Path(tmp) / "custom.joblib"
+            model.write_bytes(b"caller-trusted")
+            check = check_model_artifact("small_molecule", model)
+
+        self.assertEqual(check.status, "warn")
+        self.assertIn("caller's responsibility", check.message)
 
     def test_reasyn_check_probes_configured_interpreter_imports(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -508,6 +542,7 @@ class LDMBOTraceContractTests(unittest.TestCase):
         )
 
         self.assertEqual(feature.to_dict()["values"], (0.1, 0.9))
+        self.assertIsInstance(feature, SurrogateVector)
         self.assertEqual(observation.to_dict()["feature"]["source_id"], "candidate-1")
         self.assertEqual(selection.to_dict()["predictions"][0]["candidate_id"], "candidate-1")
         json.dumps(selection.to_dict())
@@ -560,6 +595,10 @@ class LDMTaskSpecTests(unittest.TestCase):
             project_root,
         )
         active_schema = nanogpt_procedure.initial_active_operation_schema(schema, args)
+        self.assertEqual(
+            operation_feature_dim(active_schema),
+            operation_representation_dimension(active_schema),
+        )
 
         spec = nanogpt_procedure.describe_ldm_task(
             args,
@@ -569,14 +608,41 @@ class LDMTaskSpecTests(unittest.TestCase):
         )
 
         self.assertEqual(spec.task, "nanogpt")
-        self.assertEqual(spec.candidate_space.dimension, 16)
-        self.assertEqual(spec.candidate_space.metadata["full_feature_dimension"], 27)
+        self.assertEqual(spec.candidate_domain.kind, "structured_python_program")
+        self.assertIsNone(spec.candidate_domain.dimension)
+        self.assertEqual(spec.surrogate.dimension, 16)
+        self.assertEqual(spec.surrogate.dimension_policy, "evolving")
+        self.assertEqual(spec.surrogate.metadata["full_representation_dimension"], 27)
         self.assertIn(
             "train_operations",
             {response_space.name for response_space in spec.response_spaces},
         )
+        self.assertIn(
+            "reservoir_schema_update",
+            {response_space.name for response_space in spec.response_spaces},
+        )
+        self.assertEqual(
+            [item.action_kind for item in spec.reservoir.expansions],
+            ["edit_candidate", "update_expansion_schema"],
+        )
         self.assertEqual(spec.proposal_search.name, "best_of_n")
         self.assertEqual(spec.proposal_search.breadth, 2)
+
+    def test_nanogpt_accepts_canonical_and_legacy_expansion_flags(self) -> None:
+        from tasks.nanogpt.ldm_task import procedure as nanogpt_procedure
+
+        canonical = nanogpt_procedure.parse_args(
+            ["--initial-expansion-parameters", "3", "--max-expansion-parameters", "7"]
+        )
+        legacy = nanogpt_procedure.parse_args(
+            ["--initial-operation-features", "3", "--max-active-operation-features", "7"]
+        )
+
+        self.assertEqual(canonical.initial_operation_features, legacy.initial_operation_features)
+        self.assertEqual(
+            canonical.max_active_operation_features,
+            legacy.max_active_operation_features,
+        )
 
     def test_small_molecule_spec_reports_two_objective_space(self) -> None:
         from tasks.small_molecule.ldm_task import procedure as molecule_procedure
@@ -590,7 +656,12 @@ class LDMTaskSpecTests(unittest.TestCase):
             [(objective.name, objective.direction) for objective in spec.objectives],
             [("vina", "minimize"), ("activity", "maximize")],
         )
-        self.assertEqual(spec.candidate_space.constraints["max_smiles_len"], 80)
+        self.assertEqual(spec.candidate_domain.constraints["max_smiles_len"], 80)
+        self.assertEqual(spec.reservoir.deduplication_key, "canonical SMILES")
+        self.assertEqual(
+            {item.action_kind for item in spec.reservoir.expansions},
+            {"emit_candidate", "configure_generator"},
+        )
         self.assertEqual(spec.proposal_search.name, "single_turn")
 
     def test_antibody_spec_reports_categorical_sequence_space(self) -> None:
@@ -604,8 +675,10 @@ class LDMTaskSpecTests(unittest.TestCase):
 
         self.assertEqual(args.device, "cpu")
         self.assertEqual(spec.task, "antibody")
-        self.assertEqual(spec.candidate_space.dimension, 11)
-        self.assertEqual(spec.candidate_space.constraints["alphabet_size"], 20)
+        self.assertEqual(spec.candidate_domain.dimension, 11)
+        self.assertEqual(spec.candidate_domain.constraints["alphabet_size"], 20)
+        self.assertEqual(spec.reservoir.deduplication_key, "amino-acid sequence")
+        self.assertEqual(spec.surrogate.dimension, 11)
         self.assertEqual(spec.objectives[0].direction, "minimize")
         self.assertEqual(spec.proposal_search.name, "single_turn")
 

@@ -16,7 +16,7 @@ The task follows the repository-wide layout documented in
 ```text
 ldm_task/      shared-runner adapter only
 core/          molecular search, surrogate, and scorer implementation
-resources/     committed model artifacts and other runtime inputs
+resources/     tracked model metadata and other runtime inputs
 scripts/       docking extraction and plotting utilities
 environments/  optional docking Conda specification
 tests/         task-local unit and integration tests
@@ -70,7 +70,7 @@ export LLM_API_KEY=your-api-key
 export LLM_MODEL_NAME=your-served-model
 
 export VINA_BIN=/path/to/vina
-export G12D=tasks/small_molecule/resources/models/best_g12d_model.joblib
+export G12D=/trusted/path/best_g12d_model.joblib
 export REASYN_REPO=/path/to/ReaSyn
 export REASYN_PYTHON=/path/to/ReaSyn/.venv/bin/python
 export REASYN_MODEL_PATH=/path/to/ReaSyn/data/trained_model/ar.ckpt,/path/to/ReaSyn/data/trained_model/eb.ckpt
@@ -89,7 +89,7 @@ args:
   llm-url: null
   llm-model-name: null
   vina-bin: null
-  nn-model-path: resources/models/best_g12d_model.joblib
+  nn-model-path: null
   reasyn-repo: null
   reasyn-python: null
   reasyn-model-path: null
@@ -105,7 +105,7 @@ override is preferable.
 | --- | --- | --- | --- |
 | Python environment | RDKit, Meeko, Gemmi, Gauche/gpytorch, sklearn/LightGBM, OpenAI client, plotting, and data libraries. | Molecule parsing, receptor/ligand prep, GP models, NN scoring, LLM calls. | `uv sync --locked --project tasks/small_molecule`; run with `uv run --locked --project tasks/small_molecule ...`. |
 | AutoDock Vina | External docking executable. Produces the Vina objective; lower is better. | Real Vina scoring. | `args.vina-bin`, `env.VINA_BIN`, or `vina` on `PATH`. |
-| G12D activity model | Model artifact at `tasks/small_molecule/resources/models/best_g12d_model.joblib`. Produces the activity objective; higher is better. | Real activity scoring. | `args.nn-model-path`, often through `env.G12D`. |
+| G12D activity model | Caller-supplied compatible joblib artifact; it is not distributed in Git. Produces the activity objective; higher is better. | Real activity scoring. | `args.nn-model-path` or `env.G12D`. |
 | ReaSyn | External reaction/synthesis-aware analog generator checkout plus AR and Edit Bridge checkpoints. | Seed-analog proposal methods. | `args.reasyn-repo`, `env.REASYN_HOME`, `env.REASYN_REPO`; interpreter through `args.reasyn-python`, `env.REASYN_PYTHON`, or `env.REASYN_BIN`. |
 | LLM endpoint | OpenAI-compatible chat endpoint. | Real LLM proposals. | `LLM_BASE_URL`, `LLM_MODEL_NAME`, and environment-only `LLM_API_KEY`; URL/model may also use CLI args. |
 
@@ -241,11 +241,12 @@ The checker validates:
 - ReaSyn checkout, executable interpreter, real import probe, non-empty
   checkpoints, and CUDA devices when configured
 
-The small-molecule real workflow also performs an early runtime preflight for
-Vina and the activity model before starting the search. The standalone checker
-is still required for ReaSyn methods because it validates the separate ReaSyn
-environment before an expensive run starts. It does not perform docking or
-generate analogs.
+The shared runner automatically invokes this manifest-declared preflight before
+every non-mock execution and blocks on any `FAIL`. The standalone checker is
+still recommended because it reports problems before a launch and supports
+`--no-optional`; it does not perform docking or generate analogs. Use the
+runner's `--skip-preflight` only for controlled diagnostics, never to launch a
+real campaign.
 
 ## Vina
 
@@ -264,7 +265,7 @@ Acquisition selection is configured with `args.acq`: use `ehvi` for expected
 hypervolume improvement or `mean` for a weighted posterior mean. For `mean`,
 set `args.acq-weights` to a comma-separated Vina/activity pair such as
 `0.5,0.5`. Both modes use the task-independent implementation in
-`ldm_tts.acquisition`.
+`ldm_tts.optimization.acquisition`.
 
 Important Vina fields:
 
@@ -340,6 +341,8 @@ full real configuration below.
    CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/small_molecule \
      python scripts/run_ldm_tts.py \
      config/small_molecule/real_m1_seed_analog.yaml \
+     --skip-preflight \
+     --set contract_profile= \
      --set args.dry-run=true \
      --set args.budget=1 \
      --set args.init-size=1 \
@@ -354,6 +357,7 @@ full real configuration below.
    CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/small_molecule \
      python scripts/run_ldm_tts.py \
      config/small_molecule/real_m1_seed_analog.yaml \
+     --set contract_profile= \
      --set args.budget=1 \
      --set args.init-size=1 \
      --set args.batch-size=1 \

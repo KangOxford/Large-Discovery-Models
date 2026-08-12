@@ -121,7 +121,7 @@ def test_prose_renderer_includes_model_visible_candidate_pool():
 
     row = render_record(ir)
 
-    assert "## Candidate pool" in row["instruction"]
+    assert "## Candidate reservoir" in row["instruction"]
     assert "ADGHTKQNPRA" in row["instruction"]
 
 
@@ -238,12 +238,12 @@ def test_parameter_edit_builder_allows_design_space_expansion():
     validate_ir_record(ir)
     assert "expand_design_space" in ir["request"]["allowed_actions"]
     rendered = render_record(ir)
-    assert "Inactive parameters" in rendered["instruction"]
+    assert "Inactive expansion parameters" in rendered["instruction"]
     assert "WARMDOWN_RATIO" in rendered["output"]
 
 
 def test_nanogpt_operation_engine_collects_validated_action(tmp_path, monkeypatch):
-    from ldm_tts.parameter_space import load_operation_schema
+    from tasks.nanogpt.core.expansion_schema import load_operation_schema
     from tasks.nanogpt.core.search_core import SearchConfig
     from tasks.nanogpt.core.workflow import OperationSearchEngine, parse_args
 

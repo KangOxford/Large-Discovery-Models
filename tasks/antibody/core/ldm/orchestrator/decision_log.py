@@ -9,7 +9,7 @@ _WORKSPACE_ROOT = Path(__file__).resolve().parents[5]
 if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
 
-from ldm_tts.trajectory import AtomicJsonLog, utc_timestamp
+from ldm_tts.engine.run_store import AtomicJsonLog, utc_timestamp
 
 
 class DecisionLog:

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "large-discovery-models"
+version = "0.1.0"
+description = "Empirically-grounded model-based open-ended search."
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = { file = "LICENSE" }
+dependencies = [
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+]
+
+[project.urls]
+Homepage = "https://largediscovery.net/en/"
+Repository = "https://github.com/yzailab/Large-Discovery-Models"
+
+[project.scripts]
+ldm-tts = "ldm_tts.cli.runner:main"
+
+[dependency-groups]
+dev = [
+    "pandas>=2",
+    "pytest>=8,<9",
+    "pytest-cov>=4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["ldm_tts"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/LICENSE",
+    "/README.md",
+    "/docs",
+    "/ldm_tts",
+    "/pyproject.toml",
+]

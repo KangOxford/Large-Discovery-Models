@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "task_id": "small_molecule",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/yzailab/Large-Discovery-Models",
+    "source_commit": "unqualified",
+    "task_path": "tasks/small_molecule"
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "vina",
+        "direction": "minimize",
+        "description": "AutoDock Vina binding score."
+      },
+      {
+        "name": "activity",
+        "direction": "maximize",
+        "description": "KRAS G12D activity-model score."
+      }
+    ],
+    "optimized": [
+      {
+        "name": "vina",
+        "direction": "minimize",
+        "description": "Docking objective; lower is better."
+      },
+      {
+        "name": "activity",
+        "direction": "maximize",
+        "description": "Activity objective; higher is better."
+      }
+    ],
+    "diagnostic": []
+  },
+  "evaluation": {
+    "datasets": [
+      "AutoDock Vina receptor target 8UN5 chain A",
+      "caller-supplied KRAS G12D activity model"
+    ],
+    "settings": {
+      "vina_pdb_id": "8UN5",
+      "vina_chain_id": "A",
+      "activity_model_source": "external"
+    },
+    "per_candidate_limits": {}
+  },
+  "budget": {
+    "expensive_evaluation_attempts": 80,
+    "batch_size": 1
+  },
+  "profiles": {
+    "real_m1_seed_analog": {
+      "description": "Committed 80-evaluation EHVI campaign configuration.",
+      "budget": {
+        "expensive_evaluation_attempts": 80,
+        "batch_size": 1
+      },
+      "locked_args": {
+        "budget": 80,
+        "batch-size": 1,
+        "acq": "ehvi"
+      }
+    }
+  }
+}

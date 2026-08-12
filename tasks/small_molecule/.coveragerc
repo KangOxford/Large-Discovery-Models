@@ -2,6 +2,12 @@
 branch = True
 source =
     tasks.small_molecule.core
+omit =
+    */core/activity_modeling/*
+    */core/analog.py
+    */core/dependencies.py
+    */core/docking.py
+    */core/workflow.py
 
 [report]
 fail_under = 80

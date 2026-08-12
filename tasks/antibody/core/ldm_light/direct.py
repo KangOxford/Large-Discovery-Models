@@ -9,6 +9,10 @@ import numpy as np
 
 from tasks.antibody.core.ldm_light.ldm_acq import (
     AA,
+    AROMATIC,
+    N_GLYCO,
+    longest_hydrophobic_run,
+    net_charge,
     passes_developability,
     random_candidates,
     seqs_to_indices,
@@ -100,24 +104,67 @@ def parse_direct_sequences(
     max_sequences: int | None = None,
 ) -> list[str]:
     """Parse, validate, deduplicate, and cap direct CDRH3 proposals."""
+    sequences, _ = _parse_direct_sequences_with_rejections(
+        raw,
+        seq_len=seq_len,
+        observed=observed,
+        max_sequences=max_sequences,
+    )
+    return sequences
+
+
+def _parse_direct_sequences_with_rejections(
+    raw: str,
+    *,
+    seq_len: int,
+    observed: Iterable[str],
+    max_sequences: int | None = None,
+) -> tuple[list[str], list[dict[str, Any]]]:
     observed_set = {str(seq).strip().upper() for seq in observed}
     used: set[str] = set()
     sequences: list[str] = []
-    for item in _load_json_list(raw):
+    rejections: list[dict[str, Any]] = []
+    for item_index, item in enumerate(_load_json_list(raw)):
         if not isinstance(item, str):
+            rejections.append({
+                "item_index": item_index,
+                "value": item,
+                "reasons": ["not_string"],
+            })
             continue
         sequence = item.strip().upper()
-        if (
-            valid_seq(sequence, int(seq_len))
-            and passes_developability(sequence)
-            and sequence not in observed_set
-            and sequence not in used
-        ):
+        reasons: list[str] = []
+        if len(sequence) != int(seq_len):
+            reasons.append("length")
+        if any(aa not in AA for aa in sequence):
+            reasons.append("alphabet")
+        if valid_seq(sequence, int(seq_len)):
+            if sequence.count("C") > 1:
+                reasons.append("max_cysteine")
+            if longest_hydrophobic_run(sequence) > 4:
+                reasons.append("max_hydrophobic_run")
+            if sum(1 for aa in sequence if aa in AROMATIC) > 2:
+                reasons.append("max_aromatic_FWY")
+            if not -1.0 <= net_charge(sequence) <= 2.0:
+                reasons.append("net_charge_range")
+            if N_GLYCO.search(sequence) is not None:
+                reasons.append("n_glycosylation_NXS_or_NXT")
+        if sequence in observed_set:
+            reasons.append("already_observed")
+        if sequence in used:
+            reasons.append("duplicate_response")
+        if not reasons and passes_developability(sequence):
             sequences.append(sequence)
             used.add(sequence)
             if max_sequences is not None and len(sequences) >= int(max_sequences):
                 break
-    return sequences
+        else:
+            rejections.append({
+                "item_index": item_index,
+                "sequence": sequence,
+                "reasons": reasons or ["developability"],
+            })
+    return sequences, rejections
 
 
 def _fallback_sequences(
@@ -191,13 +238,21 @@ def propose_direct_batch(
         raw_outputs.extend(outputs)
         for output_index, raw in enumerate(outputs):
             try:
-                parsed = parse_direct_sequences(
+                parsed, rejections = _parse_direct_sequences_with_rejections(
                     raw,
                     seq_len=seq_len,
                     observed=observed.union(accumulated),
                     max_sequences=1 if independent else needed,
                 )
                 accumulated.extend(parsed)
+                if not parsed:
+                    errors.append({
+                        "attempt": attempt,
+                        "output_index": output_index,
+                        "error": "no candidates passed admission",
+                        "rejections": rejections,
+                        "raw_response": raw,
+                    })
             except Exception as exc:
                 errors.append({
                     "attempt": attempt,

@@ -21,7 +21,7 @@ tests/         task-local unit and integration tests
 runs/          generated run artifacts (Git-ignored)
 ```
 
-The task declares the shared `single_turn` proposal topology for each LLM pool
+The task declares the shared `single_turn` proposal topology for each LLM reservoir
 selection or DSL update. Its budgeted multi-round AntBO loop, GP acquisition,
 Absolut evaluation, and observation updates remain in `core/`.
 
@@ -68,7 +68,7 @@ The workflow exposes the four antibody LDM variants from the paper as stable
 
 `llm_gen` is the pure-LLM direct-generation baseline and never fits or uses an
 acquisition function. `legacy_policy_max` preserves the older merged workflow:
-one DSL update, one flattened candidate pool, and global acquisition argmax.
+one DSL update, one flattened candidate reservoir, and global acquisition argmax.
 
 Softmax uses `P(x_i) proportional to exp(eta * acquisition_i)`. Set
 `--softmax-eta 0` for uniform sampling. Positive infinity is handled as an
@@ -78,8 +78,9 @@ calculation.
 For Policy methods, `--parallel-budget` is the total generated-candidate budget
 and is divided across the independently sampled policies. Set
 `--per-strategy-budget` to a positive value to override that derived cap. Each
-policy pool contributes at most one unique representative to the final Max or
-Softmax reduction, preventing a larger pool from dominating merely by size.
+policy reservoir contributes at most one unique representative to the final Max
+or Softmax reduction, preventing a larger reservoir from dominating merely by
+size.
 
 Publication-oriented five-antigen, five-seed, 200-evaluation configurations are
 committed separately so every curve has an unambiguous executable definition:

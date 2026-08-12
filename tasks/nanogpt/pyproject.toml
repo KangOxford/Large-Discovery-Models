@@ -1,7 +1,7 @@
 [project]
-name = "autoresearch"
+name = "ldm-tts-nanogpt"
 version = "0.1.0"
-description = "Autonomous pretraining research swarm"
+description = "NanoGPT task workflow for the shared LDM-TTS runner."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -13,6 +13,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8,<9",
+    "pytest-cov>=4.0",
 ]
 train = [
     "kernels>=0.11.7",

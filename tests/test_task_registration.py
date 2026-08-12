@@ -5,19 +5,24 @@ from pathlib import Path
 
 import pytest
 
-import ldm_tts.task_registry as task_registry
-from ldm_tts.task_registry import (
+import ldm_tts.registration.registry as task_registry
+import scripts.validate_tasks as validate_tasks_script
+from ldm_tts.registration.registry import (
     TASK_DEFINITIONS,
     TaskRegistrationError,
     discover_task_definitions,
     load_task_manifest,
     validate_task_layout,
 )
-from ldm_tts.task_scaffold import TaskScaffoldError, scaffold_task
+from ldm_tts.registration.scaffold import TaskScaffoldError, scaffold_task
 
 
 def test_builtin_tasks_are_discovered_from_manifests() -> None:
-    assert set(TASK_DEFINITIONS) == {"antibody", "nanogpt", "small_molecule"}
+    assert set(TASK_DEFINITIONS) == {
+        "antibody",
+        "nanogpt",
+        "small_molecule",
+    }
     for task_id, definition in TASK_DEFINITIONS.items():
         assert definition.relative_root == Path("tasks") / task_id
         assert definition.module == f"tasks.{task_id}.ldm_task.procedure"
@@ -39,12 +44,58 @@ def test_scaffolded_task_is_discoverable_and_valid(tmp_path: Path) -> None:
         repository_root=tmp_path,
     )
 
-    assert len(created) == 11
+    assert len(created) == 13
+    assert (tmp_path / "tasks" / "protein_design" / "experiment.json") in created
     definitions = discover_task_definitions(tmp_path)
     definition = definitions["protein_design"]
     assert definition.module == "tasks.protein_design.ldm_task.procedure"
     assert definition.dependency_checker is None
     assert validate_task_layout(definition, repository_root=tmp_path) == []
+    pyproject = (tmp_path / "tasks" / "protein_design" / "pyproject.toml").read_text(
+        encoding="utf-8"
+    )
+    assert '"numpy>=1.24"' in pyproject
+    assert '"pyyaml>=6.0"' in pyproject
+    readme = (tmp_path / "tasks" / "protein_design" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "uv sync --project" in readme
+    assert "uv sync --locked" not in readme
+    procedure = (
+        tmp_path / "tasks" / "protein_design" / "ldm_task" / "procedure.py"
+    ).read_text(encoding="utf-8")
+    assert "CandidateDomainSpec" in procedure
+    assert "ReservoirExpansionSpec" in procedure
+    assert "SurrogateSpaceSpec" in procedure
+    mock_engine = (
+        tmp_path / "tasks" / "protein_design" / "core" / "mock_engine.py"
+    ).read_text(encoding="utf-8")
+    assert "LDMEngine" in mock_engine
+    assert "CampaignRuntime" in mock_engine
+    assert "DraftCandidateDomain" in mock_engine
+
+
+def test_qualification_gate_allows_drafts_only_in_normal_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (tmp_path / "tasks").mkdir()
+    scaffold_task("custom", description="Custom task.", repository_root=tmp_path)
+    definitions = discover_task_definitions(tmp_path)
+    monkeypatch.setattr(validate_tasks_script, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(validate_tasks_script, "TASK_DEFINITIONS", definitions)
+    monkeypatch.setattr(validate_tasks_script, "TASK_DISCOVERY_ERROR", None)
+
+    normal_rows = validate_tasks_script.validate_registered_tasks("custom")
+    assert not any(row["level"] == "error" for row in normal_rows)
+    assert any("contract is draft" in row["message"] for row in normal_rows)
+
+    assert validate_tasks_script.main(
+        ["--task", "custom", "--require-qualified"]
+    ) == 1
+    output = capsys.readouterr().out
+    assert "[ERROR] custom: Experiment contract is draft" in output
 
 
 def test_layout_rejects_implementation_inside_adapter(tmp_path: Path) -> None:

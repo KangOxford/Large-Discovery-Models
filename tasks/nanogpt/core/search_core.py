@@ -20,8 +20,8 @@ _WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
 
-from ldm_tts.scoring import is_finite_number
-from ldm_tts.trajectory import JsonlTrajectoryRecorder
+from ldm_tts.contracts.evaluation import is_finite_number
+from ldm_tts.engine.run_store import JsonlTrajectoryRecorder
 
 
 FLOAT_RE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"

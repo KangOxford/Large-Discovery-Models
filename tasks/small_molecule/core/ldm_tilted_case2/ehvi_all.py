@@ -2,7 +2,7 @@
 
 The filename and ``EhviResult.ehvi`` field are retained for trajectory and
 import compatibility. Scoring itself is dispatched through the shared
-``ldm_tts.acquisition`` module and can be EHVI or posterior mean.
+``ldm_tts.optimization.acquisition`` module and can be EHVI or posterior mean.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import Sequence
 
 import numpy as np
 
-from ldm_tts.acquisition import make_acquisition, pareto_front
+from ldm_tts.optimization.acquisition import make_acquisition, pareto_front
 from tasks.small_molecule.core.gp import GPConfig, GPSurrogate
 from tasks.small_molecule.core.ldm_tilted_case2.candidate_record import CandidateRecord
 from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config

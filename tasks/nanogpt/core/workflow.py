@@ -28,17 +28,17 @@ _WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
 
-from ldm_tts.scoring import as_float as shared_as_float
-from ldm_tts.scoring import is_finite_number
-from ldm_tts.acquisition import make_acquisition
+from ldm_tts.contracts.evaluation import as_float as shared_as_float
+from ldm_tts.contracts.evaluation import is_finite_number
+from ldm_tts.optimization.acquisition import make_acquisition
 from ldm_tts.data import DataCollectionSink, make_parameter_edit_ir
-from ldm_tts.search_methods import (
+from ldm_tts.optimization.search import (
     SEARCH_METHOD_ALIASES as SHARED_SEARCH_METHOD_ALIASES,
     canonical_search_method,
     estimate_generated,
     get_traversal_method,
 )
-from ldm_tts.parameter_space import (
+from tasks.nanogpt.core.expansion_schema import (
     OperationParameter,
     OperationSchema,
     ValidatedOperation,
@@ -57,13 +57,16 @@ from ldm_tts.parameter_space import (
     validate_operation_payload,
     validate_operation_value,
 )
-from ldm_tts.spaces import (
+from ldm_tts.contracts import (
     AcquisitionSpec,
-    CandidateSpaceSpec,
+    CandidateDomainSpec,
     LDMTaskSpec,
     ObjectiveSpec,
-    ResponseSpaceSpec,
     ProposalSearchSpec,
+    ReservoirExpansionSpec,
+    ReservoirSpec,
+    ResponseSpaceSpec,
+    SurrogateSpaceSpec,
 )
 
 from tasks.nanogpt.core.single_search import make_unique_run_dir, safe_path_tag
@@ -475,8 +478,8 @@ class OperationSearchEngine(SearchEngine):
             self.max_active_operation_features = max(1, requested_max_features)
         if len(self.operation_schema.parameters) > self.max_active_operation_features:
             raise ValueError(
-                f"Initial active feature count {len(self.operation_schema.parameters)} exceeds "
-                f"--max-active-operation-features={self.max_active_operation_features}."
+                f"Initial expansion parameter count {len(self.operation_schema.parameters)} exceeds "
+                f"--max-expansion-parameters={self.max_active_operation_features}."
             )
         self.expansion_history: list[dict[str, Any]] = []
         self.current_iteration: int | None = None
@@ -497,7 +500,7 @@ class OperationSearchEngine(SearchEngine):
             self.full_operation_schema,
             inactive,
             version_suffix="inactive",
-            description_prefix="Inactive operation-feature pool.",
+            description_prefix="Inactive reservoir expansion parameters.",
         )
 
     def feature_expansion_available(self) -> bool:
@@ -528,7 +531,7 @@ class OperationSearchEngine(SearchEngine):
             self.full_operation_schema,
             parameters,
             version_suffix="active",
-            description_prefix="Active dynamically expanded operation-feature subset.",
+            description_prefix="Active reservoir expansion schema.",
         )
         if name not in self.full_operation_schema.parameters:
             full_parameters = dict(self.full_operation_schema.parameters)
@@ -537,7 +540,7 @@ class OperationSearchEngine(SearchEngine):
                 self.full_operation_schema,
                 full_parameters,
                 version_suffix="full",
-                description_prefix="Full operation-feature pool including proposed features.",
+                description_prefix="Full reservoir expansion schema including proposed parameters.",
             )
         record = {
             "name": name,
@@ -890,7 +893,7 @@ class OperationSearchEngine(SearchEngine):
             action=ir_action,
             request_description=(
                 "Choose one valid action: propose edits to active parameters or "
-                "expand the operation-feature design space."
+                "update the reservoir expansion schema."
             ),
             design_space_description=active_schema.description,
             allowed_actions=allowed_actions,
@@ -990,10 +993,10 @@ class OperationSearchEngine(SearchEngine):
             {
                 "role": "system",
                 "content": (
-                    "You propose train.py search actions for a dynamically expanding "
-                    "operation-feature space. Call exactly one provided tool: either "
-                    "propose_train_operations to edit active features, or "
-                    "propose_operation_feature to activate a new feature."
+                    "You propose train.py search actions using a dynamically updated "
+                    "reservoir expansion schema. Call exactly one provided tool: either "
+                    "propose_train_operations to edit active expansion parameters, or "
+                    "propose_operation_feature to activate a new expansion parameter."
                     + plain_text_instruction
                 ),
             },
@@ -1318,7 +1321,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=None,
         help=(
-            "JSON schema containing the full operation-feature pool. Required for "
+            "JSON schema containing all reservoir expansion parameters. Required for "
             "--generator operation_tool, operation_tool_plain_text, or operation_mock."
         ),
     )
@@ -1335,44 +1338,53 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Maximum structured operations allowed in one generated child.",
     )
     parser.add_argument(
+        "--operation-surrogate",
         "--operation-features",
+        dest="operation_features",
         action="store_true",
-        help="Use the active operation schema vector for GP features instead of generic code features.",
+        help="Represent candidates for the surrogate through the active expansion schema.",
     )
     parser.add_argument(
+        "--initial-expansion-parameters",
         "--initial-operation-features",
+        dest="initial_operation_features",
         default="5",
         help=(
-            "Initial active operation-feature subset. Use an integer count such as 5, "
+            "Initial active expansion-schema parameters. Use an integer count such as 5, "
             "or comma-separated schema parameter names. Default: first 5 schema parameters."
         ),
     )
     parser.add_argument(
+        "--max-expansion-parameters",
         "--max-active-operation-features",
+        dest="max_active_operation_features",
         type=int,
         default=0,
-        help="Maximum active operation features after expansion. 0 means all features in the full schema.",
+        help="Maximum active expansion-schema parameters. 0 means the full declared schema.",
     )
     parser.add_argument(
+        "--disable-expansion-schema-updates",
         "--disable-feature-expansion",
         dest="allow_feature_expansion",
         action="store_false",
-        help="Disable the propose_operation_feature action and keep the initial feature subset fixed.",
+        help="Keep the initial reservoir expansion schema fixed.",
     )
     parser.set_defaults(allow_feature_expansion=True)
     parser.add_argument(
+        "--allow-new-expansion-parameters",
         "--allow-new-feature-specs",
+        dest="allow_new_feature_specs",
         action="store_true",
         help=(
-            "Allow the LLM to propose a brand-new top-level assignment feature spec. "
-            "By default it may only activate inactive features already present in --operation-schema."
+            "Allow the LLM to propose a new top-level assignment parameter. By default "
+            "it may only activate inactive parameters already present in --operation-schema."
         ),
     )
     parser.add_argument(
         "--mock-expand-every",
         type=int,
         default=0,
-        help="For operation_mock tests, activate one inactive feature every N mock generations. 0 disables.",
+        help="For operation_mock tests, activate one inactive expansion parameter every N mock generations. 0 disables.",
     )
 
     parser.add_argument(
@@ -1422,7 +1434,7 @@ async def async_main(argv: list[str] | None = None) -> int:
         and bool(getattr(args, "allow_feature_expansion", True))
         and int(getattr(args, "concurrency", 1)) != 1
     ):
-        print("warning: feature expansion uses global active schema; forcing --concurrency 1.", file=sys.stderr)
+        print("warning: reservoir schema updates use global active state; forcing --concurrency 1.", file=sys.stderr)
         args.concurrency = 1
     effective_method = resolve_search_method(args)
     args.effective_method = effective_method
@@ -1549,8 +1561,8 @@ async def async_main(argv: list[str] | None = None) -> int:
     )
     logger.write(
         "ldm_task_spec "
-        f"candidate_space={ldm_task_spec.candidate_space.name} "
-        f"dimension={ldm_task_spec.candidate_space.dimension} "
+        f"candidate_domain={ldm_task_spec.candidate_domain.name} "
+        f"dimension={ldm_task_spec.candidate_domain.dimension} "
         f"acquisition={ldm_task_spec.acquisition.name}"
     )
     feedback_path = resolve_feedback_path(args.feedback_tsv, project_root, out_dir)
@@ -2964,78 +2976,104 @@ def describe_ldm_task(
     *,
     effective_method: str | None = None,
 ) -> LDMTaskSpec:
-    if use_operation_features(args, active_schema):
+    operation_mode = use_operation_features(args, active_schema)
+    expansion_available = False
+    inactive_names: list[str] = []
+    max_active = 0
+    full_dimension: int | None = None
+    if operation_mode:
         assert active_schema is not None
         max_active = int(getattr(args, "max_active_operation_features", 0) or 0)
         if full_schema is not None and max_active <= 0:
             max_active = len(full_schema.parameters)
         full_dimension = None if full_schema is None else operation_feature_dim(full_schema)
-        candidate_space = CandidateSpaceSpec(
-            name="operation_feature_vector",
-            kind="mixed_parameter_vector",
-            dimension=operation_feature_dim(active_schema),
-            representation="active train.py operation schema encoded as normalized numeric and one-hot choice features",
-            constraints={
-                "active_feature_count": len(active_schema.parameters),
-                "max_active_operation_features": max_active,
-            },
-            metadata={
-                "active_feature_names": list(active_schema.parameters),
-                "active_schema_version": active_schema.version,
-                "full_feature_count": None if full_schema is None else len(full_schema.parameters),
-                "full_feature_dimension": full_dimension,
-                "full_schema_version": None if full_schema is None else full_schema.version,
-            },
-        )
-    else:
-        candidate_space = CandidateSpaceSpec(
-            name="code_numeric_hash_vector",
-            kind="dense_numeric_vector",
-            dimension=feature_dim(int(args.hash_dims)),
-            representation="numeric assignment features plus hashed train.py token features",
-            constraints={"hash_dims": int(args.hash_dims)},
-            metadata={"feature_version": FEATURE_VERSION},
-        )
-
-    response_spaces: list[ResponseSpaceSpec] = []
-    if active_schema is not None and args.generator in OPERATION_GENERATORS:
-        response_spaces.append(
-            ResponseSpaceSpec(
-                name="train_operations",
-                output_kind="tool_call_or_json",
-                parser="tasks.nanogpt.ldm_task.procedure.validate_generator_action",
-                description="LLM edits active train.py operation features with deterministic application.",
-                schema=make_operation_tool_schema(
-                    active_schema,
-                    int(getattr(args, "max_operations_per_step", 1)),
-                )["function"]["parameters"],
-                metadata={
-                    "tool_name": "propose_train_operations",
-                    "active_feature_names": list(active_schema.parameters),
-                },
-            )
-        )
-        feature_expansion_allowed = bool(getattr(args, "allow_feature_expansion", True))
-        max_active = int(getattr(args, "max_active_operation_features", 0) or 0)
-        if full_schema is not None and max_active <= 0:
-            max_active = len(full_schema.parameters)
         inactive_names = (
             []
             if full_schema is None
             else [name for name in full_schema.parameters if name not in active_schema.parameters]
         )
         expansion_available = (
-            feature_expansion_allowed
+            bool(getattr(args, "allow_feature_expansion", True))
             and (max_active <= 0 or len(active_schema.parameters) < max_active)
             and (bool(inactive_names) or bool(getattr(args, "allow_new_feature_specs", False)))
+        )
+
+    candidate_domain = CandidateDomainSpec(
+        name="train_program",
+        kind="structured_python_program",
+        dimension=None,
+        representation="complete train.py program reached through validated edits",
+        constraints={
+            "edit_mode": "structured_operations" if operation_mode else "code_edit",
+            "maximum_operations_per_step": int(getattr(args, "max_operations_per_step", 1)),
+        },
+        metadata={"train_file": str(args.train_file)},
+    )
+
+    if operation_mode:
+        assert active_schema is not None
+        surrogate = SurrogateSpaceSpec(
+            kind="vector",
+            representation="normalized numeric and one-hot expansion-schema parameters",
+            dimension_policy="evolving" if expansion_available else "fixed",
+            dimension=operation_feature_dim(active_schema),
+            encoder="tasks.nanogpt.core.workflow.featurize_operation_params",
+            version=active_schema.version,
+            metadata={
+                "active_parameter_names": list(active_schema.parameters),
+                "active_parameter_count": len(active_schema.parameters),
+                "maximum_active_parameters": max_active,
+                "full_parameter_count": None if full_schema is None else len(full_schema.parameters),
+                "full_representation_dimension": full_dimension,
+                "full_schema_version": None if full_schema is None else full_schema.version,
+            },
+        )
+    else:
+        surrogate = SurrogateSpaceSpec(
+            kind="vector",
+            representation="numeric assignments plus hashed train.py tokens",
+            dimension_policy="fixed",
+            dimension=feature_dim(int(args.hash_dims)),
+            encoder="tasks.nanogpt.core.workflow.featurize_code",
+            version=FEATURE_VERSION,
+            metadata={"hash_dimensions": int(args.hash_dims)},
+        )
+
+    response_spaces: list[ResponseSpaceSpec] = []
+    reservoir_expansions: list[ReservoirExpansionSpec] = []
+    if active_schema is not None and args.generator in OPERATION_GENERATORS:
+        response_spaces.append(
+            ResponseSpaceSpec(
+                name="train_operations",
+                output_kind="tool_call_or_json",
+                parser="tasks.nanogpt.ldm_task.procedure.validate_generator_action",
+                description="LLM edits active expansion-schema parameters with deterministic application.",
+                schema=make_operation_tool_schema(
+                    active_schema,
+                    int(getattr(args, "max_operations_per_step", 1)),
+                )["function"]["parameters"],
+                metadata={
+                    "tool_name": "propose_train_operations",
+                    "active_parameter_names": list(active_schema.parameters),
+                },
+            )
+        )
+        reservoir_expansions.append(
+            ReservoirExpansionSpec(
+                name="structured_train_program_edit",
+                action_kind="edit_candidate",
+                response_space="train_operations",
+                produces_candidates=True,
+                description="Apply validated parameter operations to produce a train.py candidate.",
+            )
         )
         if expansion_available:
             response_spaces.append(
                 ResponseSpaceSpec(
-                    name="operation_feature_activation",
+                    name="reservoir_schema_update",
                     output_kind="tool_call_or_json",
                     parser="tasks.nanogpt.ldm_task.procedure.validate_feature_payload",
-                    description="LLM activates one inactive operation feature dimension for later GP scoring.",
+                    description="LLM activates one parameter for subsequent reservoir expansion.",
                     schema={
                         "type": "object",
                         "required": ["name"],
@@ -3046,8 +3084,23 @@ def describe_ldm_task(
                     },
                     metadata={
                         "tool_name": "propose_operation_feature",
-                        "inactive_feature_names": inactive_names,
-                        "allow_new_feature_specs": bool(getattr(args, "allow_new_feature_specs", False)),
+                        "inactive_parameter_names": inactive_names,
+                        "allow_new_parameter_specs": bool(getattr(args, "allow_new_feature_specs", False)),
+                    },
+                )
+            )
+            reservoir_expansions.append(
+                ReservoirExpansionSpec(
+                    name="expansion_schema_update",
+                    action_kind="update_expansion_schema",
+                    response_space="reservoir_schema_update",
+                    produces_candidates=False,
+                    description="Expand the parameter schema used by later candidate edits.",
+                    parameters={
+                        "inactive_parameter_names": inactive_names,
+                        "allow_new_parameter_specs": bool(
+                            getattr(args, "allow_new_feature_specs", False)
+                        ),
                     },
                 )
             )
@@ -3061,11 +3114,20 @@ def describe_ldm_task(
                 metadata={"generator": args.generator},
             )
         )
+        reservoir_expansions.append(
+            ReservoirExpansionSpec(
+                name="train_program_code_edit",
+                action_kind="edit_candidate",
+                response_space="code_edit",
+                produces_candidates=True,
+                description="Apply one task-validated code edit to produce a train.py candidate.",
+            )
+        )
 
     method = effective_method or resolve_search_method(args)
     return LDMTaskSpec(
         task="nanogpt",
-        candidate_space=candidate_space,
+        candidate_domain=candidate_domain,
         objectives=(
             ObjectiveSpec(
                 name=str(args.score_key),
@@ -3092,6 +3154,18 @@ def describe_ldm_task(
                 "beam_width": int(args.beam_width),
             },
         ),
+        reservoir=ReservoirSpec(
+            name="train_program_candidate_reservoir",
+            expansions=tuple(reservoir_expansions),
+            candidate_validator="train.py syntax, edit, operation-schema, and evaluation-contract checks",
+            deduplication_key="normalized train.py source hash",
+            metadata={
+                "expansion_schema_policy": (
+                    "evolving" if expansion_available else "fixed"
+                )
+            },
+        ),
+        surrogate=surrogate,
         proposal_search=ProposalSearchSpec(
             name=method,
             breadth=max(1, int(args.breadth)),
@@ -3194,10 +3268,10 @@ def build_operation_prompt(
     task_context = engine.config.task_context.strip()
     task_context_block = "\nProject and benchmark context:\n" + task_context + "\n" if task_context else ""
     expansion_instruction = (
-        "- Or expand the feature space: call `propose_operation_feature` to activate one inactive feature dimension. "
-        "Use this when the current active feature set is too narrow for the next useful search move.\n"
+        "- Or update the reservoir expansion schema: call `propose_operation_feature` to activate one inactive expansion parameter. "
+        "Use this when the current active schema is too narrow for the next useful search move.\n"
         if engine.feature_expansion_available()
-        else "- Feature expansion is unavailable; choose only active-operation edits.\n"
+        else "- Reservoir expansion schema updates are unavailable; choose only active-parameter edits.\n"
     )
     return f"""We are doing dynamically expanded model-based search over `train.py`.
 
@@ -3215,17 +3289,17 @@ Objective:
 - The metric is lower-is-better unless the run says otherwise.
 - You may edit only active top-level assignments whose names appear in the active schema below.
 - Values must stay inside the active schema range or choice set.
-- The GP currently sees only active operation features. Activating an inactive feature expands the GP feature vector for later candidates.
+- The GP surrogate representation currently encodes only active expansion parameters. Activating an inactive parameter changes that representation for later candidates.
 
-Active operation schema version: {schema.version}
-Active feature count: {len(schema.parameters)}
-Active features: {", ".join(schema.parameters)}
+Reservoir expansion schema version: {schema.version}
+Active expansion parameter count: {len(schema.parameters)}
+Active expansion parameters: {", ".join(schema.parameters)}
 {schema.description}
 
 Active edit operations:
 {chr(10).join(schema_lines)}
 
-Inactive features available for expansion:
+Inactive expansion parameters available for schema updates:
 {chr(10).join(inactive_lines)}
 
 Current active schema values:
@@ -3244,8 +3318,8 @@ Recent real evaluated states:
 {acquisition_context}
 {extra_instruction}
 Return format:
-- Choose exactly one action: either stick with the current active feature space or expand it.
-- To stick with the current active feature space and edit train.py, call `propose_train_operations` with 1 to {engine.max_operations_per_step} operations.
+- Choose exactly one action: either use the current reservoir expansion schema or update it.
+- To use the current schema and edit train.py, call `propose_train_operations` with 1 to {engine.max_operations_per_step} operations.
 {expansion_instruction.rstrip()}
 - Use `set_numeric` for int/float schema parameters and `set_choice` for choice parameters.
 - Do not output SEARCH/REPLACE blocks or unified diffs; the runner will apply valid operations deterministically.
@@ -3480,28 +3554,28 @@ def validate_feature_payload(
     current_text: str,
 ) -> tuple[OperationParameter, str]:
     if not isinstance(payload, dict):
-        raise ValueError("feature payload must be an object.")
+        raise ValueError("expansion-schema update payload must be an object.")
     raw_feature = payload.get("feature") if isinstance(payload.get("feature"), dict) else payload
     if not isinstance(raw_feature, dict):
-        raise ValueError("feature payload must include a feature object or fields.")
+        raise ValueError("expansion-schema update must include a parameter object or fields.")
     name = canonical_name(str(raw_feature.get("name") or raw_feature.get("parameter") or payload.get("name") or ""))
     if not name:
-        raise ValueError("feature payload must include a non-empty name.")
+        raise ValueError("expansion-schema update must include a non-empty parameter name.")
     if name in engine.operation_schema.parameters:
-        raise ValueError(f"feature {name} is already active.")
+        raise ValueError(f"expansion parameter {name} is already active.")
     if len(engine.operation_schema.parameters) >= engine.max_active_operation_features:
-        raise ValueError("active feature limit has already been reached.")
+        raise ValueError("active expansion-parameter limit has already been reached.")
     inactive = engine.inactive_operation_schema().parameters
     rationale = str(raw_feature.get("rationale") or payload.get("rationale") or "").strip()
     if name in inactive:
         return inactive[name], rationale
     if not engine.allow_new_feature_specs:
-        raise ValueError(f"feature {name} is not in the inactive schema feature pool.")
+        raise ValueError(f"parameter {name} is not in the inactive expansion schema.")
     parameter = operation_parameter_from_payload(raw_feature)
     values = extract_top_level_assignment_values(current_text)
     if parameter.name not in values:
         raise ValueError(
-            f"new feature {parameter.name} is not a literal top-level assignment in current train.py."
+            f"new expansion parameter {parameter.name} is not a literal top-level assignment in current train.py."
         )
     current_value = values.get(parameter.name)
     if parameter.kind == "choice":
@@ -3735,7 +3809,7 @@ def make_mock_generator_action(
             return GeneratorAction(
                 kind="feature",
                 feature=parameter,
-                rationale="Mock dynamic feature expansion.",
+                rationale="Mock reservoir expansion schema update.",
                 source="operation_mock",
             )
     operations = make_mock_operation_proposal(
@@ -5007,10 +5081,15 @@ def explicit_options_from_argv(argv: list[str]) -> set[str]:
         "--operation-retries": "operation_retries",
         "--max-operations-per-step": "max_operations_per_step",
         "--operation-features": "operation_features",
+        "--operation-surrogate": "operation_features",
         "--initial-operation-features": "initial_operation_features",
+        "--initial-expansion-parameters": "initial_operation_features",
         "--max-active-operation-features": "max_active_operation_features",
+        "--max-expansion-parameters": "max_active_operation_features",
         "--disable-feature-expansion": "allow_feature_expansion",
+        "--disable-expansion-schema-updates": "allow_feature_expansion",
         "--allow-new-feature-specs": "allow_new_feature_specs",
+        "--allow-new-expansion-parameters": "allow_new_feature_specs",
         "--mock-expand-every": "mock_expand_every",
         "--surrogate-mode": "surrogate_mode",
         "--gp-beta": "gp_beta",

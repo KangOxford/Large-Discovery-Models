@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from ldm_tts.dependency_checks import (
+from ldm_tts.registration.dependencies import (
     DependencyCheck,
-    check_small_molecule,
     plan_check_context,
 )
+from tasks.small_molecule.core.dependencies import check_small_molecule
 
 
 def check_dependencies(

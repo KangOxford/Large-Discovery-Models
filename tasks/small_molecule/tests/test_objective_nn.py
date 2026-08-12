@@ -1,13 +1,15 @@
 """Tests for ``tasks.small_molecule.core.objective_nn`` (``NNScorer``).
 
-Loads the committed G12D artifact for end-to-end coverage of the wrapper.
-For the ``on_error`` policies we inject a broken ``predict`` via a
-subclass override; no model corruption.
+Uses a generated joblib artifact for end-to-end coverage of the wrapper. For
+the ``on_error`` policies we inject a broken ``predict`` via a subclass
+override; no external model download is required.
 """
 
 from __future__ import annotations
 
 import math
+import json
+import hashlib
 import sys
 import tempfile
 import unittest
@@ -15,18 +17,18 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
+import joblib
+import numpy as np
+
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from tasks.small_molecule.core import NNScorer, NNScorerConfig  # noqa: E402
-from tasks.small_molecule.core.experiment_defaults import DEFAULT_NN_MODEL_PATH  # noqa: E402
 from tasks.small_molecule.core.objective_nn import NNScorer as _NNScorer  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-COMMITTED_MODEL = REPO_ROOT / DEFAULT_NN_MODEL_PATH
-COMMITTED_METADATA = REPO_ROOT / "resources" / "models" / "best_g12d_model_metadata.json"
 
 
 # ---------------------------------------------------------------------------
@@ -50,36 +52,63 @@ class _AlwaysFailingModel:
         raise RuntimeError("intentional test failure")
 
 
+class _SyntheticModel:
+    def predict(self, values: Any) -> Any:
+        return np.asarray([5.0 + len(str(value)) / 100.0 for value in values])
+
+
+def _write_synthetic_model(directory: Path, *, with_metadata: bool = True) -> Path:
+    model = directory / "synthetic.joblib"
+    joblib.dump(_SyntheticModel(), model)
+    if with_metadata:
+        digest = hashlib.sha256(model.read_bytes()).hexdigest()
+        (directory / "synthetic_metadata.json").write_text(
+            json.dumps({
+                "artifact": {"filename": model.name, "sha256": digest},
+                "task": "Synthetic G12D test model",
+                "best_model": "synthetic",
+                "best_metric_row": {"rmse": 0.0},
+            }),
+            encoding="utf-8",
+        )
+    return model
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 
 
-class LoadCommittedModelTests(unittest.TestCase):
-    """The committed artifact must load and expose ``.predict``."""
+class LoadModelTests(unittest.TestCase):
+    """A caller-supplied artifact must load and expose ``.predict``."""
 
-    def test_loads_committed_model(self) -> None:
-        scorer = NNScorer(NNScorerConfig(model_path=str(COMMITTED_MODEL)))
+    def setUp(self) -> None:
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.model = _write_synthetic_model(Path(self.tempdir.name))
+
+    def test_loads_synthetic_model(self) -> None:
+        scorer = NNScorer(NNScorerConfig(model_path=str(self.model)))
         self.assertTrue(hasattr(scorer, "_model"))
         self.assertTrue(callable(getattr(scorer._model, "predict", None)))
 
     def test_metadata_loaded_when_sidecar_present(self) -> None:
-        scorer = NNScorer(NNScorerConfig(model_path=str(COMMITTED_MODEL)))
+        scorer = NNScorer(NNScorerConfig(model_path=str(self.model)))
         self.assertIsInstance(scorer.metadata, dict)
         self.assertNotEqual(scorer.metadata, {})
         self.assertIn("G12D", scorer.metadata.get("task", ""))
         self.assertEqual(
-            scorer.metadata.get("best_model"), "ensemble_nn_ridge_rf"
+            scorer.metadata.get("best_model"), "synthetic"
         )
-        # best_metric_row is nested in the committed metadata.
+        # best_metric_row is nested in the synthetic metadata.
         metric_row = scorer.metadata.get("best_metric_row") or {}
         self.assertIn("rmse", metric_row)
 
     def test_explicit_metadata_path_overrides_default(self) -> None:
         scorer = NNScorer(
             NNScorerConfig(
-                model_path=str(COMMITTED_MODEL),
-                metadata_path=str(COMMITTED_METADATA),
+                model_path=str(self.model),
+                metadata_path=str(self.model.with_name("synthetic_metadata.json")),
             )
         )
         self.assertIn("G12D", scorer.metadata.get("task", ""))
@@ -94,14 +123,41 @@ class LoadCommittedModelTests(unittest.TestCase):
         """Metadata is informational; a missing or unparseable sidecar
         must NOT fail construction."""
         with tempfile.TemporaryDirectory() as tmp:
-            # Copy the committed joblib to a path with no sibling metadata.
-            import joblib
-            import shutil
             tmpdir = Path(tmp)
-            staged = tmpdir / "staged_model.joblib"
-            shutil.copyfile(COMMITTED_MODEL, staged)
+            staged = _write_synthetic_model(tmpdir, with_metadata=False)
             scorer = NNScorer(NNScorerConfig(model_path=str(staged)))
         self.assertEqual(scorer.metadata, {})
+
+    def test_checksum_mismatch_fails_before_joblib_load(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            model = tmpdir / "tampered.joblib"
+            metadata = tmpdir / "tampered_metadata.json"
+            model.write_bytes(b"not a joblib artifact")
+            metadata.write_text(
+                json.dumps({"artifact": {"sha256": "0" * 64}}),
+                encoding="utf-8",
+            )
+            with mock.patch(
+                "tasks.small_molecule.core.objective_nn.joblib.load"
+            ) as load:
+                with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
+                    NNScorer(NNScorerConfig(model_path=str(model)))
+                load.assert_not_called()
+
+    def test_unreadable_declared_metadata_fails_before_joblib_load(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            model = tmpdir / "model.joblib"
+            metadata = tmpdir / "model_metadata.json"
+            model.write_bytes(b"not a joblib artifact")
+            metadata.write_text("{not-json", encoding="utf-8")
+            with mock.patch(
+                "tasks.small_molecule.core.objective_nn.joblib.load"
+            ) as load:
+                with self.assertRaisesRegex(RuntimeError, "integrity metadata"):
+                    NNScorer(NNScorerConfig(model_path=str(model)))
+                load.assert_not_called()
 
 
 class CallContractTests(unittest.TestCase):
@@ -111,7 +167,13 @@ class CallContractTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.scorer = NNScorer(NNScorerConfig(model_path=str(COMMITTED_MODEL)))
+        cls.tempdir = tempfile.TemporaryDirectory()
+        cls.model = _write_synthetic_model(Path(cls.tempdir.name))
+        cls.scorer = NNScorer(NNScorerConfig(model_path=str(cls.model)))
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.tempdir.cleanup()
 
     def test_empty_input_returns_empty_list(self) -> None:
         self.assertEqual(self.scorer([]), [])
@@ -155,9 +217,7 @@ class CallContractTests(unittest.TestCase):
             self.assertIs(type(v), float)
 
     def test_score_in_training_range(self) -> None:
-        # The committed model is trained on public KRAS G12D IC50 with
-        # p_activity in a pIC50-like range. A simple SMILES like ethanol
-        # should produce a sane, in-range prediction.
+        # The synthetic predictor emits a finite pIC50-like value.
         score = self.scorer(["CCO"])[0]
         self.assertTrue(math.isfinite(score))
         self.assertGreater(score, 0.0)
@@ -169,11 +229,11 @@ class OnErrorPolicyTests(unittest.TestCase):
     ``model.predict`` raises."""
 
     def test_default_is_all_nan(self) -> None:
-        cfg = NNScorerConfig(model_path=str(COMMITTED_MODEL))
+        cfg = NNScorerConfig(model_path="synthetic.joblib")
         self.assertEqual(cfg.on_error, "all_nan")
 
     def test_on_error_all_nan_returns_all_nan(self) -> None:
-        cfg = NNScorerConfig(model_path=str(COMMITTED_MODEL), on_error="all_nan")
+        cfg = NNScorerConfig(model_path="synthetic.joblib", on_error="all_nan")
         scorer = _AlwaysFailingScorer(cfg)
         out = scorer(["CCO", "CCN", "c1ccccc1"])
         self.assertEqual(len(out), 3)
@@ -181,7 +241,7 @@ class OnErrorPolicyTests(unittest.TestCase):
             self.assertTrue(math.isnan(v))
 
     def test_on_error_raise_propagates(self) -> None:
-        cfg = NNScorerConfig(model_path=str(COMMITTED_MODEL), on_error="raise")
+        cfg = NNScorerConfig(model_path="synthetic.joblib", on_error="raise")
         scorer = _AlwaysFailingScorer(cfg)
         with self.assertRaises(RuntimeError) as cm:
             scorer(["CCO"])

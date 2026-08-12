@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from ldm_tts.response import (
+from ldm_tts.transport.parsing import (
     load_json_object,
     reject_keys,
     require_list,

@@ -1,8 +1,8 @@
 """NN-backed single-point Scorer for the LDM-TTS small-molecule loop.
 
-This module wraps a trained regression model. The default committed artifact is
-``resources/models/best_g12d_model.joblib`` for public KRAS G12D direct-assay
-IC50 records. The scorer is callable and
+This module wraps a caller-supplied trained regression model. The documented
+reference artifact is ``best_g12d_model.joblib`` for public KRAS G12D
+direct-assay IC50 records. It is not distributed in Git. The scorer is callable and
 mirrors :class:`VinaScorer`'s contract so the same LDM-TTS loop can swap
 between mock, NN, and Vina objectives::
 
@@ -39,7 +39,6 @@ Public surface (re-exported from :mod:`tasks.small_molecule.core.__init__`):
 
 from __future__ import annotations
 
-import json
 import math
 import sys
 from dataclasses import dataclass
@@ -51,6 +50,12 @@ import numpy as np
 from rdkit import RDLogger
 from rdkit.Chem import MolFromSmiles, MolToSmiles
 
+from tasks.small_molecule.core.model_artifact import (
+    ArtifactIntegrityError,
+    find_metadata_path,
+    load_metadata_file,
+    verify_declared_sha256,
+)
 from tasks.small_molecule.core.scorer import Scorer
 
 __all__ = [
@@ -64,7 +69,7 @@ __all__ = [
 # Pickle-module shim
 # ---------------------------------------------------------------------------
 #
-# The committed G12D model is a sklearn / joblib pickle whose
+# The reference G12D model is a sklearn / joblib pickle whose
 # custom classes (``MorganFingerprintTransformer``, ``TanimotoKNNRegressor``,
 # ``AverageRegressor``, ``RDKitDescriptorTransformer``, ``smiles_identity``,
 # ``to_dense_matrix``) are tagged ``__module__ = "train_g12c_qsar"`` by
@@ -167,8 +172,8 @@ class NNScorer:
 
     def __init__(self, config: NNScorerConfig) -> None:
         self.config = config
-        self._model = self._load_model(config.model_path)
         self.metadata: dict[str, Any] = self._load_metadata(config)
+        self._model = self._load_model(config.model_path, self.metadata)
         self.last_results: list[dict[str, Any]] = []
 
     # -- public API ----------------------------------------------------------
@@ -230,7 +235,7 @@ class NNScorer:
     # -- internals -----------------------------------------------------------
 
     @staticmethod
-    def _load_model(model_path: str) -> Any:
+    def _load_model(model_path: str, metadata: dict[str, Any]) -> Any:
         path = Path(str(model_path or "")).expanduser()
         if not str(path):
             raise RuntimeError("NNScorerConfig.model_path is empty.")
@@ -239,6 +244,15 @@ class NNScorer:
                 f"NNScorer model not found: {path} "
                 f"(set NNScorerConfig.model_path to an existing joblib file)."
             )
+        if metadata.get("_load_error"):
+            raise RuntimeError(
+                "NNScorer could not read model integrity metadata before "
+                f"deserialization: {metadata['_load_error']}"
+            )
+        try:
+            verify_declared_sha256(path, metadata)
+        except (ArtifactIntegrityError, OSError) as exc:
+            raise RuntimeError(str(exc)) from exc
         try:
             model = joblib.load(path)
         except Exception as exc:
@@ -263,27 +277,21 @@ class NNScorer:
             # The training script appends ``_metadata.json`` to the model
             # stem, so we look for ``<stem>_metadata.json`` first, then
             # ``<stem>.metadata.json`` as a fallback.
-            model_path = Path(config.model_path)
-            for candidate in (
-                model_path.with_name(model_path.stem + "_metadata.json"),
-                model_path.with_name(model_path.stem + ".metadata.json"),
-            ):
-                if candidate.is_file():
-                    meta_path_str = str(candidate)
-                    break
+            candidate = find_metadata_path(Path(config.model_path))
+            if candidate is not None:
+                meta_path_str = str(candidate)
         if not meta_path_str:
             return {}
         try:
-            with open(meta_path_str, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-        except (OSError, json.JSONDecodeError) as exc:
-            # Metadata is informational only; never fail construction on a
-            # missing or unparseable sidecar.
+            data = load_metadata_file(Path(meta_path_str))
+        except (OSError, ValueError) as exc:
+            # Metadata without a usable integrity declaration remains
+            # informational for custom caller-trusted artifacts.
             return {"_load_error": str(exc), "_path": meta_path_str}
-        return data if isinstance(data, dict) else {}
+        return data
 
     def _predict(self, canonical_smis: list[str]) -> Any:
-        # The committed ensemble emits a sklearn "feature names" warning
+        # The reference ensemble emits a sklearn "feature names" warning
         # when called with a plain list (the LightGBM sub-pipeline was
         # fit on a pandas Series). We pass through numpy and silence the
         # warning at the source to keep the BO loop's stderr clean.

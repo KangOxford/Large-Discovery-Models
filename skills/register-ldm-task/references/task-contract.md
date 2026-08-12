@@ -7,6 +7,7 @@ Required layout:
 ```text
 tasks/<task_id>/
 ├── task.json
+├── experiment.json
 ├── README.md
 ├── pyproject.toml
 ├── __init__.py
@@ -39,6 +40,29 @@ Manifest schema version 1 accepts only:
 The module and working directory are inferred as
 `tasks.<task_id>.ldm_task.procedure` and `tasks/<task_id>`.
 
+## Experiment Contract
+
+`experiment.json` is an optional, versioned sibling of `task.json`. New
+scaffolds include a valid draft contract. It records benchmark provenance,
+metric roles, official evaluator settings and per-candidate limits, generic
+budget facts, and named campaign profiles. A profile can lock config arguments;
+select it with top-level `contract_profile` in a real config. The shared runner
+rejects missing or changed locked arguments before task import.
+
+Use `qualification: draft` until the official source and seed evaluator are
+verified. Qualified runs should call
+`load_active_experiment_contract()` and
+`snapshot_experiment_contract(contract, run_dir, profile=profile)`.
+
+Metric roles are explicit:
+
+- `reported`: official benchmark and comparison outputs;
+- `optimized`: continuous objectives used by the surrogate/acquisition;
+- `diagnostic`: component metrics and operational measurements.
+
+The same metric may be both reported and optimized. Never silently substitute a
+surrogate-only transformation for the official reported metric.
+
 ## Procedure
 
 Required external interface:
@@ -58,11 +82,46 @@ def describe_ldm_task(...) -> LDMTaskSpec:
     ...
 ```
 
+`describe_ldm_task` must use the vocabulary in `docs/concepts.md` and separately
+declare:
+
+- the candidate domain and validation rules;
+- the finite reservoir and every action that can expand it;
+- the expansion schema policy when structured proposal parameters may change;
+- the surrogate representation, encoder, version, and dimension policy;
+- response contracts, objectives, proposal-search topology, and acquisition.
+
+Every `ReservoirExpansionSpec.response_space` must name a declared
+`ResponseSpaceSpec`. At least one expansion action must produce candidates;
+schema-only actions cannot form a runnable task by themselves.
+
+New procedures should dispatch into `LDMEngine` with task-owned behavioral
+adapters under `core/`:
+
+```python
+engine = LDMEngine(
+    task_spec=describe_ldm_task(args),
+    expander=task_expander,
+    candidate_domain=task_candidate_domain,
+    evaluator=task_evaluator,
+    runtime=campaign_runtime,
+    surrogate_encoder=task_encoder,  # optional with selector
+    selector=task_selector,           # optional with encoder
+)
+result = engine.run(engine_config)
+```
+
+Candidate admission returns `Candidate` or `CandidateRejection`; external
+evaluation returns `EvaluationResult`. The engine is responsible for reservoir
+deduplication, observation construction, objective validation, budget checks,
+events, checkpoints, failure classification, and summaries. Task code must not
+duplicate those policies around the engine.
+
 The runner applies config environment variables, changes to the task directory,
 imports the conventional module, and calls `main(argv)`. The task owns all
 domain execution behind that interface. Keep `ldm_task/procedure.py` as a thin
-adapter; put importable search, model, surrogate, and evaluator implementation
-under `core/`, and versioned runtime inputs under `resources/`.
+adapter; put importable reservoir-expansion, model, surrogate, and evaluator
+implementation under `core/`, and versioned runtime inputs under `resources/`.
 
 ## Dependency Hook
 
@@ -71,7 +130,7 @@ Use this exact callable shape:
 ```python
 from typing import Any
 
-from ldm_tts.dependency_checks import DependencyCheck, plan_check_context
+from ldm_tts.registration.dependencies import DependencyCheck, plan_check_context
 
 
 def check_dependencies(
@@ -82,7 +141,7 @@ def check_dependencies(
 ```
 
 Return only `DependencyCheck` objects. Use `ok`, `warn`, `fail`, and `skip`
-from `ldm_tts.dependency_checks`. Never print or return unmasked credentials.
+from `ldm_tts.registration.dependencies`. Never print or return unmasked credentials.
 
 ## Fine-Tuning Data Collection
 
@@ -121,8 +180,15 @@ the task README must state why and identify the future accepted-action boundary.
 - Mock dependency check passes without external systems.
 - Mock runner dry-run resolves the registered module and task directory.
 - Mock runner execution succeeds.
+- Mock execution traverses `LDMEngine` and writes campaign, event, checkpoint,
+  status, budget, task-spec, and summary artifacts.
 - Shared tests and `git diff --check` pass.
 - The mock collection test emits valid `ldm-2.0` IR, or the task documents why
   its response contract is not collectable.
 - No scaffold placeholders, task-name dispatch branches, secrets, or generated
   artifacts remain.
+- `experiment.json` is valid and its qualification state is reported honestly.
+- Qualified tasks pass `scripts/validate_tasks.py --task <task_id>
+  --require-qualified`.
+- Real configs select a runner-enforced profile when official budgets are known.
+- Qualified campaigns snapshot the contract and emit durable budget/status files.

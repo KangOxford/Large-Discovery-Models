@@ -11,15 +11,13 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from ldm_tts.bo import BOPrediction
-from ldm_tts.dependency_checks import (
+from ldm_tts.optimization.records import BOPrediction
+from ldm_tts.registration.dependencies import (
     DependencyCheck,
     arg_value,
     bool_arg,
-    check_antibody,
     check_cuda_visibility,
     check_llm_settings,
-    check_nanogpt,
     checks_to_json,
     cli_args_to_map,
     first_env,
@@ -29,10 +27,14 @@ from ldm_tts.dependency_checks import (
     mask_secret,
     parse_device_ids,
     query_visible_gpu_ids,
-    resolve_reasyn_python,
+    fail,
+    ok,
 )
-from ldm_tts.loop import LDMSearchRoundResult, run_budgeted_search
-from ldm_tts.parameter_space import (
+from tasks.antibody.core.dependencies import check_antibody
+from tasks.nanogpt.core.dependencies import check_nanogpt
+from tasks.small_molecule.core.dependencies import resolve_reasyn_python
+from ldm_tts.engine.runtime import LDMSearchRoundResult, run_budgeted_search
+from tasks.nanogpt.core.expansion_schema import (
     OperationParameter,
     OperationSchema,
     choice_values_equal,
@@ -49,7 +51,7 @@ from ldm_tts.parameter_space import (
     validate_operation_payload,
     validate_operation_value,
 )
-from ldm_tts.response import (
+from ldm_tts.transport.parsing import (
     extract_json_object_text,
     load_json_object,
     reject_keys,
@@ -60,7 +62,7 @@ from ldm_tts.response import (
     require_str,
     strip_json_fence,
 )
-from ldm_tts.runner import (
+from ldm_tts.cli.runner import (
     apply_override,
     args_to_cli,
     build_plan,
@@ -77,6 +79,7 @@ from ldm_tts.runner import (
     parse_override_value,
     patched_env,
     plan_for_json,
+    preflight_plan,
     pushd,
     resolve_child_config_path,
     resolve_config_path,
@@ -85,16 +88,19 @@ from ldm_tts.runner import (
     run_plan,
     validate_config_keys,
 )
-from ldm_tts.spaces import (
+from ldm_tts.contracts import (
     AcquisitionSpec,
-    CandidateSpaceSpec,
+    CandidateDomainSpec,
     LDMTaskSpec,
     ObjectiveSpec,
+    ReservoirExpansionSpec,
+    ReservoirSpec,
     ResponseSpaceSpec,
     ProposalSearchSpec,
+    SurrogateSpaceSpec,
 )
-from ldm_tts.trace_schema import CandidateTraceRecord, LDMRoundTrace
-from ldm_tts.trajectory import AtomicJsonLog, JsonlTrajectoryRecorder, load_jsonl, utc_timestamp
+from ldm_tts.engine.run_store import CandidateTraceRecord, LDMRoundTrace
+from ldm_tts.engine.run_store import AtomicJsonLog, JsonlTrajectoryRecorder, load_jsonl, utc_timestamp
 
 
 def _schema() -> OperationSchema:
@@ -111,9 +117,16 @@ def _schema() -> OperationSchema:
 
 class TestRunnerHelpers:
     def test_parse_args_defaults_and_options(self) -> None:
-        args = parse_args(["config.json", "--dry-run", "--keep-going", "--set", "args.x=2"])
+        args = parse_args([
+            "config.json",
+            "--dry-run",
+            "--keep-going",
+            "--skip-preflight",
+            "--set",
+            "args.x=2",
+        ])
         assert args.config == "config.json"
-        assert args.dry_run and args.keep_going
+        assert args.dry_run and args.keep_going and args.skip_preflight
         assert args.set == ["args.x=2"]
 
     def test_load_config_supports_json_and_yaml_and_rejects_non_objects(self, tmp_path: Path) -> None:
@@ -198,7 +211,11 @@ class TestRunnerHelpers:
         plan = build_plan(config, Path("config/test.json"))
 
         assert plan["module"] == "custom.nanogpt"
-        assert plan["env_overrides"] == {"FIRST": "one", "SECOND": "one/two"}
+        assert plan["env_overrides"]["FIRST"] == "one"
+        assert plan["env_overrides"]["SECOND"] == "one/two"
+        assert plan["env_overrides"]["LDM_EXPERIMENT_CONTRACT_PATH"].endswith(
+            "tasks/nanogpt/experiment.json"
+        )
         assert "--enabled" in plan["argv"]
         assert "--disabled" not in plan["argv"]
         assert "--no-allow-early-stop" in plan["argv"]
@@ -235,10 +252,11 @@ class TestRunnerHelpers:
         assert "cli-secret" in plan["argv"]
         assert "cli-secret" not in plan["command_display"]
         assert "extra-secret" not in plan["command_display"]
-        assert public_plan["env_overrides"] == {
-            "LLM_API_KEY": "***",
-            "PUBLIC_SETTING": "visible",
-        }
+        assert public_plan["env_overrides"]["LLM_API_KEY"] == "***"
+        assert public_plan["env_overrides"]["PUBLIC_SETTING"] == "visible"
+        assert public_plan["env_overrides"]["LDM_EXPERIMENT_CONTRACT_PATH"].endswith(
+            "tasks/nanogpt/experiment.json"
+        )
         assert "cli-secret" not in json.dumps(public_plan)
         assert "extra-secret" not in json.dumps(public_plan)
 
@@ -281,18 +299,38 @@ class TestRunnerHelpers:
         fake_main = Mock(return_value=7)
         fake_module = SimpleNamespace(main=fake_main)
         plan = {"cwd": str(tmp_path), "env_overrides": {"PLAN_ENV": "yes"}, "module": "fake", "argv": ["--x"]}
-        with patch("ldm_tts.runner.importlib.import_module", return_value=fake_module):
+        with patch("ldm_tts.cli.runner.importlib.import_module", return_value=fake_module):
             assert run_plan(plan) == 7
         fake_main.assert_called_once_with(["--x"])
         assert "PLAN_ENV" not in os.environ
 
     def test_run_plan_accepts_none_and_rejects_missing_main(self, tmp_path: Path) -> None:
         plan = {"cwd": str(tmp_path), "env_overrides": {}, "module": "fake", "argv": []}
-        with patch("ldm_tts.runner.importlib.import_module", return_value=SimpleNamespace(main=lambda _argv: None)):
+        with patch("ldm_tts.cli.runner.importlib.import_module", return_value=SimpleNamespace(main=lambda _argv: None)):
             assert run_plan(plan) == 0
-        with patch("ldm_tts.runner.importlib.import_module", return_value=SimpleNamespace()):
+        with patch("ldm_tts.cli.runner.importlib.import_module", return_value=SimpleNamespace()):
             with pytest.raises(SystemExit, match="has no main"):
                 run_plan(plan)
+
+    def test_preflight_skips_mock_plans(self) -> None:
+        with patch("ldm_tts.cli.runner.check_plan") as check_plan_mock:
+            assert preflight_plan({"task": "nanogpt", "mode": "mock"}) == []
+        check_plan_mock.assert_not_called()
+
+    def test_preflight_prints_successful_checks(self, capsys: pytest.CaptureFixture[str]) -> None:
+        checks = [ok("nanogpt", "training data", "Ready.")]
+        with patch("ldm_tts.cli.runner.check_plan", return_value=checks):
+            assert preflight_plan({"name": "real", "task": "nanogpt", "mode": "real"}) == checks
+        assert "[OK] nanogpt: training data: Ready." in capsys.readouterr().out
+
+    def test_preflight_blocks_failed_checks(self, capsys: pytest.CaptureFixture[str]) -> None:
+        checks = [fail("small_molecule", "G12D activity model", "Missing.")]
+        with (
+            patch("ldm_tts.cli.runner.check_plan", return_value=checks),
+            pytest.raises(SystemExit, match="Dependency preflight failed"),
+        ):
+            preflight_plan({"name": "real", "task": "small_molecule", "mode": "real"})
+        assert "[FAIL] small_molecule: G12D activity model: Missing." in capsys.readouterr().out
 
     def test_list_configs_skips_invalid_files(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         config_dir = tmp_path / "config"
@@ -300,13 +338,13 @@ class TestRunnerHelpers:
         (config_dir / "good.json").write_text('{"task":"nanogpt","mode":"mock"}', encoding="utf-8")
         (config_dir / "bad.json").write_text("[]", encoding="utf-8")
         (config_dir / "ignore.txt").write_text("x", encoding="utf-8")
-        with patch("ldm_tts.runner.REPO_ROOT", tmp_path):
+        with patch("ldm_tts.cli.runner.REPO_ROOT", tmp_path):
             list_configs()
         rows = json.loads(capsys.readouterr().out)
         assert rows == [{"algorithm": "", "description": "", "mode": "mock", "path": "config/good.json", "task": "nanogpt"}]
 
     def test_main_list_missing_config_dry_run_and_execution_paths(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with patch("ldm_tts.runner.list_configs") as listed:
+        with patch("ldm_tts.cli.runner.list_configs") as listed:
             assert main(["--list"]) == 0
             listed.assert_called_once()
         with pytest.raises(SystemExit, match="Provide a config"):
@@ -314,24 +352,37 @@ class TestRunnerHelpers:
 
         plan = {"name": "p", "command_display": "cmd", "task": "nanogpt", "algorithm": "", "mode": "", "config_path": "x", "cwd": ".", "module": "m", "argv": [], "env_overrides": {}}
         with (
-            patch("ldm_tts.runner.resolve_config_path", return_value=Path("x")),
-            patch("ldm_tts.runner.load_config", return_value={"task": "nanogpt"}),
-            patch("ldm_tts.runner.expand_experiments", return_value=[({"task": "nanogpt"}, Path("x"))]),
-            patch("ldm_tts.runner.build_plan", return_value=plan),
+            patch("ldm_tts.cli.runner.resolve_config_path", return_value=Path("x")),
+            patch("ldm_tts.cli.runner.load_config", return_value={"task": "nanogpt"}),
+            patch("ldm_tts.cli.runner.expand_experiments", return_value=[({"task": "nanogpt"}, Path("x"))]),
+            patch("ldm_tts.cli.runner.build_plan", return_value=plan),
+            patch("ldm_tts.cli.runner.preflight_plan") as preflight,
         ):
             assert main(["x", "--dry-run"]) == 0
+        preflight.assert_not_called()
         assert json.loads(capsys.readouterr().out)[0]["name"] == "p"
 
         with (
-            patch("ldm_tts.runner.resolve_config_path", return_value=Path("x")),
-            patch("ldm_tts.runner.load_config", return_value={}),
-            patch("ldm_tts.runner.expand_experiments", return_value=[({}, Path("x")), ({}, Path("x"))]),
-            patch("ldm_tts.runner.build_plan", side_effect=[dict(plan, name="a"), dict(plan, name="b")]),
-            patch("ldm_tts.runner.run_plan", side_effect=[2, 3]),
+            patch("ldm_tts.cli.runner.resolve_config_path", return_value=Path("x")),
+            patch("ldm_tts.cli.runner.load_config", return_value={}),
+            patch("ldm_tts.cli.runner.expand_experiments", return_value=[({}, Path("x")), ({}, Path("x"))]),
+            patch("ldm_tts.cli.runner.build_plan", side_effect=[dict(plan, name="a"), dict(plan, name="b")]),
+            patch("ldm_tts.cli.runner.run_plan", side_effect=[2, 3]),
         ):
             assert main(["x", "--keep-going"]) == 3
         output = capsys.readouterr()
         assert '"failed"' in output.err
+
+        with (
+            patch("ldm_tts.cli.runner.resolve_config_path", return_value=Path("x")),
+            patch("ldm_tts.cli.runner.load_config", return_value={}),
+            patch("ldm_tts.cli.runner.expand_experiments", return_value=[({}, Path("x"))]),
+            patch("ldm_tts.cli.runner.build_plan", return_value=dict(plan, mode="real")),
+            patch("ldm_tts.cli.runner.preflight_plan") as preflight,
+            patch("ldm_tts.cli.runner.run_plan", return_value=0),
+        ):
+            assert main(["x", "--skip-preflight"]) == 0
+        preflight.assert_not_called()
 
 
 class TestResponseValidation:
@@ -447,7 +498,7 @@ class TestOperationSpaceCoverage:
         assert initial_operation_feature_names(schema, "0") == ["COUNT"]
         assert initial_operation_feature_names(schema, "99") == ["COUNT", "RATE", "MODE"]
         assert initial_operation_feature_names(schema, "rate, rate, mode") == ["RATE", "MODE"]
-        with pytest.raises(ValueError, match="Unknown initial"):
+        with pytest.raises(ValueError, match="Unknown expansion-schema parameter"):
             initial_operation_feature_names(schema, "missing")
         with pytest.raises(ValueError, match="did not select"):
             initial_operation_feature_names(schema, ",")
@@ -540,7 +591,7 @@ class TestLoopTrajectoryAndSpecs:
 
     def test_atomic_log_cleans_temp_file_on_replace_failure(self, tmp_path: Path) -> None:
         log = AtomicJsonLog(tmp_path / "log.json", {"ok": True})
-        with patch("ldm_tts.trajectory.os.replace", side_effect=OSError("replace failed")):
+        with patch("ldm_tts.engine.run_store.os.replace", side_effect=OSError("replace failed")):
             with pytest.raises(OSError, match="replace failed"):
                 log.write({"ok": False})
         assert list(tmp_path.glob("*.tmp")) == []
@@ -548,10 +599,29 @@ class TestLoopTrajectoryAndSpecs:
     def test_specs_and_trace_records_serialize(self) -> None:
         task = LDMTaskSpec(
             task="demo",
-            candidate_space=CandidateSpaceSpec("items", "vector", dimension=2),
+            candidate_domain=CandidateDomainSpec("items", "vector", dimension=2),
             objectives=(ObjectiveSpec("loss", "minimize"),),
             response_spaces=(ResponseSpaceSpec("items", "structured", {"type": "object"}),),
             acquisition=AcquisitionSpec("ei", ("loss",), "maximize", "argmax"),
+            reservoir=ReservoirSpec(
+                name="items",
+                expansions=(
+                    ReservoirExpansionSpec(
+                        name="emit_items",
+                        action_kind="emit_candidate",
+                        response_space="items",
+                        produces_candidates=True,
+                    ),
+                ),
+                candidate_validator="validate item",
+                deduplication_key="item id",
+            ),
+            surrogate=SurrogateSpaceSpec(
+                kind="vector",
+                representation="two numeric values",
+                dimension_policy="fixed",
+                dimension=2,
+            ),
             proposal_search=ProposalSearchSpec(
                 name="beam_search",
                 breadth=3,
@@ -559,13 +629,45 @@ class TestLoopTrajectoryAndSpecs:
                 beam_width=2,
             ),
         )
-        assert task.to_dict()["candidate_space"]["dimension"] == 2
+        assert task.to_dict()["candidate_domain"]["dimension"] == 2
+        assert task.to_dict()["reservoir"]["expansions"][0]["action_kind"] == "emit_candidate"
         assert task.to_dict()["proposal_search"]["name"] == "beam_search"
         assert BOPrediction("x").to_dict()["candidate_id"] == "x"
         candidate = CandidateTraceRecord("x", {"a": 1})
         assert candidate.to_dict()["candidate_id"] == "x"
         trace = LDMRoundTrace(0, "demo", 0, 1, "items", "ei", candidates=(candidate,))
         assert trace.to_dict()["candidates"] == (candidate.to_dict(),)
+
+    def test_task_spec_rejects_unbound_reservoir_response_space(self) -> None:
+        with pytest.raises(ValueError, match="unknown response space"):
+            LDMTaskSpec(
+                task="demo",
+                candidate_domain=CandidateDomainSpec("items", "vector", dimension=2),
+                objectives=(ObjectiveSpec("loss", "minimize"),),
+                response_spaces=(
+                    ResponseSpaceSpec("items", "structured", {"type": "object"}),
+                ),
+                acquisition=AcquisitionSpec("ei", ("loss",), "maximize", "argmax"),
+                reservoir=ReservoirSpec(
+                    name="items",
+                    expansions=(
+                        ReservoirExpansionSpec(
+                            name="broken",
+                            action_kind="emit_candidate",
+                            response_space="missing",
+                            produces_candidates=True,
+                        ),
+                    ),
+                    candidate_validator="validate item",
+                    deduplication_key="item id",
+                ),
+                surrogate=SurrogateSpaceSpec(
+                    kind="vector",
+                    representation="two numeric values",
+                    dimension_policy="fixed",
+                    dimension=2,
+                ),
+            )
 
 
 class TestDependencyCoverage:
@@ -607,11 +709,11 @@ class TestDependencyCoverage:
     def test_device_parsing_and_cuda_outcomes(self) -> None:
         assert parse_device_ids("0, bad, 2,,") == [0, 2]
         assert check_cuda_visibility("t", "gpu", requested_device="cpu", env={}).status == "skip"
-        with patch("ldm_tts.dependency_checks.query_visible_gpu_ids", return_value=None):
+        with patch("ldm_tts.registration.dependencies.query_visible_gpu_ids", return_value=None):
             assert check_cuda_visibility("t", "gpu", requested_device="cuda", env={}).status == "warn"
-        with patch("ldm_tts.dependency_checks.query_visible_gpu_ids", return_value=set()):
+        with patch("ldm_tts.registration.dependencies.query_visible_gpu_ids", return_value=set()):
             assert check_cuda_visibility("t", "gpu", requested_device="cuda", env={}).status == "fail"
-        with patch("ldm_tts.dependency_checks.query_visible_gpu_ids", return_value={0, 1}):
+        with patch("ldm_tts.registration.dependencies.query_visible_gpu_ids", return_value={0, 1}):
             assert check_cuda_visibility("t", "gpu", requested_device="cuda", env={}, requested_devices=[2]).status == "fail"
             assert check_cuda_visibility("t", "gpu", requested_device="cuda", env={"CUDA_VISIBLE_DEVICES": "0"}, requested_devices=[0]).status == "ok"
         assert check_cuda_visibility(
@@ -623,12 +725,12 @@ class TestDependencyCoverage:
 
     def test_gpu_query_handles_success_failure_and_os_errors(self) -> None:
         success = subprocess.CompletedProcess([], 0, stdout="0\ninvalid\n2\n", stderr="")
-        with patch("ldm_tts.dependency_checks.subprocess.run", return_value=success):
+        with patch("ldm_tts.registration.dependencies.subprocess.run", return_value=success):
             assert query_visible_gpu_ids() == {0, 2}
         failed = subprocess.CompletedProcess([], 1, stdout="", stderr="bad")
-        with patch("ldm_tts.dependency_checks.subprocess.run", return_value=failed):
+        with patch("ldm_tts.registration.dependencies.subprocess.run", return_value=failed):
             assert query_visible_gpu_ids() == set()
-        with patch("ldm_tts.dependency_checks.subprocess.run", side_effect=FileNotFoundError):
+        with patch("ldm_tts.registration.dependencies.subprocess.run", side_effect=FileNotFoundError):
             assert query_visible_gpu_ids() is None
 
     def test_llm_checks_treat_unexpanded_environment_references_as_missing(self) -> None:

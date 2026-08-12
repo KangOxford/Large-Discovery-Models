@@ -11,7 +11,7 @@ import pytest
 
 from tasks.nanogpt.resources.train import mock_train
 from tasks.nanogpt.ldm_task import procedure as model_based_procedure
-from ldm_tts.parameter_space import load_operation_schema
+from tasks.nanogpt.core.expansion_schema import load_operation_schema
 from tasks.nanogpt.core.search_core import (
     ProgressBar,
     SearchConfig,

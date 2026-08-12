@@ -10,15 +10,18 @@ _WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
 if str(_WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(_WORKSPACE_ROOT))
 
-from ldm_tts.trajectory import JsonlTrajectoryRecorder
+from ldm_tts.engine.run_store import JsonlTrajectoryRecorder
 from ldm_tts.data import DataCollectionSink, smallmol_irs_from_round_record
-from ldm_tts.spaces import (
+from ldm_tts.contracts import (
     AcquisitionSpec,
-    CandidateSpaceSpec,
+    CandidateDomainSpec,
     LDMTaskSpec,
     ObjectiveSpec,
+    ReservoirExpansionSpec,
+    ReservoirSpec,
     ResponseSpaceSpec,
     ProposalSearchSpec,
+    SurrogateSpaceSpec,
 )
 from tasks.small_molecule.core.acquisition import hypervolume
 from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
@@ -146,9 +149,33 @@ def _ldm_task_spec(cfg: TiltedLDMCase2Config) -> LDMTaskSpec:
                 "batch_size": int(cfg.batch_size),
             },
         )
+    direct_only = cfg.method in {"m1_stratified_direct_llm_only", "m1_llm_one_step"}
+    if direct_only:
+        surrogate = SurrogateSpaceSpec(
+            kind="none",
+            representation="not used by direct LLM ordering",
+            dimension_policy="none",
+        )
+    elif gp_impl == "fingerprint+tanimoto":
+        surrogate = SurrogateSpaceSpec(
+            kind="vector",
+            representation="fixed-length molecular fingerprint",
+            dimension_policy="fixed",
+            dimension=int(cfg.gp_config.fp_n_bits),
+            encoder="tasks.small_molecule.core.gp.fingerprint_features",
+            version=f"molecular_fingerprint_{int(cfg.gp_config.fp_n_bits)}_v1",
+        )
+    else:
+        surrogate = SurrogateSpaceSpec(
+            kind="kernel",
+            representation="SMILES subsequence string kernel",
+            dimension_policy="implicit",
+            encoder="tasks.small_molecule.core.gp.SMILESStringKernel",
+            version="smiles_strkernel_v1",
+        )
     return LDMTaskSpec(
         task="small_molecule",
-        candidate_space=CandidateSpaceSpec(
+        candidate_domain=CandidateDomainSpec(
             name="smiles",
             kind="string",
             dimension=None,
@@ -187,6 +214,30 @@ def _ldm_task_spec(cfg: TiltedLDMCase2Config) -> LDMTaskSpec:
             ),
         ),
         acquisition=acquisition,
+        reservoir=ReservoirSpec(
+            name="molecular_candidate_reservoir",
+            expansions=(
+                ReservoirExpansionSpec(
+                    name="direct_smiles_generation",
+                    action_kind="emit_candidate",
+                    response_space="direct_smiles",
+                    produces_candidates=True,
+                    description="Emit valid molecular candidates as SMILES.",
+                ),
+                ReservoirExpansionSpec(
+                    name="seeded_analogue_generation",
+                    action_kind="configure_generator",
+                    response_space="seed_plan",
+                    produces_candidates=True,
+                    description="Choose molecular seeds and budgets for analogue generation.",
+                ),
+            ),
+            candidate_validator="SMILES parse, canonicalization, and molecular constraint checks",
+            deduplication_key="canonical SMILES",
+            max_size=int(cfg.max_candidates_per_round),
+            metadata={"method": cfg.method},
+        ),
+        surrogate=surrogate,
         proposal_search=ProposalSearchSpec(
             name="single_turn",
             evaluation_policy="outer_loop_acquisition_selection",

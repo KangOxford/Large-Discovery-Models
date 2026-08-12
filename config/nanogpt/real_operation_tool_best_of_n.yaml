@@ -2,6 +2,7 @@ name: nanogpt_real_operation_tool_best_of_n
 task: nanogpt
 algorithm: best_of_n
 mode: real
+contract_profile: real_operation_tool_best_of_n
 description: nanoGPT operation-tool LDM-TTS run against an OpenAI-compatible endpoint.
 args:
   train-file: resources/train/real_train.py
@@ -14,10 +15,10 @@ args:
   warmup: 20
   seed-policy: best
   buffer: runs/ablation_buffer/expanded_exp1/gp_warmup.jsonl
-  initial-operation-features: 5
-  max-active-operation-features: 0
-  disable-feature-expansion: false
-  allow-new-feature-specs: false
+  initial-expansion-parameters: 5
+  max-expansion-parameters: 0
+  disable-expansion-schema-updates: false
+  allow-new-expansion-parameters: false
   surrogate-mode: lcb
   gp-beta: 1.0
   gp-xi: 0.001

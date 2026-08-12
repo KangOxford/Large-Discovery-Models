@@ -56,18 +56,22 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 if str(WORKSPACE_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKSPACE_ROOT))
 
-from ldm_tts.task_registry import REPOSITORY_RELATIVE_PREFIXES
-from ldm_tts.spaces import (
+from ldm_tts.registration.registry import REPOSITORY_RELATIVE_PREFIXES
+from ldm_tts.contracts import (
     AcquisitionSpec,
-    CandidateSpaceSpec,
+    CandidateDomainSpec,
     LDMTaskSpec,
     ObjectiveSpec,
+    ReservoirExpansionSpec,
+    ReservoirSpec,
     ResponseSpaceSpec,
     ProposalSearchSpec,
+    SurrogateSpaceSpec,
 )
-from ldm_tts.dependency_checks import check_small_molecule, format_checks, has_failures
+from ldm_tts.registration.dependencies import format_checks, has_failures
+from tasks.small_molecule.core.dependencies import check_small_molecule
 
-DEFAULT_NN_MODEL_PATH = "resources/models/best_g12d_model.joblib"
+DEFAULT_NN_MODEL_PATH = ""
 QWEN35_DEFAULT_SAMPLING = {
     "top_p": 0.95,
     "top_k": 20,
@@ -337,7 +341,11 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         action="store_true",
         help="Allow docking against a receptor marked as debug/non-production.",
     )
-    parser.add_argument("--nn-model-path", default=DEFAULT_NN_MODEL_PATH)
+    parser.add_argument(
+        "--nn-model-path",
+        default=os.environ.get("G12D", DEFAULT_NN_MODEL_PATH),
+        help="Trusted joblib activity-model path. Required for real runs; may also be set with G12D.",
+    )
     parser.add_argument("--reasyn-repo", default=os.environ.get("REASYN_HOME", os.environ.get("REASYN_REPO", "")))
     parser.add_argument("--reasyn-python", default=os.environ.get("REASYN_PYTHON", os.environ.get("REASYN_BIN", "")))
     parser.add_argument("--reasyn-model-path", default=os.environ.get("REASYN_MODEL_PATH", ""))
@@ -449,9 +457,33 @@ def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
                 "batch_size": int(args.batch_size),
             },
         )
+    direct_only = args.method in {"m1_stratified_direct_llm_only", "m1_llm_one_step"}
+    if direct_only:
+        surrogate = SurrogateSpaceSpec(
+            kind="none",
+            representation="not used by direct LLM ordering",
+            dimension_policy="none",
+        )
+    elif args.kernel == "sk":
+        surrogate = SurrogateSpaceSpec(
+            kind="kernel",
+            representation="SMILES subsequence string kernel",
+            dimension_policy="implicit",
+            encoder="tasks.small_molecule.core.gp.SMILESStringKernel",
+            version="smiles_strkernel_v1",
+        )
+    else:
+        surrogate = SurrogateSpaceSpec(
+            kind="vector",
+            representation="fixed-length molecular fingerprint",
+            dimension_policy="fixed",
+            dimension=int(args.gp_fp_n_bits),
+            encoder="tasks.small_molecule.core.gp.fingerprint_features",
+            version=f"molecular_fingerprint_{int(args.gp_fp_n_bits)}_v1",
+        )
     return LDMTaskSpec(
         task="small_molecule",
-        candidate_space=CandidateSpaceSpec(
+        candidate_domain=CandidateDomainSpec(
             name="smiles",
             kind="string",
             dimension=None,
@@ -535,6 +567,30 @@ def describe_ldm_task(args: argparse.Namespace) -> LDMTaskSpec:
             ),
         ),
         acquisition=acquisition,
+        reservoir=ReservoirSpec(
+            name="molecular_candidate_reservoir",
+            expansions=(
+                ReservoirExpansionSpec(
+                    name="direct_smiles_generation",
+                    action_kind="emit_candidate",
+                    response_space="direct_smiles",
+                    produces_candidates=True,
+                    description="Emit valid molecular candidates as SMILES.",
+                ),
+                ReservoirExpansionSpec(
+                    name="seeded_analogue_generation",
+                    action_kind="configure_generator",
+                    response_space="seed_plan",
+                    produces_candidates=True,
+                    description="Choose molecular seeds and budgets for analogue generation.",
+                ),
+            ),
+            candidate_validator="SMILES parse, canonicalization, and molecular constraint checks",
+            deduplication_key="canonical SMILES",
+            max_size=int(args.max_candidates_per_round),
+            metadata={"method": args.method},
+        ),
+        surrogate=surrogate,
         proposal_search=ProposalSearchSpec(
             name="single_turn",
             evaluation_policy="outer_loop_acquisition_selection",

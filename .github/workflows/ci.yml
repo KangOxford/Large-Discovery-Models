@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shared:
+    name: Shared runner (Python 3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked --group dev
+      - run: uv run --locked python scripts/validate_tasks.py
+      - run: uv run --locked python -m pytest tests tasks/nanogpt/tests --cov --cov-config=.coveragerc --cov-report=term-missing
+      - run: uv run --locked python scripts/run_ldm_tts.py config/suites/mock_all.yaml --dry-run
+      - run: uv run --locked python -m compileall -q ldm_tts scripts tests
+
+  nanogpt:
+    name: nanoGPT task (Python 3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked --project tasks/nanogpt --group dev
+      - run: uv run --locked --project tasks/nanogpt python -m pytest tasks/nanogpt/tests
+      - run: uv run --locked --project tasks/nanogpt python scripts/run_ldm_tts.py config/nanogpt/mock_best_of_n.yaml
+
+  antibody:
+    name: Antibody task (Python 3.9)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked --project tasks/antibody --group dev
+      - working-directory: tasks/antibody
+        run: uv run --locked --group dev python -m pytest --cov --cov-config=.coveragerc --cov-report=term-missing
+      - run: CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/antibody python scripts/run_ldm_tts.py config/antibody/mock_ei.yaml
+
+  small-molecule:
+    name: Small molecule task (Python 3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked --project tasks/small_molecule --group dev
+      - working-directory: tasks/small_molecule
+        run: uv run --locked --group dev python -m pytest --cov --cov-config=.coveragerc --cov-report=term-missing
+      - run: CUDA_VISIBLE_DEVICES='' uv run --locked --project tasks/small_molecule python scripts/run_ldm_tts.py config/small_molecule/mock_m1_stratified_oversample.yaml

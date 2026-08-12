@@ -1,4 +1,4 @@
-"""Reservoir maintenance for oversized case2 candidate pools."""
+"""Reservoir maintenance for oversized case2 candidate reservoirs."""
 
 from __future__ import annotations
 

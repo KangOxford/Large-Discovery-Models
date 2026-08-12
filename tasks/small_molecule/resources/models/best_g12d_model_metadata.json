@@ -1,4 +1,10 @@
 {
+  "artifact": {
+    "filename": "best_g12d_model.joblib",
+    "sha256": "a4c15c1124eced2e8dc80a18fdf94752da106168209d804002b0defbf63986ed",
+    "format": "joblib/pickle",
+    "trust": "Externally distributed reference artifact; do not load untrusted joblib files."
+  },
   "task": "KRAS G12D direct-assay QSAR with CPU and GPU baselines",
   "input_csv": "activity_modeling/runs/g12d_public_data_20260629_1418/g12d_public_ic50_exact_relation_dedup_train_direct_assays.csv",
   "dataset_csv": "activity_modeling/runs/g12d_direct_qsar_gpu_fast_20260629_1503/g12d_direct_ic50_dataset.csv",
@@ -295,10 +301,10 @@
     "mae": 0.6542922922871828,
     "r2": 0.7387465485375715,
     "spearman": 0.8651154653827232,
-    "epochs": NaN,
-    "best_val_loss_norm": NaN,
-    "label_mean": NaN,
-    "label_std": NaN,
+    "epochs": null,
+    "best_val_loss_norm": null,
+    "label_mean": null,
+    "label_std": null,
     "error": ""
   },
   "final_artifact": "activity_modeling/runs/g12d_direct_qsar_gpu_fast_20260629_1503/best_model.joblib",

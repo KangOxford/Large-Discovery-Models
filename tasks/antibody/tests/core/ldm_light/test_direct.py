@@ -4,6 +4,8 @@ import json
 import random
 from types import SimpleNamespace
 
+import pytest
+
 from tasks.antibody.core.ldm_light.direct import (
     parse_direct_sequences,
     propose_direct_batch,
@@ -100,3 +102,35 @@ def test_independent_transport_uses_separate_calls():
 
     assert [candidate["sequence"] for candidate in candidates] == VALID[:3]
     assert record["generation_mode"] == "independent_calls"
+
+
+def test_generation_reports_candidate_admission_rejections():
+    class RejectingLLM:
+        def call_many(self, prompt, temperature, timeout_s, n):
+            return [json.dumps(["GYYGYGYGYGY"])] * n
+
+    with pytest.raises(RuntimeError) as exc_info:
+        propose_direct_batch(
+            llm=RejectingLLM(),
+            rng=random.Random(2),
+            antigen="SMOKE",
+            seq_len=11,
+            n=5,
+            observed=set(),
+            rows=[],
+            antigen_context=None,
+            args=_args(),
+            independent=True,
+        )
+
+    payload = json.loads(str(exc_info.value))
+    assert len(payload) == 5
+    assert payload[0]["error"] == "no candidates passed admission"
+    assert payload[0]["rejections"] == [
+        {
+            "item_index": 0,
+            "sequence": "GYYGYGYGYGY",
+            "reasons": ["max_aromatic_FWY"],
+        }
+    ]
+    assert payload[0]["raw_response"] == '["GYYGYGYGYGY"]'
