@@ -38,9 +38,12 @@ in evidence rather than model confidence alone.
 
 ### Updates
 
+- **[Custimization and Delta-Infra]** you can simple add your own tasks with `skills/register-ldm-task`, and run a demo using *Delta-Infra* (see `ready2run_examples/README.md`)
+
 - **August 2026 - LDM v0.1 release candidate.** The release candidate includes end-to-end
   LDM workflows for language-model training, small-molecule discovery, and
-  antibody design, plus a manifest-driven interface for user-defined tasks.
+  antibody design, adaptive KV-cache quantization, and a manifest-driven
+  interface for user-defined tasks.
 
 ## Contents
 
@@ -66,17 +69,18 @@ in evidence rather than model confidence alone.
 | `nanogpt` | Training-code and hyperparameter operations for nanoGPT-style pretraining. | [Clean-room quick start](tasks/nanogpt/QUICKSTART.md) | [Task guide](tasks/nanogpt/README.md) |
 | `small_molecule` | SMILES candidates for docking and activity objectives. | [Clean-room quick start](tasks/small_molecule/QUICKSTART.md) | [Task guide](tasks/small_molecule/README.md) |
 | `antibody` | CDRH3 amino-acid sequences for antigen binding. | [Clean-room quick start](tasks/antibody/QUICKSTART.md) | [Task guide](tasks/antibody/README.md) |
+| `llm_kv_adaptive_quantization` | Adaptive KV-cache quantization policies for language-model quality and compression. | [Clean-room quick start](tasks/llm_kv_adaptive_quantization/QUICKSTART.md) | [Task guide](tasks/llm_kv_adaptive_quantization/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md) |
 | ... (**more to come**)| ... (**stay tuned**) | ... | ... |
 | `your_task` | User-defined candidates and measurable objectives in any domain. | [Use `$register-ldm-task`](skills/register-ldm-task/SKILL.md) | [Task registration guide](tasks/README.md) |
 
-The three built-in clean-room guides begin with deterministic mock or CPU-safe gates and
+The four built-in clean-room guides begin with deterministic mock or CPU-safe gates and
 progress through locked installation, dependency preflight, artifact checks,
 and credential cleanup before any costly run. The evaluator-backed campaign
 examples below additionally cover real GPU nanoGPT training, Vina plus G12D
 scoring, and Absolut evaluation. Run the documented commands from the
 repository root.
 
-Task registration and conventional layout validation pass for all three
+Task registration and conventional layout validation pass for all four
 built-ins. Each ships a `draft` `experiment.json` that records metric roles,
 evaluator settings, budgets, and named real-config profiles. Their provenance
 is still explicitly unqualified, so they should be treated as runnable,
