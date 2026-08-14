@@ -1,0 +1,60 @@
+{
+  "exit_code": 0,
+  "finished": true,
+  "summary": {
+    "status": "ok",
+    "mode": "history_aware_qwen_antbo_campaign",
+    "antigen": "1ADQ_A",
+    "model": "Qwen3.5-9B",
+    "sandbox_image": "image.yangtzeailab.com/opensandbox/vllm_0.27.1:juicefs",
+    "objective": "Absolut binding energy",
+    "lower_is_better": true,
+    "rounds": 4,
+    "evaluations": 20,
+    "round_size": 5,
+    "initial_round_best": -82.24,
+    "final_best_binding_energy": -87.72,
+    "binding_energy_improvement": 5.48,
+    "best_sequence": "MKSTLEAVLGM",
+    "best_evaluation": 18,
+    "round_best_binding_energies": [
+      -82.24,
+      -86.85,
+      -81.06,
+      -87.72
+    ],
+    "improvement_evaluations": [
+      1,
+      2,
+      4,
+      7,
+      18
+    ],
+    "antbo_request_ids": [
+      "req_b0b11c398c35421fbecdc3d7f26583a6",
+      "req_a50be11d41e04c7aa22b53db341e5926",
+      "req_77df4e03ec6b4191a713b9af1ca7afb8",
+      "req_62166c4bf0c14070905db4be98afa1ce"
+    ],
+    "antbo_round_seconds": [
+      19.370335,
+      19.128739,
+      22.115259,
+      18.378871
+    ],
+    "antbo_total_seconds": 78.993204,
+    "qwen_server_execution_id": "111687d691ca44c7b7d4099a5626fa6f",
+    "qwen_round_execution_ids": [
+      "73f83911ae78453f8621d705a433311c",
+      "de485a801f864da5a11b10906b8189b2",
+      "978d7c71da6a4cd591f8cbcf3000b235",
+      "5946c38dc8954772802ac791a0fc4beb"
+    ],
+    "artifacts": {
+      "trajectory_csv": "data/generated/delta_antibody_campaign_20/progress.csv",
+      "progress_plot": "data/generated/delta_antibody_campaign_20/progress.png"
+    }
+  },
+  "result_summary": "status=ok, mode=history_aware_qwen_antbo_campaign, antigen=1ADQ_A, model=Qwen3.5-9B, rounds=4, evaluations=20, initial_round_best=-82.24, final_best_binding_energy=-87.72, binding_energy_improvement=5.48, best_sequence=MKSTLEAVLGM, best_evaluation=18, antbo_total_seconds=78.993204, csv=data/generated/delta_antibody_campaign_20/progress.csv, plot=data/generated/delta_antibody_campaign_20/progress.png",
+  "error": null
+}

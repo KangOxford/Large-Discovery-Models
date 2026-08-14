@@ -42,8 +42,9 @@ The module and working directory are inferred as
 
 ## Experiment Contract
 
-`experiment.json` is an optional, versioned sibling of `task.json`. New
-scaffolds include a valid draft contract. It records benchmark provenance,
+`experiment.json` remains optional only for legacy task discovery. It is
+required for newly scaffolded tasks and for any campaign qualification claim.
+New scaffolds include a valid draft contract. It records benchmark provenance,
 metric roles, official evaluator settings and per-candidate limits, generic
 budget facts, and named campaign profiles. A profile can lock config arguments;
 select it with top-level `contract_profile` in a real config. The shared runner
@@ -116,6 +117,12 @@ evaluation returns `EvaluationResult`. The engine is responsible for reservoir
 deduplication, observation construction, objective validation, budget checks,
 events, checkpoints, failure classification, and summaries. Task code must not
 duplicate those policies around the engine.
+
+Do not treat emitting `LDMTaskSpec` or importing shared optimization helpers as
+an engine migration. A task is engine-native only when its executed campaign
+constructs `LDMEngine` and delegates lifecycle ownership to it. When repairing a
+legacy task, identify compatibility paths explicitly and migrate them without
+silently changing budgets, artifacts, or resume behavior.
 
 The runner applies config environment variables, changes to the task directory,
 imports the conventional module, and calls `main(argv)`. The task owns all

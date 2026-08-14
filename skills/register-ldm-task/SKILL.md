@@ -92,9 +92,12 @@ Run from the repository root:
 ```bash
 python scripts/validate_tasks.py --task <task_id>
 uv run --locked --project tasks/<task_id> python -m pytest tasks/<task_id>/tests
-python scripts/check_task_dependencies.py config/<task_id>/mock.yaml --no-optional
-python scripts/run_ldm_tts.py config/<task_id>/mock.yaml --dry-run
-python scripts/run_ldm_tts.py config/<task_id>/mock.yaml
+uv run --locked --project tasks/<task_id> python scripts/check_task_dependencies.py \
+  config/<task_id>/mock.yaml --no-optional
+uv run --locked --project tasks/<task_id> python scripts/run_ldm_tts.py \
+  config/<task_id>/mock.yaml --dry-run
+uv run --locked --project tasks/<task_id> python scripts/run_ldm_tts.py \
+  config/<task_id>/mock.yaml
 python -m pytest -q tests
 git diff --check
 ```
@@ -118,6 +121,9 @@ than a standalone benchmark agent.
 - Put task CLI options under config `args`, environment values under `env`, and
   select enforced production settings with top-level `contract_profile`.
 - Define `main(argv)`, `parse_args`, and a runtime-faithful `describe_ldm_task`.
+- Do not call a task engine-native merely because it emits `LDMTaskSpec`; the
+  executed campaign must construct `LDMEngine` and delegate lifecycle ownership
+  to it.
 - Make the deterministic mock execute at least one complete `LDMEngine` round
   and assert that `events.jsonl`, `checkpoint.json`, and `summary.json` exist.
 - Count LLM calls, valid search states, selected candidates, expensive attempts,

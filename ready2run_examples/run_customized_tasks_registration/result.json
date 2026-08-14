@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "finished": true,
+  "summary": {
+    "files": 8,
+    "iterations": 20,
+    "output_dir": "data/generated/llm_kv_adaptive_quantization_real_20",
+    "qualification": "draft_non_official_not_benchmark_comparable",
+    "status": "ok"
+  },
+  "result_summary": "exit_code=0, finished=true, status=ok, iterations=20, files=8, output_dir=data/generated/llm_kv_adaptive_quantization_real_20, qualification=draft_non_official_not_benchmark_comparable",
+  "error": null
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "source_url": "https://github.com/Imbernoulli/MLS-Bench",
+  "source_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+  "task_path": "harbor/tasks/mls-bench__llm-kv-adaptive-quantization",
+  "editable_file": "transformers-kv-lab/custom_quant_eval.py",
+  "editable_lines": [41, 172],
+  "model_id": "Qwen/Qwen2.5-3B-Instruct",
+  "seed": 42,
+  "budget_bits": 4,
+  "workloads": [
+    "longbench_hotpotqa",
+    "longbench_passage_retrieval",
+    "longbench_repobench",
+    "needlebench_niah",
+    "gsm8k"
+  ],
+  "workload_timeouts_seconds": {
+    "longbench_hotpotqa": 7200,
+    "longbench_passage_retrieval": 7200,
+    "longbench_repobench": 10800,
+    "needlebench_niah": 7200,
+    "gsm8k": 32400
+  },
+  "devices_per_candidate": 5,
+  "gpu_count_per_job": 1,
+  "agent_timeout_seconds": 18000,
+  "verifier_timeout_seconds": 34800,
+  "sha256": {
+    "instruction.md": "ba7e38f730a209e7fefa436be3e3e48c4c5a623f83af8a829f86541c44593fa2",
+    "task.toml": "eaa758a600eaaa035409dd353371379ff7ba1dc446395d23ffb27684966b6b6e",
+    "tests/meta/config.json": "e609c85dc81327a284bd9ac443c5d8de195a858fbd02876804a17e9ce2566dbe",
+    "tests/meta/parser.py": "e800f82b38211c6447cd948d0514452a90b21a5838fa3cf4b49ca139b3d199f8",
+    "tests/meta/score_spec.py": "d04e9bb0904714f593162edce204b4e11b7e0b998c649e9870b95c80cd6c3018",
+    "pristine_harness": "6129821b9356b2a8ff00938b9153e7d8bc21f6d03e5930ffe9701655bb7760d9",
+    "fixed_harness": "c922c235c1caa09c6cc4be01faadb28fd12cba35852967972257c46dcdbe91dc",
+    "seed_class": "fc5b484a434d44a35e01a1e0aa1191f8046ae3a02749ef6507626d81aaf25e85"
+  }
+}

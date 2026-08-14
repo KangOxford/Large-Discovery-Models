@@ -1,0 +1,14 @@
+name: llm_kv_adaptive_quantization_mock
+task: llm_kv_adaptive_quantization
+algorithm: gp_ucb
+mode: mock
+description: Deterministic service-free GP-UCB LDMEngine smoke run.
+args:
+  mock: true
+  iterations: 1
+  reservoir-size: 4
+  evaluations-per-round: 1
+  proposal-mode: deterministic
+  acquisition-beta: 1.0
+  out-dir: runs
+  run-name: mock

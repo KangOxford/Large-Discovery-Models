@@ -1,0 +1,175 @@
+{
+  "method": "m1_stratified_direct_llm_oversample_sir",
+  "init_size": 5,
+  "init_strategy": "llm_cold_start",
+  "budget": 100,
+  "batch_size": 1,
+  "smiles_max_len": 80,
+  "max_candidates_per_round": 32,
+  "max_empty_reservoir_rounds": 10,
+  "allow_early_stop": false,
+  "minimize": [
+    true,
+    false
+  ],
+  "ref_point": [
+    0.0,
+    5.0
+  ],
+  "gp_config": {
+    "impl": "smiles-strkernel",
+    "min_jitter": 1e-06,
+    "jitter_multiplier": 10.0,
+    "max_jitter": 0.1,
+    "learning_rate": 0.1,
+    "fit_n_itersteps": 20,
+    "device": "cpu",
+    "seed": 0,
+    "fp_radius": 2,
+    "fp_n_bits": 2048,
+    "smiles_maxlen": 80,
+    "standardize_y": true
+  },
+  "acquisition": "ehvi",
+  "acquisition_weights": [
+    0.5,
+    0.5
+  ],
+  "ehvi_n_samples": 128,
+  "alpha_base_measure": 1.0,
+  "eta_ehvi_tilt": 3.0,
+  "z_clip": 5.0,
+  "eps": 1e-12,
+  "m1_k_direct_llm": 128,
+  "m1_q0_smoothing": 0.5,
+  "m1_analog_n_llm_seeds": 8,
+  "m1_analog_k_total": 1024,
+  "llm_max_retries": 10,
+  "llm_retry_wait_seconds": 10.0,
+  "trajectory_dir": "runs/delta_small_molecule_ehvi_100",
+  "resume_from_trajectory": false,
+  "seed": 42,
+  "verbose": false,
+  "ldm_task_spec": {
+    "task": "small_molecule",
+    "candidate_domain": {
+      "name": "smiles",
+      "kind": "string",
+      "dimension": null,
+      "representation": "canonical SMILES string",
+      "constraints": {
+        "max_smiles_len": 80
+      },
+      "metadata": {
+        "gp_kernel": "smiles-strkernel",
+        "gp_feature_dimension": null,
+        "max_candidates_per_round": 32
+      }
+    },
+    "objectives": [
+      {
+        "name": "vina",
+        "direction": "minimize",
+        "description": "AutoDock Vina binding score; lower is better.",
+        "metadata": {}
+      },
+      {
+        "name": "activity",
+        "direction": "maximize",
+        "description": "KRAS G12D activity model score; higher is better.",
+        "metadata": {}
+      }
+    ],
+    "response_spaces": [
+      {
+        "name": "direct_smiles",
+        "output_kind": "json",
+        "schema": {},
+        "parser": "tasks.small_molecule.core.ldm_tilted_case2.schemas.parse_m1_direct_smiles",
+        "description": "LLM emits direct candidate SMILES without objective scores.",
+        "metadata": {}
+      },
+      {
+        "name": "seed_plan",
+        "output_kind": "json",
+        "schema": {},
+        "parser": "tasks.small_molecule.core.ldm_tilted_case2.schemas.parse_seed_plan",
+        "description": "LLM emits seed SMILES and per-seed analogue budgets.",
+        "metadata": {}
+      }
+    ],
+    "acquisition": {
+      "name": "ehvi",
+      "objective_names": [
+        "vina",
+        "activity"
+      ],
+      "score_direction": "sample",
+      "selection_rule": "sample candidates from q0 base mass tilted by the robust-z shared ehvi acquisition score",
+      "parameters": {
+        "alpha_base_measure": 1.0,
+        "eta_acquisition_tilt": 3.0,
+        "acquisition_weights": [
+          0.5,
+          0.5
+        ],
+        "ehvi_n_samples": 128,
+        "batch_size": 1
+      },
+      "metadata": {}
+    },
+    "reservoir": {
+      "name": "molecular_candidate_reservoir",
+      "expansions": [
+        {
+          "name": "direct_smiles_generation",
+          "action_kind": "emit_candidate",
+          "response_space": "direct_smiles",
+          "produces_candidates": true,
+          "description": "Emit valid molecular candidates as SMILES.",
+          "parameters": {}
+        },
+        {
+          "name": "seeded_analogue_generation",
+          "action_kind": "configure_generator",
+          "response_space": "seed_plan",
+          "produces_candidates": true,
+          "description": "Choose molecular seeds and budgets for analogue generation.",
+          "parameters": {}
+        }
+      ],
+      "candidate_validator": "SMILES parse, canonicalization, and molecular constraint checks",
+      "deduplication_key": "canonical SMILES",
+      "max_size": 32,
+      "metadata": {
+        "method": "m1_stratified_direct_llm_oversample_sir"
+      }
+    },
+    "surrogate": {
+      "kind": "kernel",
+      "representation": "SMILES subsequence string kernel",
+      "dimension_policy": "implicit",
+      "dimension": null,
+      "encoder": "tasks.small_molecule.core.gp.SMILESStringKernel",
+      "version": "smiles_strkernel_v1",
+      "metadata": {}
+    },
+    "proposal_search": {
+      "name": "single_turn",
+      "breadth": 1,
+      "depth": 1,
+      "beam_width": 1,
+      "evaluation_policy": "outer_loop_acquisition_selection",
+      "parameters": {
+        "proposals_per_round": "task_configured_candidate_reservoir"
+      },
+      "metadata": {}
+    },
+    "metadata": {
+      "method": "m1_stratified_direct_llm_oversample_sir",
+      "init_strategy": "llm_cold_start",
+      "budget": 100,
+      "init_size": 5
+    }
+  }
+}

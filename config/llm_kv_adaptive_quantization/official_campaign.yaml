@@ -1,0 +1,24 @@
+name: llm_kv_adaptive_quantization_official_campaign
+task: llm_kv_adaptive_quantization
+algorithm: gp_ucb
+mode: real
+contract_profile: official_campaign
+description: One generated reservoir and one full-suite official evaluation; requires five GPUs.
+args:
+  iterations: 1
+  reservoir-size: 4
+  evaluations-per-round: 1
+  proposal-mode: openai
+  llm-url: null
+  llm-model-name: null
+  upstream-root: null
+  package-dir: null
+  workloads: longbench_hotpotqa,longbench_passage_retrieval,longbench_repobench,needlebench_niah,gsm8k
+  devices: "0,1,2,3,4"
+  model-id: Qwen/Qwen2.5-3B-Instruct
+  max-examples: 0
+  evaluation-timeout: 34800
+  contract-device: cpu
+  contract-timeout: 60
+  out-dir: runs
+  run-name: official_campaign

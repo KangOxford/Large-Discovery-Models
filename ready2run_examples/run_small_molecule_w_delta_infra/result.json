@@ -1,0 +1,21 @@
+{
+  "status": "partial",
+  "completion_reason": "stopped_at_user_request",
+  "mode": "full",
+  "model": "Qwen3.5-9B",
+  "method": "m1_stratified_direct_llm_oversample_sir",
+  "acquisition": "ehvi",
+  "seed": 42,
+  "evaluations": 30,
+  "budget": 100,
+  "batch_size": 1,
+  "all_objective_pairs_finite": true,
+  "final_hypervolume": 15.310060291545108,
+  "best_vina": -10.6,
+  "best_vina_smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)c3cccc(F)c3)c2)CC1",
+  "best_predicted_activity": 6.478514430123958,
+  "best_activity_smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)C#N)c2)CC1",
+  "model_sha256": "a4c15c1124eced2e8dc80a18fdf94752da106168209d804002b0defbf63986ed",
+  "receptor_pdb_id": "8UN5",
+  "result_summary": "partial KRAS G12D campaign: 30/100 evaluations, best Vina -10.60, best predicted activity 6.478514, final hypervolume 15.310060"
+}

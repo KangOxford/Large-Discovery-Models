@@ -1,0 +1,332 @@
+[
+  {
+    "evaluation": 1,
+    "round_idx": 0,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(F)c2)CC1",
+    "scores": [
+      -9.4,
+      5.717685017919763
+    ],
+    "vina": -9.4,
+    "predicted_activity": 5.717685017919763
+  },
+  {
+    "evaluation": 2,
+    "round_idx": 1,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(I)c2)CC1",
+    "scores": [
+      -8.0,
+      5.334435877964114
+    ],
+    "vina": -8.0,
+    "predicted_activity": 5.334435877964114
+  },
+  {
+    "evaluation": 3,
+    "round_idx": 2,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C#N)c2)CC1",
+    "scores": [
+      -8.5,
+      5.872594902104019
+    ],
+    "vina": -8.5,
+    "predicted_activity": 5.872594902104019
+  },
+  {
+    "evaluation": 4,
+    "round_idx": 3,
+    "smiles": "COc1cccc(NC(=O)C2CCN(S(C)(=O)=O)CC2)c1",
+    "scores": [
+      -8.2,
+      5.233515386384558
+    ],
+    "vina": -8.2,
+    "predicted_activity": 5.233515386384558
+  },
+  {
+    "evaluation": 5,
+    "round_idx": 4,
+    "smiles": "CCS(=O)(=O)N1CCC(C(=O)Nc2cccc(OC)c2)CC1",
+    "scores": [
+      -8.4,
+      5.327424474948178
+    ],
+    "vina": -8.4,
+    "predicted_activity": 5.327424474948178
+  },
+  {
+    "evaluation": 6,
+    "round_idx": 5,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(CF)c2)CC1",
+    "scores": [
+      -8.8,
+      5.514810965181848
+    ],
+    "vina": -8.8,
+    "predicted_activity": 5.514810965181848
+  },
+  {
+    "evaluation": 7,
+    "round_idx": 6,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(Cl)c2)CC1",
+    "scores": [
+      -9.0,
+      5.392229660379885
+    ],
+    "vina": -9.0,
+    "predicted_activity": 5.392229660379885
+  },
+  {
+    "evaluation": 8,
+    "round_idx": 7,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)F)c2)CC1",
+    "scores": [
+      -9.6,
+      6.285959775348656
+    ],
+    "vina": -9.6,
+    "predicted_activity": 6.285959775348656
+  },
+  {
+    "evaluation": 9,
+    "round_idx": 8,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(O)c2)CC1",
+    "scores": [
+      -8.7,
+      5.501967029188638
+    ],
+    "vina": -8.7,
+    "predicted_activity": 5.501967029188638
+  },
+  {
+    "evaluation": 10,
+    "round_idx": 9,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(S(=O)c3ccccc3)c2)CC1",
+    "scores": [
+      -10.1,
+      5.018443532527421
+    ],
+    "vina": -10.1,
+    "predicted_activity": 5.018443532527421
+  },
+  {
+    "evaluation": 11,
+    "round_idx": 10,
+    "smiles": "CSCc1cccc(NC(=O)C2CCN(S(C)(=O)=O)CC2)c1",
+    "scores": [
+      -8.2,
+      5.29240768206202
+    ],
+    "vina": -8.2,
+    "predicted_activity": 5.29240768206202
+  },
+  {
+    "evaluation": 12,
+    "round_idx": 11,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)F)c2)CC1",
+    "scores": [
+      -9.7,
+      6.33721285207928
+    ],
+    "vina": -9.7,
+    "predicted_activity": 6.33721285207928
+  },
+  {
+    "evaluation": 13,
+    "round_idx": 12,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)c3ccccc3)c2)CC1",
+    "scores": [
+      -10.3,
+      5.7207146809005565
+    ],
+    "vina": -10.3,
+    "predicted_activity": 5.7207146809005565
+  },
+  {
+    "evaluation": 14,
+    "round_idx": 13,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(CC(F)F)c2)CC1",
+    "scores": [
+      -9.5,
+      5.830931205027128
+    ],
+    "vina": -9.5,
+    "predicted_activity": 5.830931205027128
+  },
+  {
+    "evaluation": 15,
+    "round_idx": 14,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(Cn3ccnc3)c2)CC1",
+    "scores": [
+      -9.1,
+      5.240095643554281
+    ],
+    "vina": -9.1,
+    "predicted_activity": 5.240095643554281
+  },
+  {
+    "evaluation": 16,
+    "round_idx": 15,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(-c3ccccc3)c2)CC1",
+    "scores": [
+      -10.3,
+      5.360938759086996
+    ],
+    "vina": -10.3,
+    "predicted_activity": 5.360938759086996
+  },
+  {
+    "evaluation": 17,
+    "round_idx": 16,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(CC(F)(F)F)c2)CC1",
+    "scores": [
+      -9.6,
+      6.023173996385384
+    ],
+    "vina": -9.6,
+    "predicted_activity": 6.023173996385384
+  },
+  {
+    "evaluation": 18,
+    "round_idx": 17,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(CC(F)(F)CF)c2)CC1",
+    "scores": [
+      -9.1,
+      5.841385636442159
+    ],
+    "vina": -9.1,
+    "predicted_activity": 5.841385636442159
+  },
+  {
+    "evaluation": 19,
+    "round_idx": 18,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(CN3CCNCC3)c2)CC1",
+    "scores": [
+      -9.2,
+      5.241407911193838
+    ],
+    "vina": -9.2,
+    "predicted_activity": 5.241407911193838
+  },
+  {
+    "evaluation": 20,
+    "round_idx": 19,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)C(F)(F)F)c2)CC1",
+    "scores": [
+      -9.8,
+      6.285497163561508
+    ],
+    "vina": -9.8,
+    "predicted_activity": 6.285497163561508
+  },
+  {
+    "evaluation": 21,
+    "round_idx": 20,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)I)c2)CC1",
+    "scores": [
+      -9.3,
+      6.070442566250421
+    ],
+    "vina": -9.3,
+    "predicted_activity": 6.070442566250421
+  },
+  {
+    "evaluation": 22,
+    "round_idx": 21,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)Br)c2)CC1",
+    "scores": [
+      -9.4,
+      6.172391728066792
+    ],
+    "vina": -9.4,
+    "predicted_activity": 6.172391728066792
+  },
+  {
+    "evaluation": 23,
+    "round_idx": 22,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)c3ccccc3)c2)CC1",
+    "scores": [
+      -9.8,
+      5.834256703478367
+    ],
+    "vina": -9.8,
+    "predicted_activity": 5.834256703478367
+  },
+  {
+    "evaluation": 24,
+    "round_idx": 23,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)Cl)c2)CC1",
+    "scores": [
+      -9.7,
+      6.110404473405748
+    ],
+    "vina": -9.7,
+    "predicted_activity": 6.110404473405748
+  },
+  {
+    "evaluation": 25,
+    "round_idx": 24,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)C#N)c2)CC1",
+    "scores": [
+      -9.7,
+      6.478514430123958
+    ],
+    "vina": -9.7,
+    "predicted_activity": 6.478514430123958
+  },
+  {
+    "evaluation": 26,
+    "round_idx": 25,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)CN)c2)CC1",
+    "scores": [
+      -9.4,
+      5.880743001661936
+    ],
+    "vina": -9.4,
+    "predicted_activity": 5.880743001661936
+  },
+  {
+    "evaluation": 27,
+    "round_idx": 26,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)C(F)(F)CF)c2)CC1",
+    "scores": [
+      -9.3,
+      6.229525107928546
+    ],
+    "vina": -9.3,
+    "predicted_activity": 6.229525107928546
+  },
+  {
+    "evaluation": 28,
+    "round_idx": 27,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)S)c2)CC1",
+    "scores": [
+      -9.1,
+      6.098576760246112
+    ],
+    "vina": -9.1,
+    "predicted_activity": 6.098576760246112
+  },
+  {
+    "evaluation": 29,
+    "round_idx": 28,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)c3cccc(N)c3)c2)CC1",
+    "scores": [
+      -9.8,
+      6.318919581516918
+    ],
+    "vina": -9.8,
+    "predicted_activity": 6.318919581516918
+  },
+  {
+    "evaluation": 30,
+    "round_idx": 29,
+    "smiles": "CS(=O)(=O)N1CCC(C(=O)Nc2cccc(C(F)(F)c3cccc(F)c3)c2)CC1",
+    "scores": [
+      -10.6,
+      6.045722951488777
+    ],
+    "vina": -10.6,
+    "predicted_activity": 6.045722951488777
+  }
+]

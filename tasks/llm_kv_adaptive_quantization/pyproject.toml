@@ -1,0 +1,17 @@
+[project]
+name = "ldm-tts-llm-kv-adaptive-quantization"
+version = "0.1.0"
+description = "Optimize adaptive low-bit KV-cache quantization policies against MLS-Bench quality and compression objectives."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.uv]
+package = false

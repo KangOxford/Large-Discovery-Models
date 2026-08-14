@@ -49,12 +49,14 @@ action must appear in `request.allowed_actions`.
 
 | Task | Runtime status | Mapping |
 | --- | --- | --- |
-| Small molecule | Implemented for accepted `m1_direct` attempts in `tasks/small_molecule/core/ldm_tilted_case2/trace.py`. | `smallmol`, `complete_design`, `propose`. |
-| nanoGPT | Public builder and design guidance exist, but no task runtime imports `DataCollectionSink`. Add and test the hook before attempting collection. | `nanogpt`, `parameter_edits`, `propose` or `expand_design_space`. |
-| Antibody | Public builder and design guidance exist, but no task runtime imports `DataCollectionSink`. Add and test the hook before attempting collection. | `protein`, `complete_design`, `propose`; sequence-only traces use `reasoning_available:false`. |
+| Small molecule | Implemented for accepted direct-LLM attempts in `tasks/small_molecule/core/ldm_tilted_case2/trace.py`. | `smallmol`, `complete_design`, `propose`. |
+| nanoGPT | Implemented in `tasks/nanogpt/core/workflow.py` for validated operation edits and expansion-schema actions. | `nanogpt`, `parameter_edits`, `propose`, `expand_design_space`, or `add_new_parameter`. |
+| Antibody | Implemented in `tasks/antibody/core/ldm_light/ldm_acq.py` for validated direct LLM sequence actions; fallback and policy-DSL decisions are rejected. | `protein`, `complete_design`, `propose`; sequence rows use `reasoning_available:false`. |
 
 The small-molecule adapter is intentionally narrow. Seed-plan and ReaSyn
-analogue prompts are not collected by the current `m1_direct` adapter.
+analogue prompts are not collected by the current direct-LLM adapter. Each hook
+is method-specific, so confirm that the selected execution path reaches it
+before spending model or evaluator budget.
 
 ## Collection Boundary
 
