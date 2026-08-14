@@ -3108,10 +3108,7 @@ def prepare_ligand(
     params = AllChem.ETKDGv3()
     params.randomSeed = int(seed)
     params.useRandomCoords = True
-    try:
-        params.maxAttempts = 1000
-    except Exception:
-        pass
+    params.maxIterations = 1000
     embed_status = AllChem.EmbedMolecule(mol, params)
     if embed_status != 0:
         log_path.write_text(f"RDKit EmbedMolecule failed with code {embed_status}\n", encoding="utf-8")
@@ -3126,19 +3123,27 @@ def prepare_ligand(
             handle.write(f"Geometry optimization warning: {exc}\n")
 
     sdf_path = ligand_dir / "ligand.sdf"
-    Chem.MolToMolFile(mol, str(sdf_path))
-
-    mk_prepare_ligand = find_local_tool("mk_prepare_ligand.py", work_dir)
-    if not mk_prepare_ligand:
-        log_path.write_text("mk_prepare_ligand.py not found. Install meeko in the active Python environment.\n", encoding="utf-8")
-        return None
-    cmd = [mk_prepare_ligand, "-i", str(sdf_path), "-o", str(ligand_pdbqt_path)]
+    writer = Chem.SDWriter(str(sdf_path))
     try:
-        proc = run_logged_command(cmd, log_path, timeout=300)
+        writer.write(mol)
+    finally:
+        writer.close()
+
+    try:
+        from meeko import MoleculePreparation, PDBQTWriterLegacy
+
+        setups = MoleculePreparation().prepare(mol)
+        if len(setups) != 1:
+            raise RuntimeError(f"Meeko produced {len(setups)} ligand setups; expected one.")
+        pdbqt, success, error = PDBQTWriterLegacy.write_string(setups[0])
+        if not success:
+            raise RuntimeError(error)
+        ligand_pdbqt_path.write_text(pdbqt, encoding="utf-8")
     except Exception as exc:
-        log_path.write_text(f"mk_prepare_ligand.py failed to run: {exc}\n", encoding="utf-8")
+        log_path.write_text(f"Meeko ligand preparation failed: {exc}\n", encoding="utf-8")
         return None
-    if proc.returncode != 0 or not ligand_pdbqt_path.exists() or ligand_pdbqt_path.stat().st_size == 0:
+    log_path.write_text("Meeko Python API ligand preparation completed.\n", encoding="utf-8")
+    if not ligand_pdbqt_path.exists() or ligand_pdbqt_path.stat().st_size == 0:
         return None
     return str(ligand_pdbqt_path)
 

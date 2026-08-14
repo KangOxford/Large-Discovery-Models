@@ -1,0 +1,15 @@
+name: llm_kv_adaptive_quantization_preflight
+task: llm_kv_adaptive_quantization
+algorithm: gp_ucb
+mode: preflight
+description: CPU tensor-shape, finite-output, and memory-accounting contract check.
+args:
+  preflight: true
+  iterations: 1
+  reservoir-size: 1
+  evaluations-per-round: 1
+  proposal-mode: deterministic
+  contract-device: cpu
+  contract-timeout: 60
+  out-dir: runs
+  run-name: preflight

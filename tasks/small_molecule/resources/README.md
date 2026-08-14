@@ -4,42 +4,41 @@ Versioned evaluator metadata and other redistributable inputs live here.
 Generated docking files, caches, trajectories, and reports belong in `../runs/`
 and are ignored by Git.
 
-## External G12D model
+## KRAS G12D model
 
-The G12D joblib artifact is deliberately not distributed in Git, and this
-project does not currently document a public download URL. Obtain a compatible
-artifact from a trusted project maintainer or train and validate one locally.
-You may store it at the conventional ignored path:
+The reference KRAS G12D activity model and its metadata are located in
+`models/`:
 
 ```text
 tasks/small_molecule/resources/models/best_g12d_model.joblib
+tasks/small_molecule/resources/models/best_g12d_model_metadata.json
 ```
 
-Alternatively, keep it outside the checkout and configure it with:
+Configure real small-molecule runs to use the included model from the
+repository root:
 
 ```bash
-export G12D=/trusted/path/best_g12d_model.joblib
+export G12D="$PWD/tasks/small_molecule/resources/models/best_g12d_model.joblib"
 ```
 
-The tracked `models/best_g12d_model_metadata.json` records the published
-artifact's provenance and SHA-256 digest:
+The metadata sidecar records the model's training provenance, evaluation
+results, and SHA-256 digest:
 
 ```text
 a4c15c1124eced2e8dc80a18fdf94752da106168209d804002b0defbf63986ed
 ```
 
-Place or copy that metadata file beside the model as
-`best_g12d_model_metadata.json` to make the scorer and real-run preflight verify
-the declared digest before loading. Custom artifacts without matching checksum
-metadata remain the caller's responsibility.
+Keep the metadata beside the joblib file. The scorer and real-run preflight
+discover it automatically and verify the declared digest before loading the
+model. See [`models/README.md`](models/README.md) for the model summary,
+validation metrics, configuration options, and manual verification command.
 
 Joblib uses pickle-compatible deserialization, which can execute arbitrary
-code. Never load the published artifact or a replacement from an untrusted source. Verify
-the checksum after every transfer and review the metadata provenance before
-use.
+code. A matching checksum establishes integrity, not trust. Never load the
+included artifact or a replacement from an untrusted source.
 
 The root MIT license covers repository code. It does not establish that every
 third-party dataset or derived model can be redistributed under MIT. The
-metadata describes the public direct-assay inputs used to train the published
-artifact, but does not currently establish their source URLs and license terms.
-That unresolved redistribution status is why the binary is external.
+metadata describes the public direct-assay inputs used to train the model;
+review its provenance and any applicable source terms before redistributing or
+using the artifact outside this project.

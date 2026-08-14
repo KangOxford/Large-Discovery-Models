@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "task_id": "llm_kv_adaptive_quantization",
+  "qualification": "draft",
+  "benchmark": {
+    "source_url": "https://github.com/Imbernoulli/MLS-Bench",
+    "source_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+    "task_path": "harbor/tasks/mls-bench__llm-kv-adaptive-quantization"
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "official_score",
+        "direction": "maximize",
+        "description": "Official MLS-Bench geometric aggregate across all five workload scores."
+      },
+      {
+        "name": "final_score",
+        "direction": "maximize",
+        "description": "Benchmark-native quality reported separately for each workload."
+      },
+      {
+        "name": "effective_kv_bits",
+        "direction": "minimize",
+        "description": "Effective KV bits per cached element reported separately for each workload."
+      },
+      {
+        "name": "kv_compression_ratio",
+        "direction": "maximize",
+        "description": "FP16 reference footprint divided by effective KV bits per workload."
+      },
+      {
+        "name": "runtime_seconds",
+        "direction": "minimize",
+        "description": "Runtime reported separately for each official workload."
+      }
+    ],
+    "optimized": [
+      {
+        "name": "official_score",
+        "direction": "maximize",
+        "description": "Search objective only when all five official workloads complete."
+      },
+      {
+        "name": "selection_score",
+        "direction": "maximize",
+        "description": "Explicitly non-official signal used only by mock, tensor, and tiny qualification runs."
+      }
+    ],
+    "diagnostic": [
+      {
+        "name": "state_tensor_elements",
+        "direction": "minimize",
+        "description": "Tensor elements retained on the quantizer instance during isolated contract checks."
+      }
+    ]
+  },
+  "evaluation": {
+    "datasets": [
+      "THUDM/LongBench: hotpotqa_e, passage_retrieval_en_e, repobench-p_e",
+      "opencompass/NeedleBench: English haystacks",
+      "openai/gsm8k: main test split"
+    ],
+    "settings": {
+      "model": "Qwen/Qwen2.5-3B-Instruct",
+      "seed": 42,
+      "budget_bits": 4,
+      "workloads": [
+        "longbench_hotpotqa",
+        "longbench_passage_retrieval",
+        "longbench_repobench",
+        "needlebench_niah",
+        "gsm8k"
+      ],
+      "editable_file": "transformers-kv-lab/custom_quant_eval.py",
+      "editable_lines": "41-172",
+      "score": "Per workload: 60% quality and 40% compression; task: geometric mean of all five workload scores.",
+      "agent_timeout_seconds": 18000,
+      "verifier_timeout_seconds": 34800
+    },
+    "per_candidate_limits": {
+      "benchmark_jobs": 5,
+      "gpu_count_per_job": 1,
+      "cpu_count": 4,
+      "memory_gib": 16,
+      "storage_gib": 60,
+      "longbench_hotpotqa_seconds": 7200,
+      "longbench_passage_retrieval_seconds": 7200,
+      "longbench_repobench_seconds": 10800,
+      "needlebench_niah_seconds": 7200,
+      "gsm8k_seconds": 32400
+    }
+  },
+  "budget": {
+    "outer_iterations": 1,
+    "llm_requests": 1,
+    "proposal_attempts": 1,
+    "valid_search_candidates": 4,
+    "selected_candidates": 1,
+    "external_evaluations": 1,
+    "expensive_evaluation_attempts": 1,
+    "successful_evaluations": 1,
+    "benchmark_jobs": 5
+  },
+  "profiles": {
+    "tiny_real_qualification": {
+      "description": "One generated reservoir, one GP-UCB selection, and one example from one workload; not benchmark-comparable.",
+      "budget": {
+        "outer_iterations": 1,
+        "llm_requests": 1,
+        "proposal_attempts": 1,
+        "valid_search_candidates": 4,
+        "selected_candidates": 1,
+        "external_evaluations": 1,
+        "expensive_evaluation_attempts": 1,
+        "successful_evaluations": 1,
+        "benchmark_jobs": 1
+      },
+      "locked_args": {
+        "iterations": 1,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "proposal-mode": "openai",
+        "workloads": "longbench_hotpotqa",
+        "devices": "0",
+        "model-id": "Qwen/Qwen2.5-3B-Instruct",
+        "max-examples": 1,
+        "evaluation-timeout": 7200
+      }
+    },
+    "extended_tiny_real_20": {
+      "description": "Twenty generated reservoirs, GP-UCB selections, and one-example HotpotQA evaluations; an extended non-official diagnostic campaign.",
+      "budget": {
+        "outer_iterations": 20,
+        "llm_requests": 20,
+        "proposal_attempts": 20,
+        "valid_search_candidates": 80,
+        "selected_candidates": 20,
+        "external_evaluations": 20,
+        "expensive_evaluation_attempts": 20,
+        "successful_evaluations": 20,
+        "benchmark_jobs": 20
+      },
+      "locked_args": {
+        "iterations": 20,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "proposal-mode": "openai",
+        "workloads": "longbench_hotpotqa",
+        "devices": "0",
+        "model-id": "Qwen/Qwen2.5-3B-Instruct",
+        "max-examples": 1,
+        "evaluation-timeout": 7200
+      }
+    },
+    "official_seed": {
+      "description": "Exact upstream seed evaluated on the complete official five-workload budget outside LDM proposal generation.",
+      "budget": {
+        "outer_iterations": 1,
+        "llm_requests": 0,
+        "proposal_attempts": 0,
+        "valid_search_candidates": 1,
+        "selected_candidates": 1,
+        "external_evaluations": 1,
+        "expensive_evaluation_attempts": 1,
+        "successful_evaluations": 1,
+        "benchmark_jobs": 5
+      },
+      "locked_args": {
+        "iterations": 1,
+        "reservoir-size": 1,
+        "evaluations-per-round": 1,
+        "proposal-mode": "deterministic",
+        "workloads": "longbench_hotpotqa,longbench_passage_retrieval,longbench_repobench,needlebench_niah,gsm8k",
+        "devices": "0,1,2,3,4",
+        "model-id": "Qwen/Qwen2.5-3B-Instruct",
+        "max-examples": 0,
+        "evaluation-timeout": 34800
+      }
+    },
+    "official_campaign": {
+      "description": "One four-candidate generated reservoir, one GP-UCB selection, and one full five-workload official evaluation.",
+      "budget": {
+        "outer_iterations": 1,
+        "llm_requests": 1,
+        "proposal_attempts": 1,
+        "valid_search_candidates": 4,
+        "selected_candidates": 1,
+        "external_evaluations": 1,
+        "expensive_evaluation_attempts": 1,
+        "successful_evaluations": 1,
+        "benchmark_jobs": 5
+      },
+      "locked_args": {
+        "iterations": 1,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "proposal-mode": "openai",
+        "workloads": "longbench_hotpotqa,longbench_passage_retrieval,longbench_repobench,needlebench_niah,gsm8k",
+        "devices": "0,1,2,3,4",
+        "model-id": "Qwen/Qwen2.5-3B-Instruct",
+        "max-examples": 0,
+        "evaluation-timeout": 34800
+      }
+    }
+  }
+}

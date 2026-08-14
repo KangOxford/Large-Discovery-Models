@@ -45,9 +45,9 @@ in evidence rather than model confidence alone.
 ## Contents
 
 - [Repository Scope](#repository-scope)
-- [Versioning And API Stability](#versioning-and-api-stability)
 - [The Research Loop](#the-research-loop)
 - [Real Campaign Examples](#real-campaign-examples)
+- [Run a demo with Delta-Infra: Hassle-Free and Ready-to-Run](#run-a-demo-with-delta-infra-hassle-free-and-ready-to-run)
 - [Quick Start](#quick-start)
 - [Environment Setup](#environment-setup)
 - [Dependency Checks](#dependency-checks)
@@ -91,19 +91,6 @@ agent workflows cataloged under [`skills/`](skills/README.md):
 - `register-ldm-task` scaffolds and implements a new task.
 - `run-ldm-task` validates and progressively executes an existing task.
 
-## Versioning And API Stability
-
-LDM v0.1 is a pre-1.0 release candidate. Imports from focused packages such as
-`ldm_tts.engine`, `ldm_tts.registration`, `ldm_tts.optimization`, and
-`ldm_tts.data` are canonical. Internal module paths may change before 1.0, and
-package-root aliases that remain available should be considered transitional.
-The refactored package does not preserve every historical module path; pin a
-version and review the changelog when integrating it as a library.
-
-The `ldm-tts` console command is checkout-oriented because task packages,
-configs, and scientific assets remain outside the shared wheel. Run it from a
-repository root or set `LDM_REPO_ROOT=/path/to/checkout` explicitly.
-
 ## The Research Loop
 
 Within each discovery round, the LLM supplies a candidate reservoir while a GP
@@ -143,6 +130,39 @@ Use the [agent execution guide](docs/agent-execution.md) for the machine-oriente
 validation, resume, plotting, and safety checklist. Use
 [`scripts/plot_campaigns.py`](scripts/plot_campaigns.py) to regenerate the
 three trajectory views from persisted artifacts.
+
+## Run a demo with Delta-Infra: Hassle-Free and Ready-to-Run
+
+For a cloud-backed path that does not require configuring GPUs, model servers,
+and scientific evaluators on the local machine, start with the
+[ready-to-run examples](ready2run_examples/README.md). They use
+[Delta-Infra](https://delta-infra-dashboard-test.yangtzeailab.com/) to give
+local AI agents access to isolated CPU/GPU sandboxes, shared model endpoints,
+and managed scientific tools through `delta-cli`.
+
+Install the CLI and agent skills, then authenticate with a Delta-Infra Bearer
+token:
+
+```bash
+npx @delta-infra/cli@latest install
+delta-cli --version
+delta-cli auth login --token <your-token>
+delta-cli auth status
+```
+
+Choose the workflow that matches your goal:
+
+| Goal | Delta-Infra runbook |
+| --- | --- |
+| Run small-molecule discovery with real Qwen inference, Vina docking, and G12D activity prediction | [Small-molecule workflow](ready2run_examples/run_small_molecule_w_delta_infra/DELTA_CLI_WORKFLOW.md) |
+| Propose antibody CDRH3 sequences and evaluate them with the managed AntBO/Absolut service | [Antibody workflow](ready2run_examples/run_antibody_w_delta_infra/DELTA_CLI_WORKFLOW.md) |
+| Register a user-defined task and run a diagnostic campaign | [Custom-task registration workflow](ready2run_examples/run_customized_tasks_registration/TASK_REGISTRATION_WORKFLOW.md) |
+
+The [complete ready-to-run guide](ready2run_examples/README.md) also covers
+alternative installation methods, configuration checks, a sandbox smoke test,
+resource cleanup, credential safety, and the evidence boundary of each
+recorded run. Read the selected runbook before allocating cloud resources;
+each workflow has specific image, model, timeout, and evaluator requirements.
 
 ## Quick Start
 

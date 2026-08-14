@@ -6,8 +6,9 @@ description: Validate, configure, dry-run, smoke-test, execute, monitor, and sum
 # Run An Existing LDM Task
 
 Execute registered tasks through their checked-in configs and the shared runner.
-Preserve task configuration unless the user asks for an edit; prefer temporary
-`--set` overrides for run-specific values.
+Preserve task configuration unless the user asks for an edit. Use temporary
+`--set` overrides only when they do not violate a selected experiment-contract
+profile.
 
 Read [references/built-in-tasks.md](references/built-in-tasks.md) when running
 `nanogpt`, `small_molecule`, or `antibody`. For another task, read its
@@ -24,8 +25,18 @@ Read [references/built-in-tasks.md](references/built-in-tasks.md) when running
    ```
 
 3. Read the selected config, `tasks/<task_id>/task.json`, and the relevant task
-   README. Confirm that the config's `task` matches the intended task.
-4. Classify the requested execution level:
+   README. Also read `experiment.json` when present. Confirm that the config's
+   `task` matches the intended task.
+4. Classify the runtime implementation:
+   - **Engine-native**: the executed task path constructs `LDMEngine`; expect
+     the shared lifecycle, budget, event, checkpoint, status, and summary
+     artifacts.
+   - **Compatibility**: the task uses a task-specific loop or
+     `run_budgeted_search`; follow its README for artifacts, counters, and
+     resume behavior.
+   - Emitting `LDMTaskSpec` does not by itself make a task engine-native. Verify
+     the executed code path rather than inferring runtime ownership from names.
+5. Classify the requested execution level:
    - **Inspect**: list or explain configs; make no run.
    - **Mock**: local deterministic execution with no model or evaluator.
    - **Contract**: validate resolution and task specification without objective
@@ -33,7 +44,7 @@ Read [references/built-in-tasks.md](references/built-in-tasks.md) when running
      documented.
    - **Tiny real**: one or a few real proposals and evaluations.
    - **Full real**: the checked-in or explicitly overridden production budget.
-5. Do not silently promote a mock/contract request to a real run. Do not launch
+6. Do not silently promote a mock/contract request to a real run. Do not launch
    a full real budget merely because a tiny real run succeeds.
 
 ## Use The Task Environment
@@ -65,6 +76,12 @@ Use `--no-optional` only when the selected task path genuinely omits those
 dependencies. Never use it to suppress a dependency required by the requested
 evaluation.
 
+When a config selects `contract_profile`, treat its locked arguments as
+immutable. Do not shrink a profiled campaign with `--set`. Use a checked-in
+smoke profile when available. Clear `contract_profile` only when the task README
+explicitly documents that action for a non-qualified diagnostic or tiny run,
+and report that the resulting run is outside the named campaign contract.
+
 Stop before execution when registration validation or a required dependency
 check fails. Report the exact failed dependency and configured path. Warnings
 may proceed only when they do not invalidate the requested mode.
@@ -85,7 +102,8 @@ and report it; do not start or replace a model server unless the user asks.
 
 For mock mode, run the checked-in mock config after the three preflight gates.
 
-For real mode, follow the task README's **Minimal First Real Run** exactly:
+For real mode, reread and follow the task README's **Minimal First Real Run**
+exactly. Do not copy an older recipe from this skill over a newer task README:
 
 1. Probe the model.
 2. Run the light dependency check.
@@ -105,12 +123,21 @@ Keep long-running commands attached or poll their execution session until they
 finish, fail, or the user stops them. Do not leave a model/evaluator run active
 without reporting its session state.
 
+For an engine-native run, inspect `ldm_task_spec.json`, `events.jsonl`,
+`checkpoint.json`, `budget.json`, `status.json`, and `summary.json`. When a
+qualified contract is active, also inspect `experiment_contract.json`. For a
+compatibility run, inspect the task-specific artifacts named by its README and
+do not claim shared-engine resume or budget semantics unless the executed path
+actually provides them.
+
 After execution, report:
 
 - task, config, mode, and effective overrides;
 - interpreter/project used;
 - dependency and endpoint results;
-- output, trajectory, summary, and best-candidate paths;
+- runtime classification and whether a named contract profile remained active;
+- output, event/trajectory, checkpoint, status, summary, and best-candidate
+  paths that apply to that runtime;
 - iterations/evaluations completed and early-stop reason;
 - acquisition function and objective directions;
 - best observed candidate and objective values when available;

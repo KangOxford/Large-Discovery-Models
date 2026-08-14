@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "llm_kv_adaptive_quantization",
+  "description": "Optimize adaptive low-bit KV-cache quantization policies against MLS-Bench quality and compression objectives.",
+  "dependency_checker": "tasks.llm_kv_adaptive_quantization.ldm_task.dependencies:check_dependencies"
+}

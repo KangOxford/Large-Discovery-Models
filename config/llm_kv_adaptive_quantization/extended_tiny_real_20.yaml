@@ -1,0 +1,24 @@
+name: llm_kv_adaptive_quantization_extended_tiny_real_20
+task: llm_kv_adaptive_quantization
+algorithm: gp_ucb
+mode: real
+contract_profile: extended_tiny_real_20
+description: Twenty endpoint-generated reservoirs with one-example HotpotQA evaluations; non-official.
+args:
+  iterations: 20
+  reservoir-size: 4
+  evaluations-per-round: 1
+  proposal-mode: openai
+  llm-url: null
+  llm-model-name: null
+  upstream-root: null
+  package-dir: null
+  workloads: longbench_hotpotqa
+  devices: "0"
+  model-id: Qwen/Qwen2.5-3B-Instruct
+  max-examples: 1
+  evaluation-timeout: 7200
+  contract-device: cpu
+  contract-timeout: 60
+  out-dir: runs
+  run-name: extended_tiny_real_20

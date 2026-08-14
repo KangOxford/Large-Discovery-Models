@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
 
 from tasks.small_molecule.core.ldm_tilted_case2.base_measure import apply_m1_base_measure
-from tasks.small_molecule.core.ldm_tilted_case2.canonicalize import RawCandidate, build_candidate_records, canonicalize_smiles
+from tasks.small_molecule.core.ldm_tilted_case2.canonicalize import RawCandidate, build_candidate_records
 from tasks.small_molecule.core.ldm_tilted_case2.candidate_record import ReservoirBuildResult, SourceRecord
 from tasks.small_molecule.core.ldm_tilted_case2.config import TiltedLDMCase2Config
 from tasks.small_molecule.core.ldm_tilted_case2.prompts import build_m1_prompt, summarize_history
@@ -356,11 +355,12 @@ def _batch_items_for_records(batch: _DirectBatch, cfg):
     return items[: max(0, batch.source.requested_budget)]
 
 
-def _attach_rationales(candidates, items) -> None:
-    rationales: dict[str, list[str]] = defaultdict(list)
-    for item in items:
-        canonical = canonicalize_smiles(item.smiles)
-        if canonical is not None:
-            rationales[canonical].append(item.rationale)
+def _attach_rationales(candidates, _items) -> None:
     for candidate in candidates:
-        candidate.metadata["rationales"] = rationales.get(candidate.canonical_smiles or "", [])
+        candidate.metadata["rationales"] = [
+            str(candidate.metadata.get("rationale", "")),
+            *[
+                str(rationale)
+                for rationale in candidate.metadata.get("merged_rationales", [])
+            ],
+        ]
