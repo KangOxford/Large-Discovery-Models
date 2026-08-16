@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "stage": "seed_evaluated",
+  "observed_at": "2026-08-15",
+  "official": true,
+  "outside_campaign_budget": true,
+  "source_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+  "source_candidate": "ridge",
+  "source_path": "tasks/ai4bio-mutation-effect-prediction/edits/ridge.edit.py",
+  "source_sha256": "ecc30cf04a77eb0f4f7b8b6231a5d79639956b12f39e9090e5bb5a3a8bb5ef0f",
+  "embedding_checkpoint": {
+    "model": "esm2_t33_650M_UR50D",
+    "bytes": 2604537549,
+    "sha256": "3e8bc9f632e41f12d3b6d74941b153bbb9b43560c14788125df1268a5ca2477d"
+  },
+  "evaluation": {
+    "epochs": 200,
+    "batch_size": 64,
+    "seed": 42,
+    "optimizer": "AdamW",
+    "learning_rate": 0.001,
+    "weight_decay": 0.05,
+    "fold_strategy": "fold_random_5",
+    "benchmark_jobs": 3,
+    "parameter_count": 1281,
+    "runtime_seconds": 85.13596165739
+  },
+  "metrics": {
+    "spearman_BLAT_ECOLX": 0.736861,
+    "spearman_ESTA_BACSU": -0.104708,
+    "spearman_RASH_HUMAN": 0.683499,
+    "normalized_BLAT_ECOLX": 0.0,
+    "normalized_ESTA_BACSU": 1.9708246655307322e-05,
+    "normalized_RASH_HUMAN": 0.021785662222628517,
+    "official_score": 0.012963539299424667
+  },
+  "fold_spearmans": {
+    "BLAT_ECOLX": [
+      0.7576867852664356,
+      0.7295103924621116,
+      0.7408792790579324,
+      0.7365526647879251,
+      0.719675990673752
+    ],
+    "ESTA_BACSU": [
+      -0.09457919725083769,
+      -0.1486167502187798,
+      -0.041476410886171024,
+      -0.11422447761561809,
+      -0.12464247939459071
+    ],
+    "RASH_HUMAN": [
+      0.7183731487689651,
+      0.6718502896800527,
+      0.6912962277836909,
+      0.6864069068696822,
+      0.6495704816510418
+    ]
+  },
+  "scoring": {
+    "engine": "pinned_mlsbench.scoring.evaluate.score_record_details",
+    "record_valid": true,
+    "gmean_epsilon": 0.01
+  }
+}

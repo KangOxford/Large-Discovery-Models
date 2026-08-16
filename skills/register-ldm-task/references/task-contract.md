@@ -18,7 +18,8 @@ tasks/<task_id>/
 ├── core/
 │   └── __init__.py
 ├── resources/
-│   └── README.md
+│   ├── README.md
+│   └── qualification_evidence.json
 └── tests/
 
 config/<task_id>/
@@ -45,10 +46,17 @@ The module and working directory are inferred as
 `experiment.json` remains optional only for legacy task discovery. It is
 required for newly scaffolded tasks and for any campaign qualification claim.
 New scaffolds include a valid draft contract. It records benchmark provenance,
-metric roles, official evaluator settings and per-candidate limits, generic
-budget facts, and named campaign profiles. A profile can lock config arguments;
-select it with top-level `contract_profile` in a real config. The shared runner
-rejects missing or changed locked arguments before task import.
+proposal-provider capabilities, metric roles, official evaluator settings and
+per-candidate limits, generic budget facts, and named campaign profiles. A
+profile can lock config arguments; select it with top-level `contract_profile`
+in a real config. The shared runner rejects missing or changed locked arguments
+before task import.
+
+Declare `proposal_provider.kind` as `unspecified`, `deterministic`,
+`model_endpoint`, `external_service`, `dataset`, `simulator`, or `hybrid`.
+Also declare `requires_endpoint_preflight` and `supports_collection`. A
+`model_endpoint` provider must require preflight; a deterministic provider must
+not. Older contracts without this object load as `unspecified` for compatibility.
 
 Use `qualification: draft` until the official source and seed evaluator are
 verified. Qualified runs should call
@@ -63,6 +71,24 @@ Metric roles are explicit:
 
 The same metric may be both reported and optimized. Never silently substitute a
 surrogate-only transformation for the official reported metric.
+Use optional metric `modes` when a metric exists only in selected modes, such as
+`["mock"]` for a synthetic selection score.
+
+## Qualification Evidence
+
+New scaffolds create `resources/qualification_evidence.json` at `scaffolded`.
+Advance it through `registered`, `mock_verified`, `contract_verified`,
+`seed_evaluated`, `tiny_campaign_verified`, and `campaign_qualified`. Every
+stage through the declared current stage must be `passed` and cite at least one
+existing repository-relative evidence path that is available in a clean
+checkout. Do not cite ignored runtime output; promote a compact campaign record
+with result, budget, provenance, contract digest, and raw-artifact digests into
+the task's `resources/` directory. Campaign-qualified evidence pins the
+benchmark commit and names a profile defined by `experiment.json`.
+
+Legacy tasks may omit this file during normal validation. A new qualification
+claim must pass `scripts/validate_tasks.py --task <task_id> --require-stage
+<stage>`.
 
 ## Procedure
 
@@ -199,3 +225,6 @@ the task README must state why and identify the future accepted-action boundary.
   --require-qualified`.
 - Real configs select a runner-enforced profile when official budgets are known.
 - Qualified campaigns snapshot the contract and emit durable budget/status files.
+- Qualified run artifacts use run-relative references; budget snapshots include
+  zero-valued counters; completed scalar campaigns prefer `result.json` and
+  `trajectory.csv` exports.

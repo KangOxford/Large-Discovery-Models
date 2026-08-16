@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "task_id": "ai4bio_mutation_effect_prediction",
+  "stage": "campaign_qualified",
+  "benchmark_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+  "contract_profile": "official_campaign",
+  "gates": {
+    "scaffolded": {
+      "status": "passed",
+      "evidence": [
+        "tasks/ai4bio_mutation_effect_prediction/task.json",
+        "tasks/ai4bio_mutation_effect_prediction/experiment.json"
+      ]
+    },
+    "registered": {
+      "status": "passed",
+      "evidence": [
+        "tasks/ai4bio_mutation_effect_prediction/ldm_task/procedure.py",
+        "tasks/ai4bio_mutation_effect_prediction/README.md"
+      ]
+    },
+    "mock_verified": {
+      "status": "passed",
+      "evidence": [
+        "tasks/ai4bio_mutation_effect_prediction/tests/test_procedure.py"
+      ]
+    },
+    "contract_verified": {
+      "status": "passed",
+      "evidence": [
+        "tasks/ai4bio_mutation_effect_prediction/resources/upstream_contract.json",
+        "tasks/ai4bio_mutation_effect_prediction/scripts/verify_contract.py"
+      ]
+    },
+    "seed_evaluated": {
+      "status": "passed",
+      "evidence": [
+        "tasks/ai4bio_mutation_effect_prediction/resources/qualification_seed.json"
+      ]
+    },
+    "tiny_campaign_verified": {
+      "status": "passed",
+      "evidence": [
+        "config/ai4bio_mutation_effect_prediction/real.yaml",
+        "tasks/ai4bio_mutation_effect_prediction/resources/qualification_campaign.json"
+      ]
+    },
+    "campaign_qualified": {
+      "status": "passed",
+      "evidence": [
+        "tasks/ai4bio_mutation_effect_prediction/experiment.json",
+        "tasks/ai4bio_mutation_effect_prediction/resources/qualification_campaign.json"
+      ]
+    }
+  }
+}

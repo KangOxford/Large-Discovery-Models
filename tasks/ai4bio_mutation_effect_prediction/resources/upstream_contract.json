@@ -1,0 +1,32 @@
+{
+  "source_url": "https://github.com/Imbernoulli/MLS-Bench",
+  "source_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+  "task_path": "tasks/ai4bio-mutation-effect-prediction",
+  "editable_file": "ProteinGym/custom_mutation_pred.py",
+  "embedding_dimension": 1280,
+  "parameter_budget": {
+    "largest_baseline": "reshape_cnn",
+    "largest_baseline_parameters": 6626625,
+    "multiplier": 1.05,
+    "maximum_parameters": 6957956
+  },
+  "sha256": {
+    "task_description.md": "c29b1acd054f37f786c3d2403d033a6ef5cced5faf6945d76b5acf102c5fbd5e",
+    "config.json": "c6e7aeaa52fb589b6477582b11d3afc5cf5fadf85739aca3b354300994a476ad",
+    "score_spec.py": "8944875782e242ff23c2f1e81c9cbb6eee78692adf92364b03e124d82aec688f",
+    "budget_check.py": "d0247a0f64fe74ef76db31d4bd743b52abd69e668046685cc994ae81c8549951",
+    "parser.py": "259a0340eda29841f7789e76cf775411552aa3c3d3ea5d744d599fadd83761d2",
+    "leaderboard.csv": "ccbf01df122897be38507f9d6a6eed80c5d10e8fa3d1c2f90d1b9d77accd3778",
+    "edits/custom_template.py": "087364baa3e5d9b0b728345e04c5922a879799f49363820ab7611324b1f14d38",
+    "edits/mlp.edit.py": "1cf676870b4967cf930d7addb8fee4e03230e4179510eb01975a3eaeaa828cee",
+    "edits/reshape_cnn.edit.py": "e273f60a6f8d659989eef4f62b7ad1a580120682176f84196d1ca3617cef9c4d",
+    "edits/ridge.edit.py": "ecc30cf04a77eb0f4f7b8b6231a5d79639956b12f39e9090e5bb5a3a8bb5ef0f",
+    "src/mlsbench/__init__.py": "9d3be77b7a7c845cc06e78f977ae668d7092e4282e5ca24a791ea48a8049b96d",
+    "src/mlsbench/agent/leaderboard.py": "754980fc706cf5ed206ce03bebf78de4072e9e58341cb4d0b302c717ee8632f3",
+    "src/mlsbench/scoring/anchors.py": "cb3cbbc619619159c1047e26c01a5b10bf818ad44275f03b912d769b276bdc03",
+    "src/mlsbench/scoring/dsl.py": "200508eed4d44f6a369929f9f1ce49097cfa7f09327dc7f29585c666610968aa",
+    "src/mlsbench/scoring/evaluate.py": "6be0a1370d592005e13f76a54c865ad65514e7eaf4cf7a82c39f86479171d672",
+    "src/mlsbench/scoring/primitives.py": "d0e0d16a2d7c8367cefc9052552034857ae4b17ca7817136b589827f8c0ba369",
+    "src/mlsbench/scoring/spec.py": "b4b713ea1ac343cb35eb0666cb9054a4f314f57aebd9b4d2e11037c287800392"
+  }
+}

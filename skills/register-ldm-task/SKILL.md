@@ -1,6 +1,6 @@
 ---
 name: register-ldm-task
-description: Scaffold, implement, register, scientifically qualify, and production-check an LDM domain task in this repository. Use when adding or repairing a task adapter, task manifest, experiment.json benchmark contract, metric roles, official evaluation budget, campaign profile, dependency checker, mock/real config, GP-guided search, endpoint preflight, durable budget/status reporting, or staged real-run qualification.
+description: Scaffold, implement, register, scientifically qualify, and production-check an LDM domain task in this repository. Use when adding or repairing a task adapter, task manifest, experiment.json benchmark contract, proposal-provider capabilities, metric roles, qualification evidence, official evaluation budget, campaign profile, dependency checker, mock/real config, GP-guided search, durable budget/status reporting, or staged real-run qualification.
 ---
 
 # Register And Qualify An LDM Task
@@ -22,6 +22,8 @@ Before scaffolding, discover or ask for:
   generator, edits a candidate, or updates the expansion schema;
 - the surrogate representation, dimension policy, encoder, and version;
 - the benchmark source URL, immutable commit, and task path;
+- the proposal provider kind, whether it requires endpoint preflight, and whether
+  accepted actions support fine-tuning collection;
 - reported, optimized, and diagnostic metrics with directions;
 - one expensive evaluation and its official per-candidate limits;
 - search, LLM-attempt, expensive-evaluation, and baseline budgets;
@@ -49,8 +51,9 @@ and real evaluator checks support `qualified`.
    code in `core/`, versioned inputs in `resources/`, and outputs in ignored
    `runs/`.
 5. Complete `experiment.json`. Keep registration identity in `task.json`; keep
-   scientific provenance, metric roles, evaluator settings, limits, and named
-   runner-enforced campaign profiles in `experiment.json`.
+   scientific provenance, proposal-provider capabilities, metric roles,
+   evaluator settings, limits, and named runner-enforced campaign profiles in
+   `experiment.json`.
 6. Implement the campaign through `ldm_tts.engine.LDMEngine`. Supply task-owned
    `ReservoirExpander`, `CandidateDomainAdapter`, and `CandidateEvaluator`
    adapters. Add `SurrogateEncoder` and `AcquisitionSelector` only for
@@ -76,14 +79,20 @@ Finish each stage before starting the next:
    evaluator assembly checks.
 4. `seed_evaluated`: one official-budget seed evaluation with source commit,
    metrics, and artifacts recorded.
-5. `ldm_tiny_verified`: endpoint preflight, one generated reservoir, one
-   acquisition-selected candidate, and one real evaluation.
+5. `tiny_campaign_verified`: provider-specific preflight when required, one
+   generated reservoir, one acquisition-selected candidate, and one real
+   evaluation.
 6. `campaign_qualified`: named contract profile, durable resume, budget/status
-   files, comparison budget, and monitored detached launch.
+   files, comparison budget, and monitored durable launch.
 
 Use the exact gates and expected artifacts in
 [references/qualification.md](references/qualification.md). Registration is not
-the same as campaign qualification; report both states explicitly.
+the same as campaign qualification; report both states explicitly. Update
+`resources/qualification_evidence.json` at each completed gate and cite only
+repository-relative evidence paths that exist in a clean checkout. Never cite
+ignored `runs/`, `ldm_runs/`, or `data/generated/` output: promote the relevant
+contract digest, counters, result, provenance, and raw-artifact digests into a
+compact checked-in record under `tasks/<task_id>/resources/`.
 
 ## Required Verification
 
@@ -104,13 +113,14 @@ git diff --check
 
 After the seed and tiny LDM gates justify changing the contract to `qualified`,
 also run `python scripts/validate_tasks.py --task <task_id> --require-qualified`.
-The normal validator accepts honest draft scaffolds; the strict form is the
-campaign-readiness gate.
+For a campaign-readiness claim, also run `python scripts/validate_tasks.py
+--task <task_id> --require-stage campaign_qualified`. The normal validator
+accepts honest draft scaffolds and warns when legacy evidence is absent.
 
 Before a real launch, also verify the selected `contract_profile` appears in the
-runner dry run, endpoint preflight succeeds, `status.json` and `budget.json` are
-created, and the first selected candidate enters the intended evaluator rather
-than a standalone benchmark agent.
+runner dry run, any provider-required preflight succeeds, `status.json` and
+`budget.json` are created, and the first selected candidate enters the intended
+evaluator rather than a standalone benchmark agent.
 
 ## Interface Rules
 
@@ -128,13 +138,29 @@ than a standalone benchmark agent.
   and assert that `events.jsonl`, `checkpoint.json`, and `summary.json` exist.
 - Count LLM calls, valid search states, selected candidates, expensive attempts,
   successful evaluations, benchmark jobs, and outer iterations separately.
+- Serialize every declared budget counter, including zeros, and preserve true
+  fractional values while writing integral values as JSON integers.
 - Use expensive evaluations, not wall time or generated states, as the default
   fair-comparison x-axis unless the benchmark specifies otherwise.
 - Snapshot the active experiment contract into every qualified run.
-- Preflight real model endpoints before iteration 1. Pause resumably when the
-  circuit opens; do not exhaust the candidate budget on identical timeouts.
+- Preflight before iteration 1 only when the declared proposal provider requires
+  it. Pause resumably when a required service circuit opens; deterministic,
+  dataset-backed, or simulator providers must not be blocked by endpoint-only
+  gates.
+- Store artifact references relative to the run directory. Prefer a portable
+  `result.json` and `trajectory.csv` for completed campaigns.
+- Represent detached work with a backend-neutral durable execution handle, not
+  a local-PID assumption.
 - Keep credentials in environment variables or ignored protected files. Never
   write them to configs, logs, manifests, prompts, or command arguments.
+
+## External Execution Backends
+
+When registration is tested through Delta or another remote backend, require a
+task-aware upload bundle, archive download for complete run directories,
+idempotent terminal lifecycle operations, and a blocking `kill --wait`
+equivalent. Treat those as backend/CLI requirements; do not imitate them with
+repository-local PID files or partial artifact copies.
 
 ## Existing Task Repair
 

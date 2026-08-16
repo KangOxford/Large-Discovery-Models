@@ -199,6 +199,7 @@ class LDMEngine:
         stop_reason = "iteration_budget"
         try:
             for round_idx in range(active.next_round, config.iterations):
+                self.runtime.consume("outer_iterations")
                 self.runtime.status.update(
                     "running",
                     phase="reservoir_expansion",
@@ -249,6 +250,10 @@ class LDMEngine:
                     },
                     iteration=round_idx,
                 )
+                if reservoir.candidates:
+                    self.runtime.consume(
+                        "valid_search_candidates", len(reservoir.candidates)
+                    )
 
                 if not reservoir.candidates:
                     schema_only = expansion.schema_update is not None and not expansion.proposals
@@ -279,6 +284,8 @@ class LDMEngine:
                     selection.to_dict(),
                     iteration=round_idx,
                 )
+                if selected:
+                    self.runtime.consume("selected_candidates", len(selected))
                 if not selected:
                     stop_reason = "empty_selection"
                     active.next_round = round_idx + 1
@@ -289,12 +296,22 @@ class LDMEngine:
                 budget_exhausted = False
                 for candidate in selected[: config.evaluations_per_round]:
                     try:
-                        self.runtime.consume("external_evaluations")
+                        self.runtime.consume_many(
+                            {
+                                "external_evaluations": 1,
+                                "expensive_evaluation_attempts": 1,
+                            }
+                        )
                     except BudgetExceededError:
                         budget_exhausted = True
                         stop_reason = "external_evaluation_budget"
                         break
                     evaluation = self._evaluate(candidate)
+                    benchmark_jobs = evaluation.resource_usage.get("benchmark_jobs", 0)
+                    if benchmark_jobs:
+                        self.runtime.consume("benchmark_jobs", benchmark_jobs)
+                    if evaluation.succeeded:
+                        self.runtime.consume("successful_evaluations")
                     representation = (
                         self.surrogate_encoder.encode(candidate)
                         if self.surrogate_encoder is not None and evaluation.succeeded

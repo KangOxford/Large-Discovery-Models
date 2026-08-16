@@ -15,11 +15,14 @@ from ldm_tts.registration.registry import (
     validate_task_layout,
 )
 from ldm_tts.registration.scaffold import TaskScaffoldError, scaffold_task
+from ldm_tts.registration.qualification import load_qualification_evidence
 
 
 def test_builtin_tasks_are_discovered_from_manifests() -> None:
     assert set(TASK_DEFINITIONS) == {
+        "ai4bio_mutation_effect_prediction",
         "antibody",
+        "llm_kv_adaptive_quantization",
         "nanogpt",
         "small_molecule",
     }
@@ -44,8 +47,30 @@ def test_scaffolded_task_is_discoverable_and_valid(tmp_path: Path) -> None:
         repository_root=tmp_path,
     )
 
-    assert len(created) == 13
+    assert len(created) == 14
     assert (tmp_path / "tasks" / "protein_design" / "experiment.json") in created
+    evidence_path = (
+        tmp_path
+        / "tasks"
+        / "protein_design"
+        / "resources"
+        / "qualification_evidence.json"
+    )
+    assert evidence_path in created
+    evidence = load_qualification_evidence(
+        evidence_path,
+        repository_root=tmp_path,
+        expected_task_id="protein_design",
+    )
+    assert evidence.stage == "scaffolded"
+    contract_payload = json.loads(
+        (tmp_path / "tasks" / "protein_design" / "experiment.json").read_text()
+    )
+    assert contract_payload["proposal_provider"] == {
+        "kind": "unspecified",
+        "requires_endpoint_preflight": False,
+        "supports_collection": False,
+    }
     definitions = discover_task_definitions(tmp_path)
     definition = definitions["protein_design"]
     assert definition.module == "tasks.protein_design.ldm_task.procedure"
@@ -73,6 +98,31 @@ def test_scaffolded_task_is_discoverable_and_valid(tmp_path: Path) -> None:
     assert "LDMEngine" in mock_engine
     assert "CampaignRuntime" in mock_engine
     assert "DraftCandidateDomain" in mock_engine
+
+
+def test_qualification_stage_gate_is_explicit_and_ordered(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "tasks").mkdir()
+    scaffold_task("custom", description="Custom task.", repository_root=tmp_path)
+    definitions = discover_task_definitions(tmp_path)
+    monkeypatch.setattr(validate_tasks_script, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(validate_tasks_script, "TASK_DEFINITIONS", definitions)
+    monkeypatch.setattr(validate_tasks_script, "TASK_DISCOVERY_ERROR", None)
+
+    scaffold_rows = validate_tasks_script.validate_registered_tasks(
+        "custom", require_stage="scaffolded"
+    )
+    assert not any(row["level"] == "error" for row in scaffold_rows)
+
+    registered_rows = validate_tasks_script.validate_registered_tasks(
+        "custom", require_stage="registered"
+    )
+    assert any(
+        row["level"] == "error" and "required stage is 'registered'" in row["message"]
+        for row in registered_rows
+    )
 
 
 def test_qualification_gate_allows_drafts_only_in_normal_validation(

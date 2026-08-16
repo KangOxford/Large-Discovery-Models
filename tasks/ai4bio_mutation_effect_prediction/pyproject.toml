@@ -1,0 +1,20 @@
+[project]
+name = "ldm-tts-ai4bio-mutation-effect-prediction"
+version = "0.1.0"
+description = "Optimize protein mutation-effect predictors against the pinned MLS-Bench evaluation contract."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyyaml>=6.0",
+    "scipy>=1.10",
+    "torch>=2.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.uv]
+package = false

@@ -253,7 +253,9 @@ def test_mock_procedure_writes_engine_artifacts_and_exact_counters(
         "benchmark_jobs": 1,
         "expensive_evaluation_attempts": 1,
         "external_evaluations": 1,
+        "llm_requests": 0,
         "outer_iterations": 1,
+        "proposal_attempts": 0,
         "selected_candidates": 1,
         "successful_evaluations": 1,
         "valid_search_candidates": 4,
@@ -318,7 +320,17 @@ def test_endpoint_preflight_failure_pauses_resumably(
     status = json.loads((Path(output["run_dir"]) / "status.json").read_text())
     assert code == 2
     assert status["status"] == "paused_endpoint_unavailable"
-    assert status["budget"]["counters"] == {}
+    assert status["budget"]["counters"] == {
+        "benchmark_jobs": 0,
+        "expensive_evaluation_attempts": 0,
+        "external_evaluations": 0,
+        "llm_requests": 0,
+        "outer_iterations": 0,
+        "proposal_attempts": 0,
+        "selected_candidates": 0,
+        "successful_evaluations": 0,
+        "valid_search_candidates": 0,
+    }
 
 
 def _sha256(path: Path) -> str:

@@ -1,0 +1,150 @@
+{
+  "exit_code": 0,
+  "finished": true,
+  "extended_budget": true,
+  "execution_id": "46987492f47a4ef7a8b4d85c44a7b686",
+  "benchmark_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+  "evaluations": [
+    {
+      "iteration": 1,
+      "candidate_id": "predictor-d266b2b9f29d",
+      "official_score": 0.015752069791313345
+    },
+    {
+      "iteration": 2,
+      "candidate_id": "predictor-8ca5c8cd67dc",
+      "official_score": 0.05507618089483355
+    },
+    {
+      "iteration": 3,
+      "candidate_id": "predictor-62643934ec63",
+      "official_score": 0.030062070406610113
+    },
+    {
+      "iteration": 4,
+      "candidate_id": "predictor-7a0c378c53ef",
+      "official_score": 0.0482952318507151
+    },
+    {
+      "iteration": 5,
+      "candidate_id": "predictor-75c11a77c529",
+      "official_score": 0.04962216804451943
+    },
+    {
+      "iteration": 6,
+      "candidate_id": "predictor-f7492240a77a",
+      "official_score": 0.030509552442229054
+    },
+    {
+      "iteration": 7,
+      "candidate_id": "predictor-ca4836da1afe",
+      "official_score": 0.03065860455961386
+    },
+    {
+      "iteration": 8,
+      "candidate_id": "predictor-6027ea4838c2",
+      "official_score": 0.045692859585813955
+    },
+    {
+      "iteration": 9,
+      "candidate_id": "predictor-94a734e89994",
+      "official_score": 0.012963539299424667
+    },
+    {
+      "iteration": 10,
+      "candidate_id": "predictor-58a1d0c15ee0",
+      "official_score": 0.13563761868835467
+    },
+    {
+      "iteration": 11,
+      "candidate_id": "predictor-da08ec201330",
+      "official_score": 0.13616982363518856
+    },
+    {
+      "iteration": 12,
+      "candidate_id": "predictor-b7601be3b5e2",
+      "official_score": 0.25832843844027015
+    },
+    {
+      "iteration": 13,
+      "candidate_id": "predictor-56a493bc29ae",
+      "official_score": 0.44191975508345294
+    },
+    {
+      "iteration": 14,
+      "candidate_id": "predictor-a56244b4c02f",
+      "official_score": 0.4872663032443121
+    },
+    {
+      "iteration": 15,
+      "candidate_id": "predictor-2d9a5bc7ce9d",
+      "official_score": 0.46150911963622837
+    },
+    {
+      "iteration": 16,
+      "candidate_id": "predictor-d069831f68f4",
+      "official_score": 0.46456713876552447
+    },
+    {
+      "iteration": 17,
+      "candidate_id": "predictor-dad9326cbbe8",
+      "official_score": 0.03804122120233638
+    },
+    {
+      "iteration": 18,
+      "candidate_id": "predictor-c0a453874ae1",
+      "official_score": 0.45134093788275337
+    },
+    {
+      "iteration": 19,
+      "candidate_id": "predictor-3f2329c66cf8",
+      "official_score": 0.3917658578270754
+    },
+    {
+      "iteration": 20,
+      "candidate_id": "predictor-df61f7d47dda",
+      "official_score": 0.455166608334946
+    }
+  ],
+  "best_candidate": {
+    "candidate_id": "predictor-a56244b4c02f",
+    "specification": {
+      "activation": "relu",
+      "dropout": 0.1,
+      "feature_mode": "delta",
+      "hidden_dims": [
+        256,
+        128
+      ],
+      "layer_norm": false,
+      "learning_rate": 0.001,
+      "weight_decay": 0.05
+    },
+    "official_score": 0.4872663032443121,
+    "spearman_BLAT_ECOLX": 0.882654,
+    "spearman_ESTA_BACSU": 0.635622,
+    "spearman_RASH_HUMAN": 0.798968,
+    "parameter_count": 360961
+  },
+  "total_campaign_wall_seconds": 2152.3826587200165,
+  "total_evaluator_wall_seconds": 2152.2457147147506,
+  "counters": {
+    "outer_iterations": 20,
+    "llm_requests": 0,
+    "proposal_attempts": 0,
+    "valid_search_candidates": 80,
+    "selected_candidates": 20,
+    "external_evaluations": 20,
+    "expensive_evaluation_attempts": 20,
+    "successful_evaluations": 20,
+    "benchmark_jobs": 60
+  },
+  "artifacts": {
+    "progress_csv": "data/generated/ai4bio_mutation_effect_prediction_campaign_20/progress.csv",
+    "progress_png": "data/generated/ai4bio_mutation_effect_prediction_campaign_20/progress.png",
+    "progress_pdf": "data/generated/ai4bio_mutation_effect_prediction_campaign_20/progress.pdf",
+    "raw_campaign": "runs/ai4bio_mutation_effect_prediction/official_campaign_20"
+  },
+  "result_summary": "exit_code=0, finished=true, iterations=20, successful_evaluations=20, best_candidate=predictor-a56244b4c02f, best_official_score=0.487266303244",
+  "error": null
+}

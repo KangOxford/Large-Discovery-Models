@@ -86,12 +86,15 @@ Stop before execution when registration validation or a required dependency
 check fails. Report the exact failed dependency and configured path. Warnings
 may proceed only when they do not invalidate the requested mode.
 
-## Verify A Real Model Endpoint
+## Verify Required Providers
 
-Before a tiny or full real run, identify the configured base URL, API key source,
-and model ID. Probe both `/models` and `/chat/completions` using the environment
-variable names documented by the task. Keep the base URL at the API root,
-normally ending in `/v1`.
+Read `experiment.json.proposal_provider` before a tiny or full real run. When
+`requires_endpoint_preflight` is true, identify the configured base URL, API key
+source, and model ID. Probe both `/models` and `/chat/completions` using the
+environment variable names documented by the task. Keep the base URL at the API
+root, normally ending in `/v1`. Skip endpoint-only probes when the declared
+provider does not require them, while still running its documented dependency
+and contract checks.
 
 Do not print, log, commit, or place a real key on a command line as a literal.
 Use an existing environment variable. `EMPTY` is acceptable only for a local
@@ -105,7 +108,7 @@ For mock mode, run the checked-in mock config after the three preflight gates.
 For real mode, reread and follow the task README's **Minimal First Real Run**
 exactly. Do not copy an older recipe from this skill over a newer task README:
 
-1. Probe the model.
+1. Run the provider-specific preflight when required.
 2. Run the light dependency check.
 3. Run the task-level zero-iteration or dry contract smoke.
 4. Run the documented tiny real budget.
@@ -121,7 +124,9 @@ user explicitly requests resume behavior.
 
 Keep long-running commands attached or poll their execution session until they
 finish, fail, or the user stops them. Do not leave a model/evaluator run active
-without reporting its session state.
+without reporting its session state. Track detached work by its durable backend
+handle (local PID or remote execution ID), and treat repeated terminal status
+or cancellation responses as idempotent.
 
 For an engine-native run, inspect `ldm_task_spec.json`, `events.jsonl`,
 `checkpoint.json`, `budget.json`, `status.json`, and `summary.json`. When a
@@ -129,6 +134,12 @@ qualified contract is active, also inspect `experiment_contract.json`. For a
 compatibility run, inspect the task-specific artifacts named by its README and
 do not claim shared-engine resume or budget semantics unless the executed path
 actually provides them.
+
+For a remote backend, pull the complete run directory as an archive when
+available rather than reconstructing selected files. A remote backend used for
+campaigns should provide task-aware upload, archive pull, and blocking
+cancellation (`kill --wait` or equivalent); report missing capabilities instead
+of substituting local PID semantics.
 
 After execution, report:
 

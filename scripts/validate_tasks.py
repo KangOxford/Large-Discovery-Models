@@ -21,6 +21,13 @@ from ldm_tts.registration.registry import (
     validate_task_layout,
 )
 from ldm_tts.registration.experiment import ExperimentContractError, load_experiment_contract
+from ldm_tts.registration.qualification import (
+    QUALIFICATION_EVIDENCE_NAME,
+    QUALIFICATION_STAGES,
+    QualificationEvidenceError,
+    load_qualification_evidence,
+    qualification_stage_index,
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -32,6 +39,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Fail unless every selected task has a qualified experiment contract.",
     )
+    parser.add_argument(
+        "--require-stage",
+        choices=QUALIFICATION_STAGES,
+        default="",
+        help="Fail unless machine-readable evidence reaches this qualification stage.",
+    )
     return parser.parse_args(argv)
 
 
@@ -39,6 +52,7 @@ def validate_registered_tasks(
     task_id: str = "",
     *,
     require_qualified: bool = False,
+    require_stage: str = "",
 ) -> list[dict[str, str]]:
     if TASK_DISCOVERY_ERROR is not None:
         return [{
@@ -59,6 +73,7 @@ def validate_registered_tasks(
     rows: list[dict[str, str]] = []
     for definition in definitions:
         task_row_start = len(rows)
+        contract = None
         issues = validate_task_layout(definition, repository_root=REPO_ROOT)
         if definition.dependency_checker:
             try:
@@ -111,6 +126,85 @@ def validate_registered_tasks(
                     "path": str(contract_path),
                 })
 
+        evidence_path = (
+            REPO_ROOT
+            / definition.relative_root
+            / "resources"
+            / QUALIFICATION_EVIDENCE_NAME
+        )
+        if not evidence_path.is_file():
+            rows.append({
+                "task": definition.task_id,
+                "level": "error" if require_stage else "warning",
+                "message": (
+                    f"Qualification evidence is required at stage {require_stage!r}."
+                    if require_stage
+                    else "No machine-readable qualification evidence is registered."
+                ),
+                "path": str(evidence_path),
+            })
+        else:
+            try:
+                evidence = load_qualification_evidence(
+                    evidence_path,
+                    repository_root=REPO_ROOT,
+                    expected_task_id=definition.task_id,
+                )
+            except QualificationEvidenceError as exc:
+                rows.append({
+                    "task": definition.task_id,
+                    "level": "error",
+                    "message": str(exc),
+                    "path": str(evidence_path),
+                })
+            else:
+                evidence_errors: list[str] = []
+                if (
+                    evidence.stage_index
+                    >= qualification_stage_index("contract_verified")
+                ):
+                    if contract is None:
+                        evidence_errors.append(
+                            "contract-verified evidence requires experiment.json"
+                        )
+                    else:
+                        source_commit = str(contract.benchmark.get("source_commit", ""))
+                        if evidence.benchmark_commit != source_commit:
+                            evidence_errors.append(
+                                "qualification benchmark_commit does not match experiment.json"
+                            )
+                if evidence.stage == "campaign_qualified":
+                    if contract is not None and contract.qualification != "qualified":
+                        evidence_errors.append(
+                            "campaign-qualified evidence requires a qualified experiment contract"
+                        )
+                    if (
+                        contract is not None
+                        and evidence.contract_profile not in contract.profiles
+                    ):
+                        evidence_errors.append(
+                            f"contract profile {evidence.contract_profile!r} is not defined"
+                        )
+                for message in evidence_errors:
+                    rows.append({
+                        "task": definition.task_id,
+                        "level": "error",
+                        "message": message,
+                        "path": str(evidence_path),
+                    })
+                meets_required_stage = not require_stage or evidence.meets(require_stage)
+                rows.append({
+                    "task": definition.task_id,
+                    "level": "ok" if meets_required_stage else "error",
+                    "message": (
+                        f"Qualification evidence reaches stage {evidence.stage!r}."
+                        if meets_required_stage
+                        else f"Qualification evidence is at {evidence.stage!r}; "
+                        f"required stage is {require_stage!r}."
+                    ),
+                    "path": str(evidence_path),
+                })
+
         task_rows = rows[task_row_start:]
         if not any(row["level"] == "error" for row in task_rows):
             rows.append({
@@ -128,6 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         rows = validate_registered_tasks(
             args.task,
             require_qualified=args.require_qualified,
+            require_stage=args.require_stage,
         )
     except TaskRegistrationError as exc:
         raise SystemExit(str(exc)) from exc

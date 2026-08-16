@@ -63,9 +63,36 @@ def test_qualified_contract_exposes_metric_roles_and_pinned_source(tmp_path: Pat
     assert contract.task_id == "contract_test"
     assert contract.qualification == "qualified"
     assert contract.benchmark["source_commit"] == "0123456789abcdef"
+    assert contract.proposal_provider == {
+        "kind": "unspecified",
+        "requires_endpoint_preflight": False,
+        "supports_collection": False,
+    }
     assert [item["name"] for item in contract.metrics["reported"]] == ["objective"]
     assert [item["name"] for item in contract.metrics["optimized"]] == ["search_score"]
     assert contract.profile("official").budget["expensive_evaluation_attempts"] == 2
+
+
+def test_contract_validates_provider_capabilities_and_metric_modes(tmp_path: Path) -> None:
+    path = _write_qualified_contract(tmp_path / "experiment.json")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["proposal_provider"] = {
+        "kind": "model_endpoint",
+        "requires_endpoint_preflight": True,
+        "supports_collection": True,
+    }
+    payload["metrics"]["optimized"][0]["modes"] = ["real"]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    contract = load_experiment_contract(path)
+
+    assert contract.proposal_provider["requires_endpoint_preflight"] is True
+    assert contract.metrics["optimized"][0]["modes"] == ["real"]
+
+    payload["proposal_provider"]["requires_endpoint_preflight"] = False
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ExperimentContractError, match="must require endpoint preflight"):
+        load_experiment_contract(path)
 
 
 @pytest.mark.parametrize(
@@ -172,6 +199,19 @@ def test_budget_ledger_persists_and_prevents_overflow(tmp_path: Path) -> None:
     restored = BudgetLedger.load(path)
     assert restored.counters["expensive_evaluation_attempts"] == 2
     assert restored.remaining("expensive_evaluation_attempts") == 0
+
+
+def test_budget_snapshot_includes_zero_counters_and_normalizes_integral_floats() -> None:
+    ledger = BudgetLedger(
+        limits={"whole": 60.0, "fractional": 2.5, "unused": 1},
+        counters={"whole": 60.0, "fractional": 0.25},
+    )
+
+    assert ledger.snapshot()["counters"] == {
+        "fractional": 0.25,
+        "unused": 0,
+        "whole": 60,
+    }
 
 
 def test_campaign_status_embeds_current_budget(tmp_path: Path) -> None:

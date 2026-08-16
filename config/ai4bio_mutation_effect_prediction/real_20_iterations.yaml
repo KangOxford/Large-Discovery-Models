@@ -1,0 +1,19 @@
+name: ai4bio_mutation_effect_prediction_official_campaign_20_iterations
+task: ai4bio_mutation_effect_prediction
+algorithm: gp_ucb
+mode: real
+contract_profile: official_campaign_20_iterations
+description: Extended-budget 20-iteration campaign with 20 full official MLS-Bench evaluations.
+args:
+  mock: false
+  iterations: 20
+  reservoir-size: 4
+  evaluations-per-round: 1
+  proposal-mode: deterministic
+  acquisition-beta: 1.0
+  upstream-root: null
+  data-dir: null
+  cv-dir: null
+  evaluation-timeout: 3540
+  out-dir: runs
+  run-name: official_campaign_20
