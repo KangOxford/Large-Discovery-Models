@@ -38,12 +38,15 @@ in evidence rather than model confidence alone.
 
 ### Updates
 
-- **[Custimization and Delta-Infra]** you can simple add your own tasks with `skills/register-ldm-task`, and run a demo using *Delta-Infra* (see `ready2run_examples/README.md`)
+- **[Customization and Delta-Infra]** Add your own task with
+  [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md), or run an
+  existing LDM campaign through *Delta-Infra*. See the
+  [ready-to-run examples](ready2run_examples/README.md).
 
 - **August 2026 - LDM v0.1 release candidate.** The release candidate includes end-to-end
   LDM workflows for language-model training, small-molecule discovery, and
-  antibody design, adaptive KV-cache quantization, and a manifest-driven
-  interface for user-defined tasks.
+  antibody design, adaptive KV-cache quantization, mutation-effect prediction,
+  and a manifest-driven interface for user-defined tasks.
 
 ## Contents
 
@@ -69,24 +72,26 @@ in evidence rather than model confidence alone.
 | `nanogpt` | Training-code and hyperparameter operations for nanoGPT-style pretraining. | [Clean-room quick start](tasks/nanogpt/QUICKSTART.md) | [Task guide](tasks/nanogpt/README.md) |
 | `small_molecule` | SMILES candidates for docking and activity objectives. | [Clean-room quick start](tasks/small_molecule/QUICKSTART.md) | [Task guide](tasks/small_molecule/README.md) |
 | `antibody` | CDRH3 amino-acid sequences for antigen binding. | [Clean-room quick start](tasks/antibody/QUICKSTART.md) | [Task guide](tasks/antibody/README.md) |
-| `llm_kv_adaptive_quantization` | Adaptive KV-cache quantization policies for language-model quality and compression. | [Clean-room quick start](tasks/llm_kv_adaptive_quantization/QUICKSTART.md) | [Task guide](tasks/llm_kv_adaptive_quantization/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md) |
+| `llm_kv_adaptive_quantization` | Adaptive KV-cache quantization policies for language-model quality and compression. | [Clean-room quick start](tasks/llm_kv_adaptive_quantization/QUICKSTART.md) | [Task guide](tasks/llm_kv_adaptive_quantization/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [registration and Delta workflow](ready2run_examples/run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md) |
+| `ai4bio_mutation_effect_prediction` | Bounded mutation-effect predictor architectures evaluated on three pinned ProteinGym assays through MLS-Bench. | [Clean-room quick start](tasks/ai4bio_mutation_effect_prediction/QUICKSTART.md) | [Task guide](tasks/ai4bio_mutation_effect_prediction/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [registration and Delta workflow](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/REGISTER_AND_DELTA_WORKFLOW.md) |
 | ... (**more to come**)| ... (**stay tuned**) | ... | ... |
 | `your_task` | User-defined candidates and measurable objectives in any domain. | [Use `$register-ldm-task`](skills/register-ldm-task/SKILL.md) | [Task registration guide](tasks/README.md) |
 
-The four built-in clean-room guides begin with deterministic mock or CPU-safe gates and
+The five built-in clean-room guides begin with deterministic mock or CPU-safe gates and
 progress through locked installation, dependency preflight, artifact checks,
 and credential cleanup before any costly run. The evaluator-backed campaign
 examples below additionally cover real GPU nanoGPT training, Vina plus G12D
-scoring, and Absolut evaluation. Run the documented commands from the
-repository root.
+scoring, Absolut evaluation, and the pinned three-assay MLS-Bench mutation
+predictor evaluation. Run the documented commands from the repository root.
 
-Task registration and conventional layout validation pass for all four
-built-ins. Each ships a `draft` `experiment.json` that records metric roles,
-evaluator settings, budgets, and named real-config profiles. Their provenance
-is still explicitly unqualified, so they should be treated as runnable,
-evaluator-backed examples, not benchmark-qualified or production-qualified
-implementations. The plots below demonstrate observed progress in specific
-runs; they do not close that qualification gap.
+Task registration and conventional layout validation pass for all five
+built-ins. The nanoGPT, small-molecule, antibody, and adaptive KV-cache tasks
+retain `draft` experiment contracts and should be treated as runnable examples,
+not benchmark-qualified implementations. The AI4Bio mutation-effect task has a
+source-pinned qualified contract and machine-readable evidence through
+`campaign_qualified`, including an official one-iteration campaign and
+separately labeled 3- and 20-iteration extended-budget runs. Qualification is
+task-specific; evidence from AI4Bio does not qualify the other adapters.
 
 Task authors can add a manifest-registered adapter without editing the shared
 runner. See [Registering LDM Tasks](tasks/README.md) or use the repository-local
@@ -160,7 +165,35 @@ Choose the workflow that matches your goal:
 | --- | --- |
 | Run small-molecule discovery with real Qwen inference, Vina docking, and G12D activity prediction | [Small-molecule workflow](ready2run_examples/run_small_molecule_w_delta_infra/DELTA_CLI_WORKFLOW.md) |
 | Propose antibody CDRH3 sequences and evaluate them with the managed AntBO/Absolut service | [Antibody workflow](ready2run_examples/run_antibody_w_delta_infra/DELTA_CLI_WORKFLOW.md) |
-| Register a user-defined task and run a diagnostic campaign | [Custom-task registration workflow](ready2run_examples/run_customized_tasks_registration/TASK_REGISTRATION_WORKFLOW.md) |
+| Register a user-defined task and run a diagnostic campaign | [Custom-task registration workflow](ready2run_examples/run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md) |
+| Register and qualify the AI4Bio mutation-effect task, then run an official or extended-budget campaign | [AI4Bio registration and Delta workflow](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/REGISTER_AND_DELTA_WORKFLOW.md) |
+
+You can also give a coding agent a goal-oriented prompt and let the checked-in
+skills and runbooks drive preflight, execution, monitoring, artifact transfer,
+and cleanup. For example:
+
+```text
+Use the delta-cli skills to run an LDM campaign on the antibody task. Read the
+task guide and checked-in config, perform the required preflight checks, start
+with the documented smoke or tiny run, monitor it to a terminal state, collect
+the run artifacts, and release all Delta-Infra resources.
+```
+
+```text
+Read skills/register-ldm-task/SKILL.md and register <CUSTOMIZED_TASK> as a new
+LDM task. Use delta-cli for mock and dependency preflight tests and, after the
+qualification gates pass, run the documented tiny real campaign. Preserve
+machine-readable qualification evidence and clean up every sandbox.
+```
+
+For the newly registered benchmark task, a concrete campaign prompt is:
+
+```text
+Use the delta-cli skills to run the checked-in 3-iteration LDM campaign for
+ai4bio_mutation_effect_prediction. Validate the campaign profile, monitor the
+run to completion, pull the complete run directory, summarize the result and
+trajectory, and release the sandbox.
+```
 
 The [complete ready-to-run guide](ready2run_examples/README.md) also covers
 alternative installation methods, configuration checks, a sandbox smoke test,
