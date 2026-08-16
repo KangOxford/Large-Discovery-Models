@@ -8,6 +8,13 @@ Record the current stage in
 must cite existing repository-relative evidence paths. Validate a claim with
 `scripts/validate_tasks.py --task <task_id> --require-stage <stage>`.
 
+Evidence paths must exist in a clean Git checkout. Runtime directories such as
+`runs/`, `ldm_runs/`, and `data/generated/` remain ignored and must not be cited
+directly. For a completed campaign, add a compact record under
+`tasks/<task_id>/resources/` containing the contract digest, execution result,
+complete budget counters, scientific metrics, provenance, and SHA-256 digests
+of the retained raw artifacts.
+
 ## 1. Registered
 
 Required evidence:

@@ -5,6 +5,10 @@ task and scorer file digests, ESM-2 embedding dimension, and exact parameter
 budget used by the candidate validator. `qualification_seed.json` records the
 official three-assay ridge seed, its five-fold metrics, ESM-2 checkpoint digest,
 normalized MLS-Bench score, parameter count, and runtime.
+`qualification_campaign.json` is the compact, versioned evidence snapshot for
+the official one-iteration Delta campaign. It records the contract digest,
+search selection, complete budget, official result, and digests of the raw
+campaign artifacts without checking generated runtime output into Git.
 
 ProteinGym data, precomputed ESM-2 embeddings, CV split files, upstream
 checkouts, model caches, and run outputs are external generated assets and must

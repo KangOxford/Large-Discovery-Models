@@ -41,15 +41,15 @@
     "tiny_campaign_verified": {
       "status": "passed",
       "evidence": [
-        "runs/ai4bio_mutation_effect_prediction/official_campaign/checkpoint.json",
-        "runs/ai4bio_mutation_effect_prediction/official_campaign/status.json"
+        "config/ai4bio_mutation_effect_prediction/real.yaml",
+        "tasks/ai4bio_mutation_effect_prediction/resources/qualification_campaign.json"
       ]
     },
     "campaign_qualified": {
       "status": "passed",
       "evidence": [
-        "runs/ai4bio_mutation_effect_prediction/official_campaign/experiment_contract.json",
-        "runs/ai4bio_mutation_effect_prediction/official_campaign/summary.json"
+        "tasks/ai4bio_mutation_effect_prediction/experiment.json",
+        "tasks/ai4bio_mutation_effect_prediction/resources/qualification_campaign.json"
       ]
     }
   }

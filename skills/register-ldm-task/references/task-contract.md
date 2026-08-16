@@ -80,8 +80,11 @@ New scaffolds create `resources/qualification_evidence.json` at `scaffolded`.
 Advance it through `registered`, `mock_verified`, `contract_verified`,
 `seed_evaluated`, `tiny_campaign_verified`, and `campaign_qualified`. Every
 stage through the declared current stage must be `passed` and cite at least one
-existing repository-relative evidence path. Campaign-qualified evidence pins
-the benchmark commit and names a profile defined by `experiment.json`.
+existing repository-relative evidence path that is available in a clean
+checkout. Do not cite ignored runtime output; promote a compact campaign record
+with result, budget, provenance, contract digest, and raw-artifact digests into
+the task's `resources/` directory. Campaign-qualified evidence pins the
+benchmark commit and names a profile defined by `experiment.json`.
 
 Legacy tasks may omit this file during normal validation. A new qualification
 claim must pass `scripts/validate_tasks.py --task <task_id> --require-stage

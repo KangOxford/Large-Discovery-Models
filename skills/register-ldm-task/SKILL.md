@@ -89,7 +89,10 @@ Use the exact gates and expected artifacts in
 [references/qualification.md](references/qualification.md). Registration is not
 the same as campaign qualification; report both states explicitly. Update
 `resources/qualification_evidence.json` at each completed gate and cite only
-repository-relative evidence paths that exist.
+repository-relative evidence paths that exist in a clean checkout. Never cite
+ignored `runs/`, `ldm_runs/`, or `data/generated/` output: promote the relevant
+contract digest, counters, result, provenance, and raw-artifact digests into a
+compact checked-in record under `tasks/<task_id>/resources/`.
 
 ## Required Verification
 
