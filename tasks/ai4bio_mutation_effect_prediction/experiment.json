@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "task_id": "ai4bio_mutation_effect_prediction",
+  "qualification": "qualified",
+  "benchmark": {
+    "source_url": "https://github.com/Imbernoulli/MLS-Bench",
+    "source_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+    "task_path": "tasks/ai4bio-mutation-effect-prediction"
+  },
+  "proposal_provider": {
+    "kind": "deterministic",
+    "requires_endpoint_preflight": false,
+    "supports_collection": true
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "official_score",
+        "direction": "maximize",
+        "description": "Pinned MLS-Bench geometric mean of three baseline-normalized bounded-power setting scores."
+      },
+      {
+        "name": "spearman_BLAT_ECOLX",
+        "direction": "maximize",
+        "description": "Mean random five-fold CV Spearman for BLAT_ECOLX_Firnberg_2014."
+      },
+      {
+        "name": "spearman_ESTA_BACSU",
+        "direction": "maximize",
+        "description": "Mean random five-fold CV Spearman for ESTA_BACSU_Nutschel_2020."
+      },
+      {
+        "name": "spearman_RASH_HUMAN",
+        "direction": "maximize",
+        "description": "Mean random five-fold CV Spearman for RASH_HUMAN_Bandaru_2017."
+      }
+    ],
+    "optimized": [
+      {
+        "name": "official_score",
+        "direction": "maximize",
+        "description": "Official objective used by qualified real campaigns."
+      },
+      {
+        "name": "selection_score",
+        "direction": "maximize",
+        "description": "Explicitly synthetic signal used only by mock qualification runs.",
+        "modes": [
+          "mock"
+        ]
+      }
+    ],
+    "diagnostic": [
+      {
+        "name": "parameter_count",
+        "direction": "minimize",
+        "description": "Analytical trainable parameter count for the candidate head."
+      },
+      {
+        "name": "runtime_seconds",
+        "direction": "minimize",
+        "description": "Wall time for the complete three-assay candidate evaluation."
+      }
+    ]
+  },
+  "evaluation": {
+    "datasets": [
+      "ProteinGym: BLAT_ECOLX_Firnberg_2014 (4783 single mutants)",
+      "ProteinGym: ESTA_BACSU_Nutschel_2020 (2172 single mutants)",
+      "ProteinGym: RASH_HUMAN_Bandaru_2017 (3134 single mutants)"
+    ],
+    "settings": {
+      "representation": "Frozen ESM-2 650M mean-pooled mutant and mutant-minus-WT embeddings",
+      "embedding_dimension": 1280,
+      "fold_strategy": "ProteinGym random five-fold cross-validation only",
+      "epochs": 200,
+      "batch_size": 64,
+      "optimizer": "AdamW with candidate-bounded learning_rate and weight_decay",
+      "seed": 42,
+      "editable_file": "ProteinGym/custom_mutation_pred.py",
+      "editable_regions": "MutationPredictor lines 108-137 and CONFIG_OVERRIDES lines 345-347",
+      "score": "Pinned MLS-Bench bounded-power normalization against leaderboard baselines, followed by its epsilon-floored geometric mean"
+    },
+    "per_candidate_limits": {
+      "benchmark_jobs": 3,
+      "gpu_count": 1,
+      "benchmark_job_timeout_seconds": 3540,
+      "max_parameters": 6957956,
+      "parameter_budget_rule": "floor(1.05 * reshape_cnn_baseline_parameters)"
+    }
+  },
+  "budget": {
+    "outer_iterations": 1,
+    "llm_requests": 0,
+    "proposal_attempts": 0,
+    "valid_search_candidates": 4,
+    "selected_candidates": 1,
+    "external_evaluations": 1,
+    "expensive_evaluation_attempts": 1,
+    "successful_evaluations": 1,
+    "benchmark_jobs": 3
+  },
+  "profiles": {
+    "official_campaign": {
+      "description": "One deterministic four-candidate reservoir, one GP-UCB selection, and one full three-assay official evaluation.",
+      "budget": {
+        "outer_iterations": 1,
+        "llm_requests": 0,
+        "proposal_attempts": 0,
+        "valid_search_candidates": 4,
+        "selected_candidates": 1,
+        "external_evaluations": 1,
+        "expensive_evaluation_attempts": 1,
+        "successful_evaluations": 1,
+        "benchmark_jobs": 3
+      },
+      "locked_args": {
+        "iterations": 1,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "proposal-mode": "deterministic",
+        "acquisition-beta": 1.0,
+        "evaluation-timeout": 3540
+      }
+    },
+    "official_campaign_3_iterations": {
+      "description": "Extended-budget campaign with three deterministic four-candidate reservoirs, three sequential GP-UCB selections, and three full three-assay official evaluations.",
+      "budget": {
+        "outer_iterations": 3,
+        "llm_requests": 0,
+        "proposal_attempts": 0,
+        "valid_search_candidates": 12,
+        "selected_candidates": 3,
+        "external_evaluations": 3,
+        "expensive_evaluation_attempts": 3,
+        "successful_evaluations": 3,
+        "benchmark_jobs": 9
+      },
+      "locked_args": {
+        "iterations": 3,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "proposal-mode": "deterministic",
+        "acquisition-beta": 1.0,
+        "evaluation-timeout": 3540
+      }
+    },
+    "official_campaign_20_iterations": {
+      "description": "Extended-budget campaign with twenty deterministic four-candidate reservoirs, twenty sequential GP-UCB selections, and twenty full three-assay official evaluations.",
+      "budget": {
+        "outer_iterations": 20,
+        "llm_requests": 0,
+        "proposal_attempts": 0,
+        "valid_search_candidates": 80,
+        "selected_candidates": 20,
+        "external_evaluations": 20,
+        "expensive_evaluation_attempts": 20,
+        "successful_evaluations": 20,
+        "benchmark_jobs": 60
+      },
+      "locked_args": {
+        "iterations": 20,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "proposal-mode": "deterministic",
+        "acquisition-beta": 1.0,
+        "evaluation-timeout": 3540
+      }
+    }
+  }
+}

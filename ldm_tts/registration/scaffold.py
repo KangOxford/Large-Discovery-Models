@@ -70,6 +70,9 @@ def _task_files(
         task_root / "core" / "__init__.py": '"""Private task implementation."""\n',
         task_root / "core" / "mock_engine.py": _mock_engine_template(task_id),
         task_root / "resources" / "README.md": _resources_readme_template(task_id),
+        task_root / "resources" / "qualification_evidence.json": (
+            _qualification_evidence_template(task_id)
+        ),
         task_root / "tests" / "__init__.py": "",
         task_root / "tests" / "test_procedure.py": _test_template(task_id),
         task_root / "README.md": _readme_template(task_id, description),
@@ -282,6 +285,11 @@ def _experiment_contract_template(task_id: str) -> str:
             "source_url": "local://unqualified",
             "source_commit": "unqualified",
         },
+        "proposal_provider": {
+            "kind": "unspecified",
+            "requires_endpoint_preflight": False,
+            "supports_collection": False,
+        },
         "metrics": {
             "reported": [{"name": "objective", "direction": "maximize"}],
             "optimized": [{"name": "objective", "direction": "maximize"}],
@@ -294,6 +302,33 @@ def _experiment_contract_template(task_id: str) -> str:
         },
         "budget": {},
         "profiles": {},
+    }
+    return json.dumps(payload, indent=2) + "\n"
+
+
+def _qualification_evidence_template(task_id: str) -> str:
+    pending = {"status": "pending", "evidence": []}
+    payload = {
+        "schema_version": 1,
+        "task_id": task_id,
+        "stage": "scaffolded",
+        "benchmark_commit": "unqualified",
+        "contract_profile": "",
+        "gates": {
+            "scaffolded": {
+                "status": "passed",
+                "evidence": [
+                    f"tasks/{task_id}/task.json",
+                    f"tasks/{task_id}/experiment.json",
+                ],
+            },
+            "registered": dict(pending),
+            "mock_verified": dict(pending),
+            "contract_verified": dict(pending),
+            "seed_evaluated": dict(pending),
+            "tiny_campaign_verified": dict(pending),
+            "campaign_qualified": dict(pending),
+        },
     }
     return json.dumps(payload, indent=2) + "\n"
 

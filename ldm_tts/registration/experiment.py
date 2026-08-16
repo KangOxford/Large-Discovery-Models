@@ -16,6 +16,17 @@ ACTIVE_CONTRACT_PATH_ENV = "LDM_EXPERIMENT_CONTRACT_PATH"
 ACTIVE_CONTRACT_PROFILE_ENV = "LDM_EXPERIMENT_CONTRACT_PROFILE"
 METRIC_DIRECTIONS = frozenset({"maximize", "minimize"})
 METRIC_ROLES = ("reported", "optimized", "diagnostic")
+PROPOSAL_PROVIDER_KINDS = frozenset(
+    {
+        "unspecified",
+        "deterministic",
+        "model_endpoint",
+        "external_service",
+        "dataset",
+        "simulator",
+        "hybrid",
+    }
+)
 
 
 class ExperimentContractError(ValueError):
@@ -46,6 +57,7 @@ class ExperimentContract:
     task_id: str
     qualification: str
     benchmark: dict[str, Any]
+    proposal_provider: dict[str, Any]
     metrics: dict[str, tuple[dict[str, Any], ...]]
     evaluation: dict[str, Any]
     budget: dict[str, Any]
@@ -93,6 +105,7 @@ def load_experiment_contract(path: Path) -> ExperimentContract:
             "task_id",
             "qualification",
             "benchmark",
+            "proposal_provider",
             "metrics",
             "evaluation",
             "budget",
@@ -126,6 +139,18 @@ def load_experiment_contract(path: Path) -> ExperimentContract:
     _nonempty_string(benchmark.get("source_commit"), "benchmark.source_commit", path)
     if "task_path" in benchmark:
         _nonempty_string(benchmark["task_path"], "benchmark.task_path", path)
+
+    proposal_provider = _validate_proposal_provider(
+        payload.get(
+            "proposal_provider",
+            {
+                "kind": "unspecified",
+                "requires_endpoint_preflight": False,
+                "supports_collection": False,
+            },
+        ),
+        path,
+    )
 
     metrics_payload = _object(payload.get("metrics"), "metrics", path)
     _reject_unknown(metrics_payload, set(METRIC_ROLES), "metrics", path)
@@ -212,6 +237,7 @@ def load_experiment_contract(path: Path) -> ExperimentContract:
         task_id=task_id,
         qualification=qualification,
         benchmark=dict(benchmark),
+        proposal_provider=proposal_provider,
         metrics=metrics,
         evaluation=dict(evaluation),
         budget=dict(budget),
@@ -282,7 +308,12 @@ def _validate_metric(
     path: Path,
 ) -> dict[str, Any]:
     metric = _object(raw, f"metrics.{role}[]", path)
-    _reject_unknown(metric, {"name", "direction", "description"}, "metric", path)
+    _reject_unknown(
+        metric,
+        {"name", "direction", "description", "modes"},
+        "metric",
+        path,
+    )
     name = _nonempty_string(metric.get("name"), f"metrics.{role}.name", path)
     direction = _nonempty_string(
         metric.get("direction"), f"metrics.{role}.{name}.direction", path
@@ -291,7 +322,62 @@ def _validate_metric(
         raise ExperimentContractError(
             f"Metric {name!r} has invalid direction {direction!r} in {path}"
         )
+    if "modes" in metric:
+        modes = metric["modes"]
+        if (
+            not isinstance(modes, list)
+            or not modes
+            or not all(isinstance(mode, str) and mode.strip() for mode in modes)
+        ):
+            raise ExperimentContractError(
+                f"metrics.{role}.{name}.modes must be a non-empty string array in {path}"
+            )
+        normalized_modes = [mode.strip() for mode in modes]
+        if len(set(normalized_modes)) != len(normalized_modes):
+            raise ExperimentContractError(
+                f"metrics.{role}.{name}.modes must not contain duplicates in {path}"
+            )
+        metric = {**metric, "modes": normalized_modes}
     return dict(metric)
+
+
+def _validate_proposal_provider(raw: Any, path: Path) -> dict[str, Any]:
+    provider = _object(raw, "proposal_provider", path)
+    _reject_unknown(
+        provider,
+        {"kind", "requires_endpoint_preflight", "supports_collection"},
+        "proposal_provider",
+        path,
+    )
+    kind = _nonempty_string(provider.get("kind"), "proposal_provider.kind", path)
+    if kind not in PROPOSAL_PROVIDER_KINDS:
+        raise ExperimentContractError(
+            f"proposal_provider.kind must be one of {sorted(PROPOSAL_PROVIDER_KINDS)} "
+            f"in {path}"
+        )
+    requires_endpoint_preflight = _boolean(
+        provider.get("requires_endpoint_preflight"),
+        "proposal_provider.requires_endpoint_preflight",
+        path,
+    )
+    supports_collection = _boolean(
+        provider.get("supports_collection"),
+        "proposal_provider.supports_collection",
+        path,
+    )
+    if kind == "model_endpoint" and not requires_endpoint_preflight:
+        raise ExperimentContractError(
+            f"model_endpoint proposal providers must require endpoint preflight in {path}"
+        )
+    if kind == "deterministic" and requires_endpoint_preflight:
+        raise ExperimentContractError(
+            f"deterministic proposal providers cannot require endpoint preflight in {path}"
+        )
+    return {
+        "kind": kind,
+        "requires_endpoint_preflight": requires_endpoint_preflight,
+        "supports_collection": supports_collection,
+    }
 
 
 def _object(value: Any, field: str, path: Path) -> dict[str, Any]:
@@ -304,6 +390,12 @@ def _nonempty_string(value: Any, field: str, path: Path) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ExperimentContractError(f"{field} must be a non-empty string in {path}")
     return value.strip()
+
+
+def _boolean(value: Any, field: str, path: Path) -> bool:
+    if not isinstance(value, bool):
+        raise ExperimentContractError(f"{field} must be a boolean in {path}")
+    return value
 
 
 def _reject_unknown(

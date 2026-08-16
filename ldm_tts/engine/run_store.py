@@ -59,6 +59,27 @@ class BudgetLedger:
         self.write()
         return updated
 
+    def consume_many(
+        self, amounts: Mapping[str, int | float]
+    ) -> dict[str, int | float]:
+        """Validate and persist a group of counter updates atomically."""
+
+        updates: dict[str, int | float] = {}
+        for name, raw_amount in amounts.items():
+            amount = _validated_number(raw_amount, f"amount for {name}")
+            current = self.counters.get(name, 0)
+            updated = current + amount
+            limit = self.limits.get(name)
+            if limit is not None and updated > limit:
+                raise BudgetExceededError(
+                    f"Budget {name!r} would be exceeded: "
+                    f"{current} + {amount} > {limit}"
+                )
+            updates[name] = updated
+        self.counters.update(updates)
+        self.write()
+        return updates
+
     def set_counter(self, name: str, value: int | float) -> None:
         value = _validated_number(value, f"counter {name}")
         limit = self.limits.get(name)
@@ -77,10 +98,25 @@ class BudgetLedger:
 
     def snapshot(self) -> dict[str, Any]:
         names = sorted(set(self.limits) | set(self.counters))
+        limits = {
+            name: _serialized_number(value)
+            for name, value in self.limits.items()
+        }
+        counters = {
+            name: _serialized_number(self.counters.get(name, 0))
+            for name in names
+        }
         return {
-            "limits": dict(self.limits),
-            "counters": dict(self.counters),
-            "remaining": {name: self.remaining(name) for name in names},
+            "limits": limits,
+            "counters": counters,
+            "remaining": {
+                name: (
+                    None
+                    if self.remaining(name) is None
+                    else _serialized_number(self.remaining(name))
+                )
+                for name in names
+            },
             "metadata": dict(self.metadata),
         }
 
@@ -294,6 +330,13 @@ class CampaignRuntime:
         self.status.update("running", phase="budget_updated", budget=self.budget)
         return value
 
+    def consume_many(
+        self, amounts: Mapping[str, int | float]
+    ) -> dict[str, int | float]:
+        values = self.budget.consume_many(amounts)
+        self.status.update("running", phase="budget_updated", budget=self.budget)
+        return values
+
     def record(
         self,
         event_type: str,
@@ -374,6 +417,30 @@ class CampaignRuntime:
             budget=self.budget,
         )
 
+    def pause(
+        self,
+        status: str,
+        *,
+        phase: str,
+        message: str,
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Persist a non-terminal, resumable campaign interruption."""
+
+        if not status.startswith("paused_"):
+            raise ValueError("paused campaign status must start with 'paused_'")
+        payload = {"status": status, "phase": phase, "message": message}
+        if details:
+            payload["details"] = dict(details)
+        self.record("campaign_paused", payload)
+        self.status.update(
+            status,
+            phase=phase,
+            message=message,
+            budget=self.budget,
+            details=details,
+        )
+
 
 def atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
     path = Path(path)
@@ -431,6 +498,12 @@ def _validated_numbers(
 def _validated_number(value: int | float, field_name: str) -> int | float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
         raise ValueError(f"{field_name} must be a non-negative number")
+    return value
+
+
+def _serialized_number(value: int | float) -> int | float:
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
     return value
 
 

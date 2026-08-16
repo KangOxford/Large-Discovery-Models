@@ -3,6 +3,11 @@
 Use this reference after registration scaffolding and before any production
 claim or long-running campaign.
 
+Record the current stage in
+`tasks/<task_id>/resources/qualification_evidence.json`. Each completed gate
+must cite existing repository-relative evidence paths. Validate a claim with
+`scripts/validate_tasks.py --task <task_id> --require-stage <stage>`.
+
 ## 1. Registered
 
 Required evidence:
@@ -49,12 +54,15 @@ Required evidence:
 
 Only now change `qualification` from `draft` to `qualified`.
 
-## 5. Tiny LDM Verified
+## 5. Tiny Campaign Verified
 
 Required evidence:
 
-- A short authenticated endpoint preflight validates connectivity, model name,
-  response shape, and latency before search begins.
+- `experiment.json` declares the proposal-provider kind and capabilities.
+- When `requires_endpoint_preflight` is true, a short authenticated preflight
+  validates connectivity, provider/model identity, response shape, and latency
+  before search begins. Endpoint checks are not gates for deterministic,
+  dataset-backed, or simulator providers that declare the capability false.
 - One configured test-time-search reservoir is generated and cheaply validated.
 - Acquisition scores every valid candidate and selects exactly the configured
   number for expensive evaluation.
@@ -62,7 +70,7 @@ Required evidence:
   benchmark agent, enters the evaluator.
 - `experiment_contract.json`, `budget.json`, `status.json`, search manifest,
   selection record, evaluation manifest, and summary are durable.
-- Endpoint failures open a circuit and produce `paused_endpoint_unavailable`
+- Required-service failures open a circuit and produce a resumable paused state
   without consuming expensive evaluation budget.
 
 ## 6. Campaign Qualified
@@ -73,16 +81,26 @@ Required evidence:
   changes to official settings or campaign budget.
 - `scripts/validate_tasks.py --task <task_id> --require-qualified` succeeds.
 - `budget.json` separately limits and reports outer iterations, LLM requests,
-  valid search candidates, expensive attempts, benchmark jobs, and completions.
+  valid search candidates, expensive attempts, benchmark jobs, and completions;
+  every declared counter is present even when its value is zero.
 - Resume reconstructs state from terminal manifests and never repeats a
   completed expensive evaluation.
-- Detached launch writes a PID, unbuffered log, heartbeat status, and unique run
-  directory without copying credentials.
+- Detached launch returns a durable execution handle, unbuffered log, heartbeat
+  status, and unique run directory without copying credentials. The handle may
+  be a local PID or a remote execution ID.
 - Monitoring reports search phase, selected candidate, evaluator phase, device
   assignment, completed/remaining budget, best optimized metric, and official
   reported metric.
 - Baseline and LDM comparisons declare the same primary expensive-evaluation
   budget. Extended-budget results are labeled separately.
+- Artifact references are run-relative, and completed campaigns provide a
+  portable `result.json` plus `trajectory.csv` when the task reports a scalar
+  trajectory.
+
+For Delta or another remote execution backend, archive pull, task-aware upload,
+blocking cancellation (`kill --wait` or equivalent), and repeated terminal
+status/cancel calls must be idempotent. These are backend requirements rather
+than repository-local lifecycle implementations.
 
 ## Incident Rules
 

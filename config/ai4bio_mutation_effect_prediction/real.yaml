@@ -1,0 +1,19 @@
+name: ai4bio_mutation_effect_prediction_official_campaign
+task: ai4bio_mutation_effect_prediction
+algorithm: gp_ucb
+mode: real
+contract_profile: official_campaign
+description: One deterministic reservoir and one full three-assay official MLS-Bench evaluation.
+args:
+  mock: false
+  iterations: 1
+  reservoir-size: 4
+  evaluations-per-round: 1
+  proposal-mode: deterministic
+  acquisition-beta: 1.0
+  upstream-root: null
+  data-dir: null
+  cv-dir: null
+  evaluation-timeout: 3540
+  out-dir: runs
+  run-name: official_campaign

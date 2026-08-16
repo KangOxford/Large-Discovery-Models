@@ -101,7 +101,7 @@ delta-cli sandbox kill <sandbox_id>
 | --- | --- | --- |
 | Run a small-molecule campaign | [Small-molecule workflow](./run_small_molecule_w_delta_infra/DELTA_CLI_WORKFLOW.md) | Real Qwen inference, AutoDock Vina scoring against KRAS G12D, activity prediction, and EHVI search. The included result is a deliberately stopped partial 30/100 campaign. |
 | Run an antibody campaign | [Antibody workflow](./run_antibody_w_delta_infra/DELTA_CLI_WORKFLOW.md) | Real Qwen CDRH3 proposals and 20 managed AntBO/Absolut evaluations for antigen `1ADQ_A`. |
-| Register and run a custom task | [Task-registration workflow](./run_customized_tasks_registration/TASK_REGISTRATION_WORKFLOW.md) | Manifest-based registration and a 20-iteration diagnostic campaign for adaptive LLM KV-cache quantization. The recorded campaign is non-official and the task remains `draft`. |
+| Register and run a custom task | [Task-registration workflow](run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md) | Manifest-based registration and a 20-iteration diagnostic campaign for adaptive LLM KV-cache quantization. The recorded campaign is non-official and the task remains `draft`. |
 
 Each workflow documents its exact configuration, commands, validation gates,
 failure recovery, evidence boundary, and generated artifacts. Read the chosen

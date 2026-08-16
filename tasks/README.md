@@ -21,7 +21,8 @@ tasks/<task_id>/
 ├── core/                     # private task implementation
 │   └── __init__.py
 ├── resources/                # versioned schemas, seeds, inputs, models
-│   └── README.md
+│   ├── README.md
+│   └── qualification_evidence.json  # ordered machine-readable gate evidence
 ├── scripts/                  # optional maintenance/training CLIs
 ├── environments/             # optional Conda or external-tool specs
 ├── tests/                    # task-local tests
@@ -97,7 +98,9 @@ New tasks also carry `experiment.json`. `task.json` answers "what adapter is
 registered?" while `experiment.json` answers "what scientific and operational
 claim does this run enforce?" The contract records immutable benchmark
 provenance, reported/optimized/diagnostic metric roles, official evaluator
-settings, per-candidate limits, and named campaign profiles.
+settings, per-candidate limits, proposal-provider capabilities, and named
+campaign profiles. Endpoint preflight is required only when
+`proposal_provider.requires_endpoint_preflight` is true.
 
 Scaffolds begin at `qualification: draft`. Change this to `qualified` only after
 one official-budget seed evaluation and a tiny LDM-selected real evaluation pass.
@@ -110,6 +113,13 @@ contract_profile: official_campaign
 The shared runner validates the profile's locked arguments before importing the
 task procedure. Qualified procedures snapshot the active contract into the run
 directory and use `ldm_tts.engine.run_store` for durable `budget.json` and `status.json`.
+
+New scaffolds also start
+`resources/qualification_evidence.json` at `scaffolded`. Advance it through
+`registered`, `mock_verified`, `contract_verified`, `seed_evaluated`,
+`tiny_campaign_verified`, and `campaign_qualified`, citing existing
+repository-relative artifacts for every passed gate. Validate an explicit claim
+with `scripts/validate_tasks.py --task <task_id> --require-stage <stage>`.
 
 ## Procedure Interface
 
@@ -275,4 +285,8 @@ dry contract run, then a tiny evaluated run.
 - Generated runs, caches, model downloads, and virtual environments remain
   untracked.
 - Qualified runs snapshot the contract, enforce a budget ledger, emit status
-  heartbeats, and preflight remote model endpoints before iteration 1.
+  heartbeats, serialize zero-valued counters, and run provider-required
+  preflight before iteration 1.
+- Run artifact references are portable and relative to the run directory;
+  scalar campaigns should export `result.json` and `trajectory.csv` when
+  practical.

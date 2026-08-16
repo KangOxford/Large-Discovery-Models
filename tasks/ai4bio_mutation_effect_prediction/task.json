@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "ai4bio_mutation_effect_prediction",
+  "description": "Optimize protein mutation-effect predictors against the pinned MLS-Bench evaluation contract.",
+  "dependency_checker": "tasks.ai4bio_mutation_effect_prediction.ldm_task.dependencies:check_dependencies"
+}
