@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "task_id": "causal_discovery_discrete",
+  "stage": "campaign_qualified",
+  "benchmark_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+  "contract_profile": "official_campaign_20_iterations",
+  "gates": {
+    "scaffolded": {
+      "status": "passed",
+      "evidence": [
+        "tasks/causal_discovery_discrete/task.json",
+        "tasks/causal_discovery_discrete/experiment.json"
+      ]
+    },
+    "registered": {
+      "status": "passed",
+      "evidence": [
+        "tasks/causal_discovery_discrete/ldm_task/procedure.py",
+        "tasks/causal_discovery_discrete/resources/upstream_contract.json"
+      ]
+    },
+    "mock_verified": {
+      "status": "passed",
+      "evidence": [
+        "tasks/causal_discovery_discrete/tests/test_procedure.py",
+        "config/causal_discovery_discrete/mock.yaml"
+      ]
+    },
+    "contract_verified": {
+      "status": "passed",
+      "evidence": [
+        "tasks/causal_discovery_discrete/resources/upstream_contract.json",
+        "tasks/causal_discovery_discrete/tests/test_procedure.py"
+      ]
+    },
+    "seed_evaluated": {
+      "status": "passed",
+      "evidence": [
+        "tasks/causal_discovery_discrete/resources/qualification_seed.json"
+      ]
+    },
+    "tiny_campaign_verified": {
+      "status": "passed",
+      "evidence": [
+        "config/causal_discovery_discrete/real.yaml",
+        "tasks/causal_discovery_discrete/resources/qualification_campaign.json"
+      ]
+    },
+    "campaign_qualified": {
+      "status": "passed",
+      "evidence": [
+        "tasks/causal_discovery_discrete/experiment.json",
+        "tasks/causal_discovery_discrete/resources/qualification_campaign.json"
+      ]
+    }
+  }
+}

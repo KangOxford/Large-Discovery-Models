@@ -121,6 +121,11 @@ New scaffolds also start
 repository-relative artifacts for every passed gate. Validate an explicit claim
 with `scripts/validate_tasks.py --task <task_id> --require-stage <stage>`.
 
+Those evidence paths must exist in a clean checkout. Do not cite ignored
+`runs/`, `ldm_runs/`, or `data/generated/` files; promote the relevant campaign
+result, contract and artifact digests, counters, metrics, and provenance into a
+compact versioned record under the task's `resources/` directory.
+
 ## Procedure Interface
 
 `ldm_task/procedure.py` must define:

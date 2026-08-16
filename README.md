@@ -73,25 +73,30 @@ in evidence rather than model confidence alone.
 | `small_molecule` | SMILES candidates for docking and activity objectives. | [Clean-room quick start](tasks/small_molecule/QUICKSTART.md) | [Task guide](tasks/small_molecule/README.md) |
 | `antibody` | CDRH3 amino-acid sequences for antigen binding. | [Clean-room quick start](tasks/antibody/QUICKSTART.md) | [Task guide](tasks/antibody/README.md) |
 | `llm_kv_adaptive_quantization` (adopted from [MLS-Bench](https://github.com/Imbernoulli/MLS-Bench)) | Adaptive KV-cache quantization policies for language-model quality and compression. | [Clean-room quick start](tasks/llm_kv_adaptive_quantization/QUICKSTART.md) | [Task guide](tasks/llm_kv_adaptive_quantization/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [registration and Delta workflow](ready2run_examples/run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md) |
-| `ai4bio_mutation_effect_prediction` (adopted from [MLS-Bench](https://github.com/Imbernoulli/MLS-Bench) | Bounded mutation-effect predictor architectures evaluated on three pinned ProteinGym assays through MLS-Bench. | [Clean-room quick start](tasks/ai4bio_mutation_effect_prediction/QUICKSTART.md) | [Task guide](tasks/ai4bio_mutation_effect_prediction/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [registration and Delta workflow](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/REGISTER_AND_DELTA_WORKFLOW.md) |
+| `ai4bio_mutation_effect_prediction` (adopted from [MLS-Bench](https://github.com/Imbernoulli/MLS-Bench)) | Bounded mutation-effect predictor architectures evaluated on three pinned ProteinGym assays through MLS-Bench. | [Clean-room quick start](tasks/ai4bio_mutation_effect_prediction/QUICKSTART.md) | [Task guide](tasks/ai4bio_mutation_effect_prediction/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [registration and Delta workflow](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/REGISTER_AND_DELTA_WORKFLOW.md) |
+| `causal_discovery_discrete` (adopted from [MLS-Bench](https://github.com/Imbernoulli/MLS-Bench)) | Bounded discrete causal-graph discovery evaluated on five pinned Bayesian-network datasets through MLS-Bench. | [Clean-room quick start](tasks/causal_discovery_discrete/QUICKSTART.md) | [Task guide](tasks/causal_discovery_discrete/README.md); added with [`skills/register-ldm-task`](skills/register-ldm-task/SKILL.md); [recorded Delta campaign](ready2run_examples/run_customized_causal_discovery_discrete/) |
 | ... (**more to come**)| ... (**stay tuned**) | ... | ... |
 | `your_task` | User-defined candidates and measurable objectives in any domain. | [Use `$register-ldm-task`](skills/register-ldm-task/SKILL.md) | [Task registration guide](tasks/README.md) |
 
-The five built-in clean-room guides begin with deterministic mock or CPU-safe gates and
+The six built-in clean-room guides begin with deterministic mock or CPU-safe gates and
 progress through locked installation, dependency preflight, artifact checks,
 and credential cleanup before any costly run. The evaluator-backed campaign
 examples below additionally cover real GPU nanoGPT training, Vina plus G12D
 scoring, Absolut evaluation, and the pinned three-assay MLS-Bench mutation
-predictor evaluation. Run the documented commands from the repository root.
+predictor and five-network discrete causal-discovery evaluations. Run the
+documented commands from the repository root.
 
-Task registration and conventional layout validation pass for all five
+Task registration and conventional layout validation pass for all six
 built-ins. The nanoGPT, small-molecule, antibody, and adaptive KV-cache tasks
 retain `draft` experiment contracts and should be treated as runnable examples,
-not benchmark-qualified implementations. The AI4Bio mutation-effect task has a
-source-pinned qualified contract and machine-readable evidence through
-`campaign_qualified`, including an official one-iteration campaign and
-separately labeled 3- and 20-iteration extended-budget runs. Qualification is
-task-specific; evidence from AI4Bio does not qualify the other adapters.
+not benchmark-qualified implementations. The AI4Bio mutation-effect and
+discrete causal-discovery tasks have source-pinned qualified contracts and
+machine-readable evidence through `campaign_qualified`. AI4Bio includes an
+official one-iteration campaign and separately labeled 3- and 20-iteration
+extended-budget runs. Discrete causal discovery includes a separately labeled
+20-iteration extended-budget run with 100 official network jobs. Qualification
+is task-specific; evidence from either qualified task does not qualify the
+other adapters.
 
 Task authors can add a manifest-registered adapter without editing the shared
 runner. See [Registering LDM Tasks](tasks/README.md) or use the repository-local
@@ -135,10 +140,25 @@ evidence of optimization progress, not a controlled causal estimate of the LDM
 component. Establishing an LDM advantage requires multiple seeds and matched
 random, pure-LLM, BO-only, and acquisition-ablation baselines.
 
+Three additional registered-task campaigns are shown separately because their
+budgets and evidence claims differ from the three 100-evaluation examples
+above. Adaptive KV-cache quantization is a non-official diagnostic campaign and
+remains `draft`; AI4Bio reports official MLS-Bench evaluations from a separately
+labeled 20-iteration extended-budget campaign; discrete causal discovery reports
+official MLS-Bench scores from 20 five-network evaluations under its separately
+labeled extended-budget profile.
+
+| [Adaptive KV-cache quantization](ready2run_examples/run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md): GP-UCB, 20 diagnostic evaluations | [AI4Bio mutation-effect prediction](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/REGISTER_AND_DELTA_WORKFLOW.md): GP-UCB, 20 official evaluations | [Discrete causal discovery](tasks/causal_discovery_discrete/README.md): GP-UCB, 20 official evaluations |
+| --- | --- | --- |
+| [![Adaptive KV-cache quantization objective progress](ready2run_examples/run_customized_llm_kv_adaptive_quantization/progress.png)](ready2run_examples/run_customized_llm_kv_adaptive_quantization/progress.png) | [![AI4Bio mutation-effect prediction campaign progress](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/progress.png)](ready2run_examples/run_customized_ai4bio_mutation_effect_prediction/progress.png) | [![Discrete causal-discovery campaign progress](ready2run_examples/run_customized_causal_discovery_discrete/progress.png)](ready2run_examples/run_customized_causal_discovery_discrete/progress.png) |
+| Twenty Qwen-generated four-candidate reservoirs and 20 successful one-example HotpotQA evaluations. Best non-official selection score: `0.4979345`. | Twenty deterministic four-candidate reservoirs and 20 successful three-assay ProteinGym evaluations. Best official score: `0.4872663032443121` at iteration 14. | Twenty deterministic four-candidate reservoirs and 20 successful five-network evaluations, totaling 100 benchmark jobs. Best official score: `0.02766568667561009`, first reached at iteration 6. |
+
 Use the [agent execution guide](docs/agent-execution.md) for the machine-oriented execution,
 validation, resume, plotting, and safety checklist. Use
 [`scripts/plot_campaigns.py`](scripts/plot_campaigns.py) to regenerate the
-three trajectory views from persisted artifacts.
+three original trajectory views from persisted artifacts, and use
+[`scripts/plot_causal_discovery_campaign.py`](scripts/plot_causal_discovery_campaign.py)
+to regenerate the discrete causal-discovery view.
 
 ## Run a demo with Delta-Infra: Hassle-Free and Ready-to-Run
 

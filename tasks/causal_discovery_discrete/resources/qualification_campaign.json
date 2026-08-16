@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "stage": "campaign_qualified",
+  "observed_at": "2026-08-16",
+  "execution": {
+    "backend": "Delta Sandbox",
+    "execution_id": "e81e7b5a9bc0491d9221707c20fe1280",
+    "run_id": "official_campaign_20",
+    "status": "completed",
+    "rounds_run": 20,
+    "stop_reason": "iteration_budget"
+  },
+  "contract": {
+    "benchmark_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+    "profile": "official_campaign_20_iterations",
+    "budget_class": "extended",
+    "sha256": "b94e627c89aa563e767fa32e6ae729216276cba53e65fb61b475d32301f43662"
+  },
+  "search": {
+    "algorithm": "gp_ucb",
+    "acquisition_beta": 1.0,
+    "reservoir_size": 4,
+    "selected_candidate_id": "causal-e37d61dc934b",
+    "successful_evaluations": 20,
+    "failed_evaluations": 0
+  },
+  "budget": {
+    "limits": {
+      "outer_iterations": 20,
+      "llm_requests": 0,
+      "proposal_attempts": 0,
+      "valid_search_candidates": 80,
+      "selected_candidates": 20,
+      "external_evaluations": 20,
+      "expensive_evaluation_attempts": 20,
+      "successful_evaluations": 20,
+      "benchmark_jobs": 100
+    },
+    "counters": {
+      "outer_iterations": 20,
+      "llm_requests": 0,
+      "proposal_attempts": 0,
+      "valid_search_candidates": 80,
+      "selected_candidates": 20,
+      "external_evaluations": 20,
+      "expensive_evaluation_attempts": 20,
+      "successful_evaluations": 20,
+      "benchmark_jobs": 100
+    }
+  },
+  "evaluation": {
+    "official": true,
+    "evaluator": "pinned_mlsbench_causal_discovery_discrete",
+    "candidate_id": "causal-e37d61dc934b",
+    "candidate_spec": {
+      "min_association": 0.06,
+      "max_degree": 2
+    },
+    "runtime_seconds": 0.28346439194865525,
+    "metrics": {
+      "official_score": 0.02766568667561009,
+      "shd_Cancer": 4.0,
+      "shd_Child": 22.0,
+      "shd_Alarm": 49.0,
+      "shd_Hailfinder": 72.0,
+      "shd_Win95pts": 114.0,
+      "adj_precision_Cancer": 1.0,
+      "adj_precision_Child": 0.8461538461538461,
+      "adj_precision_Alarm": 0.7857142857142857,
+      "adj_precision_Hailfinder": 0.7575757575757576,
+      "adj_precision_Win95pts": 0.8297872340425532,
+      "adj_recall_Cancer": 0.25,
+      "adj_recall_Child": 0.44,
+      "adj_recall_Alarm": 0.4782608695652174,
+      "adj_recall_Hailfinder": 0.3787878787878788,
+      "adj_recall_Win95pts": 0.3482142857142857,
+      "arrow_precision_Cancer": 0.0,
+      "arrow_precision_Child": 0.0,
+      "arrow_precision_Alarm": 0.0,
+      "arrow_precision_Hailfinder": 0.0,
+      "arrow_precision_Win95pts": 0.0,
+      "arrow_recall_Cancer": 0.0,
+      "arrow_recall_Child": 0.0,
+      "arrow_recall_Alarm": 0.0,
+      "arrow_recall_Hailfinder": 0.0,
+      "arrow_recall_Win95pts": 0.0
+    }
+  },
+  "raw_artifacts": {
+    "retention": "Pulled campaign outputs remain excluded from Git; these digests identify the exact extended-budget qualification artifacts.",
+    "evaluation_manifest_count": 20,
+    "result.json": "23a5d03e2ff2a1a9b1e0febf624f80cb5ad329385af5eff58d29cd2edd9f478d",
+    "trajectory.csv": "33e832449f101f46db5cf1e02c64bbeb7bb00085e830bf44969de47e4871fa0c",
+    "budget.json": "d7326edfb2dc300cc5271f93ab3c8d8cfe9260ae4606648580a1d95446c51442",
+    "status.json": "c2760e8ac9312e771d1cec659fe0dd5a9056e818b7392e165267ee00a0ac51ba",
+    "summary.json": "31cde456270f7e2735a738972ade3e52aefc9871ee90790a670b242ed2b7b37a",
+    "checkpoint.json": "81e54686cd6f7454ae67f8bcae823dcc65b634066b22581836ef0fdbe338d1e9",
+    "experiment_contract.json": "83cd878f34e451caa51953f1fab31f523786713fa1b11fec0560885a5813bb41",
+    "search_manifest.json": "6eaca37bf29b42f09e8b650b7b4c5d1ea16fb6795efbd8719ee1977edf9d8e9c",
+    "selection_record.json": "76f7be1e731631dd3e4fc4b157d7d86d43977d31c4da4d153089e9cf95789903",
+    "best_evaluation_manifest.json": "562dcfc4481a032fea6089d30b716bb22a33c2ba2dbde60a29112ca9533a5420"
+  }
+}

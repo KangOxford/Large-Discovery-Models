@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "task_id": "causal_discovery_discrete",
+  "description": "Optimize discrete causal-discovery algorithms against the pinned MLS-Bench CPDAG benchmark.",
+  "dependency_checker": "tasks.causal_discovery_discrete.ldm_task.dependencies:check_dependencies"
+}

@@ -502,7 +502,6 @@ that behavior and validate plot/CSV generation without requiring a real run.
 - [`result.json`](./result.json): concise structured campaign result
 - [`progress.csv`](./progress.csv): all 20 evaluations and best-so-far values
 - [`progress.png`](./progress.png): raster trajectory plot
-- [`progress.pdf`](./progress.pdf): vector trajectory plot
 - `runs/ai4bio_mutation_effect_prediction/official_campaign_20/`: complete raw
   campaign evidence from the Delta sandbox
 

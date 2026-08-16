@@ -1,0 +1,18 @@
+[project]
+name = "ldm-tts-causal-discovery-discrete"
+version = "0.1.0"
+description = "Optimize discrete causal-discovery algorithms against pinned MLS-Bench."
+requires-python = ">=3.10"
+dependencies = [
+  "causal-learn>=0.1.4.3",
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "pgmpy>=1.0",
+  "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=7.0"]
+
+[tool.uv]
+package = false

@@ -2,8 +2,8 @@
 
 This directory contains reproducible runbooks and artifacts from running Large
 Discovery Model (LDM) campaigns on **Delta-Infra**. Start here when you want to
-run an existing small-molecule, antibody, or AI4Bio campaign, or use an existing
-run as a reference for registering a new LDM task.
+run an existing small-molecule, antibody, AI4Bio, or discrete causal-discovery
+campaign, or use an existing run as a reference for registering a new LDM task.
 
 ## What is Delta-Infra?
 
@@ -103,10 +103,11 @@ delta-cli sandbox kill <sandbox_id>
 | Run an antibody campaign | [Antibody workflow](./run_antibody_w_delta_infra/DELTA_CLI_WORKFLOW.md) | Real Qwen CDRH3 proposals and 20 managed AntBO/Absolut evaluations for antigen `1ADQ_A`. |
 | Register and run a custom task | [Task-registration workflow](run_customized_llm_kv_adaptive_quantization/TASK_REGISTRATION_WORKFLOW.md) | Manifest-based registration and a 20-iteration diagnostic campaign for adaptive LLM KV-cache quantization. The recorded campaign is non-official and the task remains `draft`. |
 | Register, qualify, and run the AI4Bio mutation-effect task | [AI4Bio registration and Delta workflow](run_customized_ai4bio_mutation_effect_prediction/REGISTER_AND_DELTA_WORKFLOW.md) | Source-pinned MLS-Bench registration, staged qualification, official three-assay evaluation, and a separately labeled 20-iteration extended-budget campaign with CSV/PDF/PNG progress artifacts. |
+| Register, qualify, and run discrete causal discovery | [Causal-discovery quickstart](../tasks/causal_discovery_discrete/QUICKSTART.md) and [recorded artifacts](./run_customized_causal_discovery_discrete/) | Source-pinned MLS-Bench registration, staged qualification, and a 20-iteration extended-budget GP-UCB campaign. All 20 candidates completed the five-network evaluator for 100 benchmark jobs; the best official score was `0.02766568667561009`, first reached at iteration 6. |
 
-Each workflow documents its exact configuration, commands, validation gates,
-failure recovery, evidence boundary, and generated artifacts. Read the chosen
-workflow before allocating resources: its image, CPU/GPU requirements,
+Each linked workflow or task guide documents its exact configuration, commands,
+validation gates, failure recovery, evidence boundary, and generated artifacts.
+Read the chosen guide before allocating resources: its image, CPU/GPU requirements,
 timeouts, model paths, and evaluator dependencies are more specific than the
 generic smoke test above.
 

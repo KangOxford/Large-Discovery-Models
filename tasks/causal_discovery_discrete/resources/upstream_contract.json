@@ -1,0 +1,27 @@
+{
+  "source_url": "https://github.com/Imbernoulli/MLS-Bench",
+  "source_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+  "task_path": "tasks/causal-discovery-discrete",
+  "harbor_task_path": "harbor/tasks/mls-bench__causal-discovery-discrete",
+  "seed": 42,
+  "cases": {
+    "Cancer": {"network": "cancer", "samples": 500},
+    "Child": {"network": "child", "samples": 2000},
+    "Alarm": {"network": "alarm", "samples": 5000},
+    "Hailfinder": {"network": "hailfinder", "samples": 10000},
+    "Win95pts": {"network": "win95pts", "samples": 10000}
+  },
+  "limits": {
+    "cpu_count": 4,
+    "gpu_count": 0,
+    "per_network_timeout_seconds": 3540,
+    "verifier_timeout_seconds": 5940,
+    "agent_timeout_seconds": 18000
+  },
+  "sha256": {
+    "tasks/causal-discovery-discrete/config.json": "d4b5a9027c0170e965f5ff06525335802459e2675e93103fb7d8e193babf1657",
+    "tasks/causal-discovery-discrete/score_spec.py": "c9bb34fdea2284bb6031abdb45efd70f96525a923cfc67ccac204900e74a5ea2",
+    "tasks/causal-discovery-discrete/leaderboard.csv": "37cfeb699013ab1baaac42e0b1b6338b1fca1847768c9cbcb3d586e44f65e30c",
+    "harbor/tasks/mls-bench__causal-discovery-discrete/tests/meta/dgp.py": "3eaccae6f9316af2bbdf7b28534c21142b902e4336e3c8035937b4dd1cd45608"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "stage": "seed_evaluated",
+  "observed_at": "2026-08-16",
+  "official": true,
+  "inside_campaign_budget": true,
+  "source_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+  "source_path": "tasks/causal-discovery-discrete",
+  "candidate": {
+    "candidate_id": "causal-ba2d4aa430db",
+    "source": "deterministic_catalog",
+    "spec": {
+      "min_association": 0.0025,
+      "max_degree": 2
+    }
+  },
+  "evaluation": {
+    "seed": 42,
+    "benchmark_jobs": 5,
+    "runtime_seconds": 0.3115497208200395,
+    "datasets": {
+      "Cancer": 500,
+      "Child": 2000,
+      "Alarm": 5000,
+      "Hailfinder": 10000,
+      "Win95pts": 10000
+    }
+  },
+  "metrics": {
+    "official_score": 0.010000000000000004,
+    "shd_Cancer": 7.0,
+    "shd_Child": 27.0,
+    "shd_Alarm": 53.0,
+    "shd_Hailfinder": 85.0,
+    "shd_Win95pts": 125.0,
+    "adj_precision_Cancer": 0.4,
+    "adj_precision_Child": 0.6,
+    "adj_precision_Alarm": 0.696969696969697,
+    "adj_precision_Hailfinder": 0.5434782608695652,
+    "adj_precision_Win95pts": 0.65625,
+    "adj_recall_Cancer": 0.5,
+    "adj_recall_Child": 0.48,
+    "adj_recall_Alarm": 0.5,
+    "adj_recall_Hailfinder": 0.3787878787878788,
+    "adj_recall_Win95pts": 0.375,
+    "arrow_precision_Cancer": 0.0,
+    "arrow_precision_Child": 0.0,
+    "arrow_precision_Alarm": 0.0,
+    "arrow_precision_Hailfinder": 0.0,
+    "arrow_precision_Win95pts": 0.0,
+    "arrow_recall_Cancer": 0.0,
+    "arrow_recall_Child": 0.0,
+    "arrow_recall_Alarm": 0.0,
+    "arrow_recall_Hailfinder": 0.0,
+    "arrow_recall_Win95pts": 0.0
+  },
+  "scoring": {
+    "engine": "pinned_mlsbench.scoring.evaluate.score_record_details",
+    "record_valid": true,
+    "evaluation_manifest_sha256": "bb5b7f7a0481f3b81fa9fce1490edd08d20af3d87c0467125eb42f169afe3dd5"
+  }
+}
