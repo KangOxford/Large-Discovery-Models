@@ -1,0 +1,17 @@
+name: causal_discovery_discrete_official_campaign_20_iterations
+task: causal_discovery_discrete
+algorithm: gp_ucb
+mode: real
+contract_profile: official_campaign_20_iterations
+description: Extended-budget 20-iteration campaign with 100 official network jobs.
+args:
+  mock: false
+  iterations: 20
+  reservoir-size: 4
+  evaluations-per-round: 1
+  proposal-mode: deterministic
+  acquisition-beta: 1.0
+  upstream-root: null
+  evaluation-timeout: 3540
+  out-dir: runs
+  run-name: official_campaign_20

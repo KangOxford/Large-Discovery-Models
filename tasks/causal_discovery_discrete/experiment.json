@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "task_id": "causal_discovery_discrete",
+  "qualification": "qualified",
+  "benchmark": {
+    "source_url": "https://github.com/Imbernoulli/MLS-Bench",
+    "source_commit": "cfd57a7e0139c72753e32e31bca593719b098717",
+    "task_path": "tasks/causal-discovery-discrete"
+  },
+  "proposal_provider": {
+    "kind": "deterministic",
+    "requires_endpoint_preflight": false,
+    "supports_collection": true
+  },
+  "metrics": {
+    "reported": [
+      {
+        "name": "official_score",
+        "direction": "maximize",
+        "description": "Pinned MLS-Bench geometric mean of five baseline-normalized bounded-power network scores."
+      }
+    ],
+    "optimized": [
+      {
+        "name": "official_score",
+        "direction": "maximize",
+        "description": "Official MLS-Bench aggregate used by real GP-UCB campaigns."
+      },
+      {
+        "name": "selection_score",
+        "direction": "maximize",
+        "description": "Synthetic signal used only by mock qualification runs.",
+        "modes": ["mock"]
+      }
+    ],
+    "diagnostic": [
+      {
+        "name": "shd_<case>",
+        "direction": "minimize",
+        "description": "Structural Hamming distance for each official network."
+      },
+      {
+        "name": "adj_precision_<case>",
+        "direction": "maximize",
+        "description": "Adjacency precision for each official network."
+      },
+      {
+        "name": "adj_recall_<case>",
+        "direction": "maximize",
+        "description": "Adjacency recall for each official network."
+      },
+      {
+        "name": "arrow_precision_<case>",
+        "direction": "maximize",
+        "description": "Arrow precision for each official network."
+      },
+      {
+        "name": "arrow_recall_<case>",
+        "direction": "maximize",
+        "description": "Arrow recall for each official network."
+      },
+      {
+        "name": "runtime_seconds",
+        "direction": "minimize",
+        "description": "Wall time for all five official network jobs."
+      }
+    ]
+  },
+  "evaluation": {
+    "datasets": [
+      "bnlearn Cancer: 500 observations, 5 nodes",
+      "bnlearn Child: 2000 observations, 20 nodes",
+      "bnlearn Alarm: 5000 observations, 37 nodes",
+      "bnlearn Hailfinder: 10000 observations, 56 nodes",
+      "bnlearn Win95pts: 10000 observations, 76 nodes"
+    ],
+    "settings": {
+      "seed": 42,
+      "input": "integer-coded observational samples from pgmpy get_example_model",
+      "target": "ground-truth DAG converted to CPDAG with causallearn dag2cpdag",
+      "editable_interface": "run_causal_discovery(X) -> causallearn GeneralGraph",
+      "candidate_algorithm": "normalized mutual-information skeleton with bounded threshold and degree",
+      "score": "Pinned MLS-Bench bounded-power normalization against leaderboard baselines followed by geometric mean"
+    },
+    "per_candidate_limits": {
+      "benchmark_jobs": 5,
+      "gpu_count": 0,
+      "benchmark_job_timeout_seconds": 3540,
+      "verifier_timeout_seconds": 5940,
+      "agent_timeout_seconds": 18000
+    }
+  },
+  "budget": {
+    "outer_iterations": 1,
+    "llm_requests": 0,
+    "proposal_attempts": 0,
+    "valid_search_candidates": 4,
+    "selected_candidates": 1,
+    "external_evaluations": 1,
+    "expensive_evaluation_attempts": 1,
+    "successful_evaluations": 1,
+    "benchmark_jobs": 5
+  },
+  "profiles": {
+    "official_campaign": {
+      "description": "One deterministic four-candidate reservoir, one GP-UCB selection, and one five-network official evaluation.",
+      "budget": {
+        "outer_iterations": 1,
+        "llm_requests": 0,
+        "proposal_attempts": 0,
+        "valid_search_candidates": 4,
+        "selected_candidates": 1,
+        "external_evaluations": 1,
+        "expensive_evaluation_attempts": 1,
+        "successful_evaluations": 1,
+        "benchmark_jobs": 5
+      },
+      "locked_args": {
+        "iterations": 1,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "proposal-mode": "deterministic",
+        "acquisition-beta": 1.0,
+        "evaluation-timeout": 3540
+      }
+    },
+    "official_campaign_20_iterations": {
+      "description": "Extended-budget campaign with twenty deterministic reservoirs and twenty five-network evaluations.",
+      "budget": {
+        "outer_iterations": 20,
+        "llm_requests": 0,
+        "proposal_attempts": 0,
+        "valid_search_candidates": 80,
+        "selected_candidates": 20,
+        "external_evaluations": 20,
+        "expensive_evaluation_attempts": 20,
+        "successful_evaluations": 20,
+        "benchmark_jobs": 100
+      },
+      "locked_args": {
+        "iterations": 20,
+        "reservoir-size": 4,
+        "evaluations-per-round": 1,
+        "proposal-mode": "deterministic",
+        "acquisition-beta": 1.0,
+        "evaluation-timeout": 3540
+      }
+    }
+  }
+}

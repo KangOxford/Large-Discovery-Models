@@ -94,12 +94,23 @@ ignored `runs/`, `ldm_runs/`, or `data/generated/` output: promote the relevant
 contract digest, counters, result, provenance, and raw-artifact digests into a
 compact checked-in record under `tasks/<task_id>/resources/`.
 
+Local existence is not sufficient: every cited evidence path must also be
+tracked by Git. Before advancing a gate, run `git status --short --untracked-files=all
+-- tasks/<task_id> config/<task_id>` and verify each cited path with
+`git ls-files --error-unmatch -- <repository-relative-evidence-path>`. This is
+especially important for `config/<task_id>/mock.yaml`: an untracked config can
+make local validation pass while a clean GitHub Actions checkout reports that
+the task has no config directory and that the evidence path is missing.
+
 ## Required Verification
 
 Run from the repository root:
 
 ```bash
 python scripts/validate_tasks.py --task <task_id>
+git status --short --untracked-files=all -- tasks/<task_id> config/<task_id>
+# Repeat for every path cited by resources/qualification_evidence.json.
+git ls-files --error-unmatch -- <repository-relative-evidence-path>
 uv run --locked --project tasks/<task_id> python -m pytest tasks/<task_id>/tests
 uv run --locked --project tasks/<task_id> python scripts/check_task_dependencies.py \
   config/<task_id>/mock.yaml --no-optional
