@@ -22,6 +22,7 @@ def test_builtin_tasks_are_discovered_from_manifests() -> None:
     assert set(TASK_DEFINITIONS) == {
         "ai4bio_mutation_effect_prediction",
         "antibody",
+        "causal_discovery_discrete",
         "llm_kv_adaptive_quantization",
         "nanogpt",
         "small_molecule",

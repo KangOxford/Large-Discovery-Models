@@ -126,6 +126,13 @@ Those evidence paths must exist in a clean checkout. Do not cite ignored
 result, contract and artifact digests, counters, metrics, and provenance into a
 compact versioned record under the task's `resources/` directory.
 
+A path that exists only as an untracked working-tree file is not clean-checkout
+evidence. Before advancing a qualification gate, inspect `git status --short
+--untracked-files=all -- tasks/<task_id> config/<task_id>` and require
+`git ls-files --error-unmatch -- <evidence-path>` to succeed for every cited
+path. This check prevents a local pass followed by a CI failure because a cited
+mock or real config was never added to Git.
+
 ## Procedure Interface
 
 `ldm_task/procedure.py` must define:

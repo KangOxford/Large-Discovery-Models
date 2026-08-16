@@ -4,3 +4,4 @@ experiments:
   - ../nanogpt/mock_best_of_n.yaml
   - ../small_molecule/mock_m1_stratified_oversample.yaml
   - ../antibody/mock_ei.yaml
+  - ../causal_discovery_discrete/mock.yaml

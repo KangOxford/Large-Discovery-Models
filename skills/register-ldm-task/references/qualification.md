@@ -15,6 +15,15 @@ directly. For a completed campaign, add a compact record under
 complete budget counters, scientific metrics, provenance, and SHA-256 digests
 of the retained raw artifacts.
 
+Do not equate a file's local existence with clean-checkout availability. Before
+recording a passed gate, run `git status --short --untracked-files=all --
+tasks/<task_id> config/<task_id>` and require
+`git ls-files --error-unmatch -- <evidence-path>` to succeed for every path
+listed by that gate. In particular, ensure `config/<task_id>/mock.yaml` is
+tracked before citing it as `mock_verified` evidence; otherwise local validation
+can pass while CI checks a checkout in which the entire config directory is
+absent.
+
 ## 1. Registered
 
 Required evidence:
