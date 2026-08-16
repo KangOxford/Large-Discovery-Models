@@ -2,12 +2,12 @@
   "exit_code": 0,
   "finished": true,
   "summary": {
+    "status": "ok",
     "files": 8,
     "iterations": 20,
-    "output_dir": "data/generated/llm_kv_adaptive_quantization_real_20",
     "qualification": "draft_non_official_not_benchmark_comparable",
-    "status": "ok"
+    "output_dir": "data/generated/llm_kv_quantization_trial2"
   },
-  "result_summary": "exit_code=0, finished=true, status=ok, iterations=20, files=8, output_dir=data/generated/llm_kv_adaptive_quantization_real_20, qualification=draft_non_official_not_benchmark_comparable",
+  "result_summary": "exit_code=0, finished=true, status=ok, files=8, iterations=20, qualification=draft_non_official_not_benchmark_comparable, output_dir=data/generated/llm_kv_quantization_trial2",
   "error": null
 }

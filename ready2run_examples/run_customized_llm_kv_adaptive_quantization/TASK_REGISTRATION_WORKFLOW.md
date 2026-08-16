@@ -357,69 +357,314 @@ document.
 
 ## Delta Sandbox Campaign Workflow
 
-The real 20-run diagnostic used Delta CLI for the heavy environment. The
-proposal model and benchmark model were different and should not be confused:
+This section documents the second 20-iteration demo run. It used Delta CLI to
+host both the private proposal endpoint and the benchmark process, while the
+task still ran through the same registered adapter and shared `LDMEngine`
+described above. No external model API or `api_credential.json` was used.
+
+The two models had separate roles and must not be conflated:
 
 | Role | Model |
 | --- | --- |
-| Proposal generation | Shared `Qwen3.5-9B` checkpoint |
+| Proposal generation | Local shared `Qwen3.5-9B` checkpoint served by vLLM |
 | Benchmark evaluation | `Qwen/Qwen2.5-3B-Instruct` fixed by MLS-Bench |
 
-The practical lifecycle was:
+### 1. Check Delta configuration before allocating resources
 
-1. Check Delta configuration and authentication.
-2. Create one task-owned sandbox with the required GPU and memory.
-3. Resolve and retain the real `sandbox_id` and working directory returned by
-   Delta CLI.
-4. Stage the repository task, pinned MLS-Bench checkout, prepared
-   `transformers-kv-lab`, and evaluator environment.
-5. Start the Qwen proposal endpoint as a long-running background execution.
-6. Run registration, dependency, mock, and endpoint checks inside the same
-   heavy environment.
-7. Run a one-iteration confirmation before authorizing the 20-iteration
-   profile.
-8. Launch `extended_tiny_real_20` with one GPU, one HotpotQA example per
-   selected candidate, and the locked 20-job budget.
-9. Monitor durable events, status, checkpoints, evaluation manifests, and
-   counters rather than relying only on streaming logs.
-10. Pull campaign artifacts to the host and verify terminal counts before
-    destroying the task-owned sandbox.
+Run both read-only checks first:
 
-The endpoint remained private to the sandbox. The campaign process called it
-through the task's OpenAI-compatible proposal client; no credentials were
-stored in the checked-in configs or pulled run artifacts.
+```bash
+delta-cli config show
+delta-cli auth status
+```
+
+Continue only when both commands return exit code zero with top-level
+`ok: true`. The displayed credential must remain masked.
+
+### 2. Create exactly one GPU sandbox
+
+The working image needs the `r3l` vLLM environment used by the Qwen launcher
+and enough GPU memory to keep the 9B proposal model resident while the 3B
+benchmark model runs:
+
+```bash
+delta-cli sandbox create \
+  --image image.yangtzeailab.com/opensandbox/vllm_0.27.1:juicefs \
+  --cpu 16 \
+  --memory 64Gi \
+  --gpu 1 \
+  --gpu-mem 80000 \
+  --max-life 180 \
+  --no-auto-cleanup
+```
+
+Record `data.sandbox_id` from the response. Do not invent an ID or submit a
+second create request if the first request has an uncertain result; use a
+read-only `sandbox list` call to reconcile server state first.
+
+Resolve the authoritative working directory once:
+
+```bash
+delta-cli sandbox working-directory <sandbox-id>
+```
+
+Every later `<working-directory>` placeholder means the exact `data.path`
+returned by this command.
+
+### 3. Stage bounded inputs with explicit destinations
+
+Upload the repository components needed by the runner rather than transferring
+an unrelated working tree. The pinned MLS-Bench checkout remains a separate
+input:
+
+```bash
+delta-cli sandbox upload <sandbox-id> \
+  --source ldm_tts \
+  --target <working-directory>/repo/ldm_tts
+
+delta-cli sandbox upload <sandbox-id> \
+  --source config \
+  --target <working-directory>/repo/config
+
+delta-cli sandbox upload <sandbox-id> \
+  --source scripts \
+  --target <working-directory>/repo/scripts
+
+delta-cli sandbox upload <sandbox-id> \
+  --source tasks/llm_kv_adaptive_quantization \
+  --target <working-directory>/repo/tasks/llm_kv_adaptive_quantization
+
+delta-cli sandbox write <sandbox-id> \
+  --source tasks/__init__.py \
+  --path <working-directory>/repo/tasks/__init__.py
+
+delta-cli sandbox upload <sandbox-id> \
+  --source /path/to/pinned/mls-bench \
+  --target <working-directory>/mls-bench
+```
+
+Use individual `sandbox write` calls for important small files when exact
+placement matters. During the plotting follow-up, relative `write-multiple`
+targets were reported as successful but did not land under the current
+sandbox's working directory.
+
+### 4. Prepare and validate both Python environments
+
+The evaluator and proposal server intentionally use different Python
+environments. Install benchmark dependencies into `/opt/conda/bin/python`:
+
+```bash
+delta-cli sandbox run-bg <sandbox-id> \
+  --command "bash <working-directory>/repo/scripts/delta_llm_kv_eval_setup.sh" \
+  --timeout 1800 \
+  --wait
+```
+
+Then validate the shared Qwen checkpoint with the vLLM environment:
+
+```bash
+delta-cli sandbox run <sandbox-id> \
+  --command "/opt/conda/envs/r3l/bin/python <working-directory>/repo/scripts/delta_qwen35_env_probe.py" \
+  --timeout 60
+```
+
+The actual shared checkpoint was
+`/workspace/577908796194689024/models/Qwen3.5-9B`. The probe verifies the
+safetensors index, every referenced shard, absence of partial downloads,
+runtime imports, CUDA visibility, and the GPU name. If the shared workspace
+root differs, update the two Qwen helper scripts to the real path before they
+are uploaded; do not download a second copy by default.
+
+### 5. Start and verify the private Qwen endpoint
+
+Start vLLM as a background job because it must remain alive for the entire
+campaign:
+
+```bash
+delta-cli sandbox run-bg <sandbox-id> \
+  --command "bash <working-directory>/repo/scripts/delta_launch_qwen35.sh" \
+  --timeout 21600
+```
+
+Retain the returned server `execution_id` for log inspection and cancellation.
+The launcher serves `Qwen3.5-9B` on sandbox-local
+`http://127.0.0.1:8000/v1` with:
+
+```text
+--language-model-only
+--max-model-len 4096
+--gpu-memory-utilization 0.80
+--enforce-eager
+--reasoning-parser qwen3
+```
+
+Probe model discovery and a deterministic `OK` response from inside the same
+sandbox:
+
+```bash
+delta-cli sandbox run <sandbox-id> \
+  --command "/opt/conda/envs/r3l/bin/python <working-directory>/repo/scripts/delta_probe_qwen35.py" \
+  --timeout 180
+```
+
+The endpoint is not exposed to the host. `LDM_LLM_API_KEY=EMPTY` is only a
+non-secret placeholder required by the local OpenAI-compatible client.
+
+### 6. Gate the full run with one real iteration
+
+Use `tiny_real.yaml` with the same paths and local endpoint that the full run
+will use:
+
+```bash
+delta-cli sandbox run-bg <sandbox-id> \
+  --command "cd <working-directory>/repo && env PYTHONPATH=<working-directory>/repo LDM_LLM_URL=http://127.0.0.1:8000/v1 LDM_LLM_MODEL=Qwen3.5-9B LDM_LLM_API_KEY=EMPTY /opt/conda/bin/python scripts/run_ldm_tts.py config/llm_kv_adaptive_quantization/tiny_real.yaml --set args.upstream-root=<working-directory>/mls-bench --set args.package-dir=<working-directory>/mls-bench/harbor/tasks/mls-bench__llm-kv-adaptive-quantization/environment/_scaffold/transformers-kv-lab --set args.evaluator-python=/opt/conda/bin/python --set args.out-dir=<working-directory>/runs --set args.run-name=local_qwen35_9b_tiny_real" \
+  --timeout 7200 \
+  --wait
+```
+
+Authorize the 20-iteration run only after this job has exit code zero and its
+`status.json`, `budget.json`, and evaluation manifest all report one successful
+real evaluation.
+
+### 7. Launch the locked 20-iteration campaign
+
+The campaign helper performs the dependency preflight, sets the local endpoint
+environment, generates a timestamped run name, invokes the registered task,
+and prints a bounded JSON summary at the end:
+
+```bash
+delta-cli sandbox run-bg <sandbox-id> \
+  --command "/opt/conda/bin/python <working-directory>/repo/scripts/delta_llm_kv_local_campaign.py --repo <working-directory>/repo --upstream-root <working-directory>/mls-bench --package-dir <working-directory>/mls-bench/harbor/tasks/mls-bench__llm-kv-adaptive-quantization/environment/_scaffold/transformers-kv-lab --output-root <working-directory>/runs --evaluator-python /opt/conda/bin/python" \
+  --timeout 21600 \
+  --wait
+```
+
+The effective profile remains `extended_tiny_real_20`: 20 iterations, four
+valid candidates per reservoir, one GP-UCB selection per iteration, one
+HotpotQA example per selected candidate, and exactly 20 benchmark jobs. The
+helper sets proposal timeout to 600 seconds and proposal output to at most 1024
+tokens.
+
+### 8. Monitor durable state, not only the event stream
+
+Keep the campaign `execution_id` from the `run-bg` init frame. Delta logs show
+process health, while task artifacts establish scientific and accounting
+progress:
+
+```bash
+delta-cli sandbox logs <sandbox-id> \
+  --execution-id <campaign-execution-id>
+
+delta-cli sandbox read <sandbox-id> \
+  --path <working-directory>/runs/<run-name>/status.json
+
+delta-cli sandbox read <sandbox-id> \
+  --path <working-directory>/runs/<run-name>/budget.json
+```
+
+Do not submit the campaign again after a client timeout or lost stream. First
+inspect the execution state and durable files; a remote process may still be
+running.
+
+### 9. Pull and validate the completed evidence
+
+After the helper reports `status: completed`, pull the exact run directory:
+
+```bash
+delta-cli sandbox pull <sandbox-id> \
+  --source <working-directory>/runs/<run-name>/ \
+  --target tasks/llm_kv_adaptive_quantization/runs/<run-name>/ \
+  --recursive
+```
+
+The accepted trial-2 run name was
+`local_qwen35_9b_extended_tiny_real_20_20260816_163130`. Acceptance required
+agreement across `status.json`, `budget.json`, `events.jsonl`,
+`selection_record.json`, all 20 evaluation manifests, and the helper's final
+JSON. Exit code zero alone was not sufficient.
+
+The plots were derived from those pulled artifacts, without rerunning the
+campaign:
+
+```bash
+python scripts/plot_llm_kv_campaign.py \
+  --run-dir tasks/llm_kv_adaptive_quantization/runs/local_qwen35_9b_extended_tiny_real_20_20260816_163130 \
+  --output-dir data/generated/llm_kv_quantization_trial2 \
+  --source-label tasks/llm_kv_adaptive_quantization/runs/local_qwen35_9b_extended_tiny_real_20_20260816_163130
+```
+
+When the host lacks Matplotlib, run only this display step in a short CPU
+sandbox, pull the eight generated files, and destroy that sandbox. Do not
+submit another LDM campaign to make the plots.
+
+### 10. Stop the server and destroy the task-owned sandbox
+
+Cancel the long-running vLLM execution, then destroy the exact sandbox created
+for this workflow:
+
+```bash
+delta-cli sandbox cancel <sandbox-id> \
+  --execution-id <server-execution-id>
+
+delta-cli sandbox kill <sandbox-id>
+
+delta-cli sandbox list --sandbox-id <sandbox-id>
+```
+
+Cleanup is complete only when the kill command returns top-level `ok: true`
+and the sandbox is no longer running. A silent or hung kill/finish client is
+not success; reconcile server state and escalate the lifecycle failure instead
+of assuming the resource was released.
 
 ## What the 20 Runs Showed
 
-The campaign completed in roughly 12 minutes from its first to last durable
-event. Proposal latency stayed near five seconds per iteration. The first
-benchmark evaluation took 153.2 seconds because it included model download and
-cache warmup; the median of iterations 2 through 20 was 18.4 seconds.
+The accepted trial-2 campaign completed all 20 iterations in roughly 8 minutes
+23 seconds from `status.json` start to finish. Proposal latency stayed between
+5.02 and 5.95 seconds. The first evaluation took 153.04 seconds because it
+included model download and cache warmup; the median of iterations 2 through
+20 was 5.76 seconds.
 
 Observed ranges were:
 
 | Metric | Minimum | Maximum |
 | --- | ---: | ---: |
-| Selection score | 0.268271636 | 0.4979345 |
-| HotpotQA final score | 9.52381 | 40.0 |
-| Effective KV bits | 2.4375 | 4.75 |
-| FP16 compression ratio | 3.368421 | 6.564103 |
-| Evaluation runtime | 17.450805 s | 153.204105 s |
+| Selection score | 0.266008086 | 0.528205148 |
+| HotpotQA final score | 10.0 | 40.0 |
+| Effective KV bits | 2.054688 | 4.375 |
+| FP16 compression ratio | 3.657143 | 7.787072 |
+| Evaluation runtime | 5.435379 s | 153.035805 s |
 
-The best-so-far line is flat because the first selected candidate remained the
-incumbent. That is still useful operational evidence: the campaign generated,
-encoded, scored, selected, evaluated, and persisted all 20 rounds correctly.
-It is not evidence that 20 one-example measurements provide a statistically
-reliable ranking of quantizers.
+The final iteration produced the best selection objective:
+
+| Field | Value |
+| --- | --- |
+| Candidate | `quantizer-fcaa157c443e` |
+| Bit cap | 2 |
+| Key group size | 16 |
+| Value group size | 64 |
+| Residual length | 128 |
+| Selection score | 0.528205148 |
+| HotpotQA final score | 33.333333 |
+| Effective KV bits | 2.4375 |
+| FP16 KV compression ratio | 6.564103 |
+
+This is useful operational evidence: the campaign generated, encoded, scored,
+selected, evaluated, and persisted all 20 rounds with no failed evaluation and
+no dropped candidate. It is not evidence that 20 one-example measurements
+provide a statistically reliable ranking of quantizers.
 
 The generated plots make the behavior inspectable:
 
-- [Objective progress](./progress.png)
-- [HotpotQA, compression, and runtime diagnostics](./metrics.png)
-- [GP-UCB acquisition trace](./acquisition.png)
+- [Objective progress](../../data/generated/llm_kv_quantization_trial2/progress.png)
+- [HotpotQA, compression, and runtime diagnostics](../../data/generated/llm_kv_quantization_trial2/metrics.png)
+- [GP-UCB acquisition trace](../../data/generated/llm_kv_quantization_trial2/acquisition.png)
+- [Per-iteration data](../../data/generated/llm_kv_quantization_trial2/progress.csv)
+- [Machine-readable summary](../../data/generated/llm_kv_quantization_trial2/summary.json)
 
 PDF versions are stored beside each PNG. The reusable plotting utility is
-[plot_llm_kv_campaign.py](../../../scripts/plot_llm_kv_campaign.py).
+[plot_llm_kv_campaign.py](../../scripts/plot_llm_kv_campaign.py). All outputs
+retain `draft_non_official_not_benchmark_comparable`; the run remains a
+one-example HotpotQA diagnostic rather than an official benchmark.
 
 ## Practical Lessons
 
@@ -514,4 +759,3 @@ the real model and benchmark environments entered the picture.
 - [ ] Generated runs remain under ignored task `runs/` directories.
 - [ ] Pulled campaign artifacts are validated before sandbox destruction.
 - [ ] Non-official results are not presented as official benchmark results.
-
