@@ -15,6 +15,9 @@
   <a href="assets/wechata_group_invitation.jpg" title="Join our WeChat group">
     <img alt="WeChat group" src="https://img.shields.io/badge/WeChat-Join_Group-07C160?style=flat-square&amp;logo=wechat&amp;logoColor=white">
   </a>
+  <a href="https://delta-infra-dashboard-test.yangtzeailab.com/" title="Delta-CLI | Compute">
+    <img alt="Delta-CLI | Compute" src="assets/delta-lab-logo.png" height="28">
+  </a>
 </p>
 
 <p align="center">
