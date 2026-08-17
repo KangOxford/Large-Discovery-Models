@@ -108,6 +108,7 @@ def request_openai_chat(
     timeout_seconds: float,
     max_tokens: int,
     temperature: float,
+    extra_body: Mapping[str, Any] | None = None,
 ) -> str:
     """Return text from one validated OpenAI-compatible chat response."""
 
@@ -119,6 +120,7 @@ def request_openai_chat(
         timeout_seconds=timeout_seconds,
         max_tokens=max_tokens,
         temperature=temperature,
+        extra_body=extra_body,
     )
     try:
         content = result["choices"][0]["message"]["content"]
@@ -201,6 +203,7 @@ def preflight_openai_chat(
     model: str,
     api_key: str,
     timeout_seconds: float = 30.0,
+    extra_body: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Probe authentication, model availability, latency, and response shape."""
 
@@ -211,8 +214,9 @@ def preflight_openai_chat(
         api_key=api_key,
         messages=[{"role": "user", "content": "Reply with exactly OK."}],
         timeout_seconds=timeout_seconds,
-        max_tokens=8,
+        max_tokens=32,
         temperature=0.0,
+        extra_body=extra_body,
     )
     return {
         "status": "ok",
@@ -272,11 +276,17 @@ class OpenAICompatibleProposalClient:
         self.sleep = sleep
 
     def preflight(self) -> dict[str, Any]:
+        preflight_body = {
+            name: value
+            for name, value in self.extra_body.items()
+            if name != "response_format"
+        }
         return preflight_openai_chat(
             url=self.url,
             model=self.model,
             api_key=self.api_key,
             timeout_seconds=min(self.timeout_seconds, 30.0),
+            extra_body=preflight_body,
         )
 
     def propose(self, request: ProposalRequest) -> ProposalResponse:
