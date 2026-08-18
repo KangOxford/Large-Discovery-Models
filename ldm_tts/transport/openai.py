@@ -175,9 +175,14 @@ def request_openai_chat_response(
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             result = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        raise EndpointRequestError(f"HTTP {exc.code} from chat endpoint") from exc
+        detail = _http_error_detail(exc)
+        raise EndpointRequestError(
+            f"HTTP {exc.code} from chat endpoint" + (f": {detail}" if detail else "")
+        ) from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise EndpointRequestError(f"Chat endpoint request failed: {exc}") from exc
+    if not isinstance(result, dict):
+        raise EndpointRequestError("Chat response root is not an object")
     try:
         message = result["choices"][0]["message"]
     except (KeyError, IndexError, TypeError) as exc:
@@ -192,9 +197,21 @@ def request_openai_chat_response(
         isinstance(tool_calls, list) and tool_calls
     ):
         raise EndpointRequestError("Chat response contains neither text nor tool calls")
-    if not isinstance(result, dict):
-        raise EndpointRequestError("Chat response root is not an object")
     return result
+
+
+def _http_error_detail(exc: urllib.error.HTTPError) -> str:
+    """Return a bounded, human-readable body excerpt from an HTTP error."""
+
+    try:
+        raw = exc.read()
+    except Exception:
+        return ""
+    body = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+    body = body.strip()
+    if not body:
+        return ""
+    return body if len(body) <= 500 else body[:500] + "..."
 
 
 def preflight_openai_chat(
@@ -327,7 +344,7 @@ class OpenAICompatibleProposalClient:
                 )
             except EndpointRequestError as exc:
                 last_error = exc
-                if attempt > self.max_retries:
+                if isinstance(exc, EndpointCircuitOpen) or attempt > self.max_retries:
                     break
                 if self.retry_backoff_seconds:
                     self.sleep(self.retry_backoff_seconds * attempt)
