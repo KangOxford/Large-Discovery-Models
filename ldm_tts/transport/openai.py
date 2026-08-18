@@ -108,6 +108,7 @@ def request_openai_chat(
     timeout_seconds: float,
     max_tokens: int,
     temperature: float,
+    extra_body: Mapping[str, Any] | None = None,
 ) -> str:
     """Return text from one validated OpenAI-compatible chat response."""
 
@@ -119,6 +120,7 @@ def request_openai_chat(
         timeout_seconds=timeout_seconds,
         max_tokens=max_tokens,
         temperature=temperature,
+        extra_body=extra_body,
     )
     try:
         content = result["choices"][0]["message"]["content"]
@@ -173,9 +175,14 @@ def request_openai_chat_response(
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             result = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        raise EndpointRequestError(f"HTTP {exc.code} from chat endpoint") from exc
+        detail = _http_error_detail(exc)
+        raise EndpointRequestError(
+            f"HTTP {exc.code} from chat endpoint" + (f": {detail}" if detail else "")
+        ) from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise EndpointRequestError(f"Chat endpoint request failed: {exc}") from exc
+    if not isinstance(result, dict):
+        raise EndpointRequestError("Chat response root is not an object")
     try:
         message = result["choices"][0]["message"]
     except (KeyError, IndexError, TypeError) as exc:
@@ -190,9 +197,21 @@ def request_openai_chat_response(
         isinstance(tool_calls, list) and tool_calls
     ):
         raise EndpointRequestError("Chat response contains neither text nor tool calls")
-    if not isinstance(result, dict):
-        raise EndpointRequestError("Chat response root is not an object")
     return result
+
+
+def _http_error_detail(exc: urllib.error.HTTPError) -> str:
+    """Return a bounded, human-readable body excerpt from an HTTP error."""
+
+    try:
+        raw = exc.read()
+    except Exception:
+        return ""
+    body = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+    body = body.strip()
+    if not body:
+        return ""
+    return body if len(body) <= 500 else body[:500] + "..."
 
 
 def preflight_openai_chat(
@@ -201,6 +220,7 @@ def preflight_openai_chat(
     model: str,
     api_key: str,
     timeout_seconds: float = 30.0,
+    extra_body: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Probe authentication, model availability, latency, and response shape."""
 
@@ -211,8 +231,9 @@ def preflight_openai_chat(
         api_key=api_key,
         messages=[{"role": "user", "content": "Reply with exactly OK."}],
         timeout_seconds=timeout_seconds,
-        max_tokens=8,
+        max_tokens=32,
         temperature=0.0,
+        extra_body=extra_body,
     )
     return {
         "status": "ok",
@@ -272,11 +293,17 @@ class OpenAICompatibleProposalClient:
         self.sleep = sleep
 
     def preflight(self) -> dict[str, Any]:
+        preflight_body = {
+            name: value
+            for name, value in self.extra_body.items()
+            if name != "response_format"
+        }
         return preflight_openai_chat(
             url=self.url,
             model=self.model,
             api_key=self.api_key,
             timeout_seconds=min(self.timeout_seconds, 30.0),
+            extra_body=preflight_body,
         )
 
     def propose(self, request: ProposalRequest) -> ProposalResponse:
@@ -317,7 +344,7 @@ class OpenAICompatibleProposalClient:
                 )
             except EndpointRequestError as exc:
                 last_error = exc
-                if attempt > self.max_retries:
+                if isinstance(exc, EndpointCircuitOpen) or attempt > self.max_retries:
                     break
                 if self.retry_backoff_seconds:
                     self.sleep(self.retry_backoff_seconds * attempt)

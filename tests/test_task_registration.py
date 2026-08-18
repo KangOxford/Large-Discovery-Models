@@ -34,6 +34,31 @@ def test_builtin_tasks_are_discovered_from_manifests() -> None:
         assert definition.dependency_checker
 
 
+def test_builtin_qualification_evidence_avoids_ignored_runtime_directories() -> None:
+    forbidden_parts = {"runs", "ldm_runs", "generated"}
+    for task_id, definition in TASK_DEFINITIONS.items():
+        evidence_path = (
+            Path(__file__).resolve().parents[1]
+            / definition.relative_root
+            / "resources"
+            / "qualification_evidence.json"
+        )
+        if not evidence_path.is_file():
+            continue
+        evidence = load_qualification_evidence(
+            evidence_path,
+            repository_root=Path(__file__).resolve().parents[1],
+            expected_task_id=task_id,
+        )
+        ignored_references = [
+            reference
+            for gate in evidence.gates.values()
+            for reference in gate.evidence
+            if forbidden_parts.intersection(Path(reference).parts)
+        ]
+        assert ignored_references == []
+
+
 def test_builtin_task_layouts_have_no_validation_errors() -> None:
     for definition in TASK_DEFINITIONS.values():
         issues = validate_task_layout(definition)
