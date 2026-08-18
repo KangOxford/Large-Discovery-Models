@@ -43,6 +43,7 @@ results.tsv
 **/ldm_runs/
 **/ldm_docs/
 **/docking_work/
+/rl_runs/
 
 # Task-specific generated data
 /antibody/cache/
