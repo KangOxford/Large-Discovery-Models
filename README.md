@@ -9,7 +9,7 @@
   <a href="https://largediscovery.net/" title="Visit the Large Discovery website"><img alt="Website" src="https://img.shields.io/badge/Website-Project_Page-2563EB?style=flat-square" /></a>
   <img alt="X / Twitter" src="https://img.shields.io/badge/X_%2F_Twitter-Follow-000000?style=flat-square" />
   <a href="assets/wechat_group_invitation.JPG" title="Join our WeChat group"><img alt="WeChat group" src="https://img.shields.io/badge/WeChat-Join_Group-07C160?style=flat-square&amp;logo=wechat&amp;logoColor=white" /></a>
-  <a href="https://delta-infra-dashboard-test.yangtzeailab.com/" title="Delta-CLI | Compute"><img alt="Delta-CLI | Compute" src="assets/delta-cli-badge.png" height="20" /></a>
+  <a href="https://delta-infra-dashboard.yangtzeailab.com/" title="Delta-CLI | Compute"><img alt="Delta-CLI | Compute" src="assets/delta-cli-badge.png" height="20" /></a>
 </p>
 
 <p align="center">
@@ -158,7 +158,7 @@ three original trajectory views from persisted artifacts.
 For a cloud-backed path that does not require configuring GPUs, model servers,
 and scientific evaluators on the local machine, start with the
 [ready-to-run examples](ready2run_examples/README.md). They use
-[Delta-Infra](https://delta-infra-dashboard-test.yangtzeailab.com/) to give
+[Delta-Infra](https://delta-infra-dashboard.yangtzeailab.com/) to give
 local AI agents access to isolated CPU/GPU sandboxes, shared model endpoints,
 and managed scientific tools through `delta-cli`.
 
