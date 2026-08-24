@@ -9,7 +9,7 @@
   <a href="https://largediscovery.net/" title="Visit the Large Discovery website"><img alt="Website" src="https://img.shields.io/badge/Website-Project_Page-2563EB?style=flat-square" /></a>
   <img alt="X / Twitter" src="https://img.shields.io/badge/X_%2F_Twitter-Follow-000000?style=flat-square" />
   <a href="assets/wechat_group_invitation.JPG" title="Join our WeChat group"><img alt="WeChat group" src="https://img.shields.io/badge/WeChat-Join_Group-07C160?style=flat-square&amp;logo=wechat&amp;logoColor=white" /></a>
-  <a href="https://delta-infra-dashboard-test.yangtzeailab.com/" title="Delta-CLI | Compute"><img alt="Delta-CLI | Compute" src="assets/delta-cli-badge.png" height="20" /></a>
+  <a href="https://delta-infra-dashboard.yangtzeailab.com/" title="Delta-CLI | Compute"><img alt="Delta-CLI | Compute" src="assets/delta-cli-badge.png" height="20" /></a>
 </p>
 
 <p align="center">
@@ -158,7 +158,7 @@ three original trajectory views from persisted artifacts.
 For a cloud-backed path that does not require configuring GPUs, model servers,
 and scientific evaluators on the local machine, start with the
 [ready-to-run examples](ready2run_examples/README.md). They use
-[Delta-Infra](https://delta-infra-dashboard-test.yangtzeailab.com/) to give
+[Delta-Infra](https://delta-infra-dashboard.yangtzeailab.com/) to give
 local AI agents access to isolated CPU/GPU sandboxes, shared model endpoints,
 and managed scientific tools through `delta-cli`.
 
@@ -510,10 +510,12 @@ parsing, trajectory metadata, and common tests in one place. Task adapters keep
 domain-specific dependencies such as training data, Vina, ReaSyn, and Absolut
 behind task boundaries.
 
-### LDM Engine
+### LDM Campaign Algorithm
 
-`ldm_tts.engine.LDMEngine` is the task-neutral runtime counterpart to
-`LDMTaskSpec`. It executes the lifecycle declared by the task contract:
+`ldm_tts.campaign.run_campaign` is the deep task-neutral interface for an
+experiment. A caller supplies one `CampaignRecipe` containing only the
+scientific adapters and one `CampaignBudget`; the shared implementation uses
+`LDMEngine` internally to execute the lifecycle declared by `LDMTaskSpec`:
 
 ```text
 reservoir expansion
@@ -524,9 +526,10 @@ reservoir expansion
   -> durable campaign checkpoint
 ```
 
-The engine owns lifecycle policy, budget enforcement, failure classification,
-event recording, checkpoints, and summaries. A task supplies adapters at the
-scientific seams:
+The campaign algorithm owns runtime creation, exact partial batches,
+successful-result targets, failed-evaluation replacement, lifecycle policy,
+budget enforcement, failure classification, event recording, checkpoints,
+resume, and summaries. A task supplies adapters at the scientific seams:
 
 | Interface | Task-owned responsibility | Shared implementation |
 | --- | --- | --- |
@@ -538,9 +541,13 @@ scientific seams:
 
 `CampaignRuntime` writes a common `campaign.json`, `budget.json`, `status.json`,
 `events.jsonl`, `checkpoint.json`, `ldm_task_spec.json`, and `summary.json`
-contract. New task scaffolds execute their deterministic mock through this
-engine. Existing workflows remain supported and can migrate adapter by adapter
-without changing their registered task IDs or historical artifacts.
+contract. Every built-in task — `nanogpt`, `small_molecule`, `antibody`,
+`llm_kv_adaptive_quantization`, `causal_discovery_discrete`, and
+`ai4bio_mutation_effect_prediction` — calls the shared campaign interface and
+delegates lifecycle ownership to it; the tasks keep exporting their historical
+trajectory files (for example `small_molecule`'s `history.json`/`rounds.jsonl`
+and `antibody`'s `results.csv`/`llm_acq_decisions.jsonl`) from engine events so
+downstream tooling keeps working.
 
 The declarative and behavioral layers deliberately stay separate:
 `ReservoirExpansionSpec` describes what a task permits, while a
