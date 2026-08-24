@@ -58,6 +58,11 @@ class EnvConfig:
     reservoir_size: int = 1
     evaluations_per_round: int = 1
     max_empty_reservoir_rounds: int = 3
+    target_observations: int | None = None
+    target_successful_evaluations: int | None = None
+    max_evaluation_attempts: int | None = None
+    max_evaluation_attempts_per_round: int | None = None
+    replace_failed_evaluations: bool = False
     reward: str = "improvement"
     reward_failure: float = 0.0
     reward_invalid: float = 0.0
@@ -71,6 +76,35 @@ class EnvConfig:
             raise ValueError("env evaluations_per_round must be positive")
         if self.max_empty_reservoir_rounds < 1:
             raise ValueError("env max_empty_reservoir_rounds must be positive")
+        if self.target_observations is not None and self.target_observations < 0:
+            raise ValueError("env target_observations must be non-negative")
+        if (
+            self.target_successful_evaluations is not None
+            and self.target_successful_evaluations < 0
+        ):
+            raise ValueError(
+                "env target_successful_evaluations must be non-negative"
+            )
+        if (
+            self.target_observations is not None
+            and self.target_successful_evaluations is not None
+        ):
+            raise ValueError(
+                "env must target observations or successful evaluations, not both"
+            )
+        if self.max_evaluation_attempts is not None and self.max_evaluation_attempts < 0:
+            raise ValueError("env max_evaluation_attempts must be non-negative")
+        if (
+            self.max_evaluation_attempts_per_round is not None
+            and self.max_evaluation_attempts_per_round < 1
+        ):
+            raise ValueError(
+                "env max_evaluation_attempts_per_round must be positive"
+            )
+        if self.replace_failed_evaluations and self.target_successful_evaluations is None:
+            raise ValueError(
+                "env replace_failed_evaluations requires target_successful_evaluations"
+            )
         if self.reward not in REWARD_POLICIES:
             raise ValueError(
                 f"unknown reward policy {self.reward!r}; expected one of {REWARD_POLICIES}"
@@ -234,69 +268,163 @@ class LDMEnv:
         if self._done:
             raise RuntimeError("step() called after the episode finished")
 
+    # ------------------------------------------------------- budget semantics
+    #
+    # These mirror ldm_tts.engine.runtime's budget helpers so an RL episode
+    # stops and counts evaluations the same way a campaign does. The only
+    # structural difference is that the env has no CampaignRuntime ledger:
+    # ``max_evaluation_attempts`` consumption is derived from the observation
+    # count (one observation per evaluation attempt, success or failure).
+
+    def _successful_evaluation_count(self) -> int:
+        return sum(item.evaluation.succeeded for item in self._state.observations)
+
+    def _completion_reason(self) -> str | None:
+        if (
+            self.config.target_observations is not None
+            and len(self._state.observations) >= self.config.target_observations
+        ):
+            return "observation_target"
+        if (
+            self.config.target_successful_evaluations is not None
+            and self._successful_evaluation_count()
+            >= self.config.target_successful_evaluations
+        ):
+            return "successful_evaluation_target"
+        return None
+
+    def _desired_round_results(self) -> int:
+        if self.config.target_observations is not None:
+            remaining = max(
+                0, self.config.target_observations - len(self._state.observations)
+            )
+            return min(self.config.evaluations_per_round, remaining)
+        if self.config.target_successful_evaluations is not None:
+            remaining = max(
+                0,
+                self.config.target_successful_evaluations
+                - self._successful_evaluation_count(),
+            )
+            return min(self.config.evaluations_per_round, remaining)
+        return self.config.evaluations_per_round
+
+    def _remaining_evaluation_attempts(self) -> int | None:
+        if self.config.max_evaluation_attempts is None:
+            return None
+        return max(0, self.config.max_evaluation_attempts - len(self._state.observations))
+
     # ------------------------------------------------------------------ step
 
     def step(self, action_text: str) -> EnvStep:
-        """Execute one engine round driven by the policy action text."""
+        """Execute one engine round driven by the policy action text.
+
+        Mirrors ``LDMEngine.run``'s per-round flow: loop-top completion and
+        attempt-budget guards, reservoir build, target-aware selection count,
+        failed-evaluation replacement, and a post-round completion check.
+        """
 
         self._check_done()
         round_idx = self._state.next_round
         remaining = self.config.iterations - round_idx - 1
         baseline = self._componentwise_best(self._state.observations)
         terminated = False
-
-        try:
-            payloads = self._parse_action(action_text)
-            parse_error: str | None = None
-        except Exception as exc:  # noqa: BLE001 - parser errors are env feedback
-            payloads = []
-            parse_error = str(exc)
-
-        proposals = tuple(
-            RawProposal(
-                payload,
-                source="policy",
-                metadata={"round_idx": round_idx, "policy": True},
-            )
-            for payload in payloads
-        )
-        reservoir_limit = self.config.reservoir_size
-        if self.task_spec.reservoir.max_size is not None:
-            reservoir_limit = min(reservoir_limit, self.task_spec.reservoir.max_size)
-        build = self._builder.build(
-            proposals,
-            evaluated_keys=(
-                item.canonical_key for item in self._state.observations
-            ),
-            max_size=reservoir_limit,
-            metadata={"round_idx": round_idx},
-        )
-
+        stop_reason = ""
+        remaining_attempts: int | None = None
+        parse_error: str | None = None
+        payloads: list[Any] = []
+        rejections: list[Any] = []
         new_observations: list[Observation] = []
         selection: BOSelectionResult | None = None
-        if build.candidates:
-            self._state.empty_reservoir_rounds = 0
-            selection = self._select(build.candidates, self.config.evaluations_per_round)
-            selected = self._resolve_selection(build.candidates, selection)
-            for candidate in selected[: self.config.evaluations_per_round]:
-                evaluation = self._evaluate(candidate)
-                representation = (
-                    self.surrogate_encoder.encode(candidate)
-                    if self.surrogate_encoder is not None and evaluation.succeeded
-                    else None
-                )
-                observation = Observation(
-                    candidate=candidate,
-                    evaluation=evaluation,
-                    surrogate=representation,
-                    round_idx=round_idx,
-                )
-                self._state.observations.append(observation)
-                new_observations.append(observation)
+
+        completed = self._completion_reason()
+        if completed is not None:
+            terminated = True
+            stop_reason = completed
         else:
-            self._state.empty_reservoir_rounds += 1
-            if self._state.empty_reservoir_rounds >= self.config.max_empty_reservoir_rounds:
+            remaining_attempts = self._remaining_evaluation_attempts()
+            if remaining_attempts == 0:
                 terminated = True
+                stop_reason = "evaluation_attempt_budget"
+
+        if not terminated:
+            try:
+                payloads = self._parse_action(action_text)
+            except Exception as exc:  # noqa: BLE001 - parser errors are env feedback
+                payloads = []
+                parse_error = str(exc)
+
+            proposals = tuple(
+                RawProposal(
+                    payload,
+                    source="policy",
+                    metadata={"round_idx": round_idx, "policy": True},
+                )
+                for payload in payloads
+            )
+            reservoir_limit = self.config.reservoir_size
+            if self.task_spec.reservoir.max_size is not None:
+                reservoir_limit = min(reservoir_limit, self.task_spec.reservoir.max_size)
+            build = self._builder.build(
+                proposals,
+                evaluated_keys=(
+                    item.canonical_key for item in self._state.observations
+                ),
+                max_size=reservoir_limit,
+                metadata={"round_idx": round_idx},
+            )
+            rejections = build.rejections
+
+            if build.candidates:
+                self._state.empty_reservoir_rounds = 0
+                desired = self._desired_round_results()
+                selection_count = desired
+                if self.config.replace_failed_evaluations:
+                    selection_count = (
+                        self.config.max_evaluation_attempts_per_round
+                        or len(build.candidates)
+                    )
+                selection_count = min(selection_count, len(build.candidates))
+                if remaining_attempts is not None:
+                    selection_count = min(selection_count, remaining_attempts)
+                selection = self._select(build.candidates, selection_count)
+                selected = self._resolve_selection(build.candidates, selection)
+                round_observations = 0
+                round_successes = 0
+                for candidate in selected:
+                    if self.config.target_successful_evaluations is not None:
+                        if round_successes >= desired:
+                            break
+                    elif round_observations >= desired:
+                        break
+                    evaluation = self._evaluate(candidate)
+                    representation = (
+                        self.surrogate_encoder.encode(candidate)
+                        if self.surrogate_encoder is not None and evaluation.succeeded
+                        else None
+                    )
+                    observation = Observation(
+                        candidate=candidate,
+                        evaluation=evaluation,
+                        surrogate=representation,
+                        round_idx=round_idx,
+                    )
+                    self._state.observations.append(observation)
+                    new_observations.append(observation)
+                    round_observations += 1
+                    if evaluation.succeeded:
+                        round_successes += 1
+                completed = self._completion_reason()
+                if completed is not None:
+                    terminated = True
+                    stop_reason = completed
+            else:
+                self._state.empty_reservoir_rounds += 1
+                if (
+                    self._state.empty_reservoir_rounds
+                    >= self.config.max_empty_reservoir_rounds
+                ):
+                    terminated = True
+                    stop_reason = "empty_reservoir_limit"
 
         reward, reward_components = self._reward(
             new_observations, parse_error, baseline, selection
@@ -307,6 +435,8 @@ class LDMEnv:
 
         self._state.next_round = round_idx + 1
         truncated = not terminated and self._state.next_round >= self.config.iterations
+        if truncated:
+            stop_reason = "iteration_budget"
         self._done = terminated or truncated
 
         observation = render_step_observation(
@@ -314,7 +444,7 @@ class LDMEnv:
             remaining_rounds=max(0, remaining),
             parse_error=parse_error,
             proposals_count=len(payloads),
-            rejections=build.rejections,
+            rejections=rejections,
             evaluations=new_observations,
             incumbent=incumbent_after,
         )
@@ -324,7 +454,7 @@ class LDMEnv:
                 "round_idx": round_idx,
                 "parse_error": parse_error,
                 "proposal_count": len(payloads),
-                "rejections": [item.to_dict() for item in build.rejections],
+                "rejections": [item.to_dict() for item in rejections],
                 "evaluated": [item.to_dict() for item in new_observations],
                 "incumbent": None if incumbent_after is None else incumbent_after.to_dict(),
                 "selection": None if selection is None else selection.to_dict(),
@@ -334,6 +464,7 @@ class LDMEnv:
                 "empty_reservoir_rounds": self._state.empty_reservoir_rounds,
                 "terminated": terminated,
                 "truncated": truncated,
+                "stop_reason": stop_reason,
             }
         )
         return EnvStep(
@@ -529,11 +660,12 @@ class LDMEnv:
             observation = step.observation
             if step.done:
                 break
-        stop_reason = (
-            "empty_reservoir_limit"
-            if steps and steps[-1].terminated
-            else "iteration_budget"
-        )
+        if steps and steps[-1].info.get("stop_reason"):
+            stop_reason = str(steps[-1].info["stop_reason"])
+        elif steps and steps[-1].terminated:
+            stop_reason = "empty_reservoir_limit"
+        else:
+            stop_reason = "iteration_budget"
         incumbent = self.objectives.incumbent(self._state.observations) if len(
             self.objectives.specs
         ) == 1 else None

@@ -38,17 +38,35 @@ def _load_generate_state(args: Any) -> Any:
 
 
 def _apply_chat_template(state: Any, text: str) -> str:
-    """Wrap the rendered prompt in the tokenizer chat template when possible."""
+    """Wrap the rendered prompt in the tokenizer chat template when possible.
+
+    Reasoning-capable checkpoints (e.g. Qwen3.5) emit a ``<think>...</think>``
+    block by default, which consumes the rollout response budget and yields
+    ``length``-truncated turns before any candidate is produced. Disable
+    thinking via the ``enable_thinking`` template kwarg, mirroring
+    ``scripts/llm_server.py``; tokenizers without that kwarg fall back to the
+    plain template.
+    """
 
     tokenizer = getattr(state, "tokenizer", None)
     if tokenizer is None or not hasattr(tokenizer, "apply_chat_template"):
         return text
-    try:
-        templated = tokenizer.apply_chat_template(
+
+    def _render(**kwargs: Any) -> str:
+        return tokenizer.apply_chat_template(
             [{"role": "user", "content": text}],
             add_generation_prompt=True,
             tokenize=False,
+            **kwargs,
         )
+
+    try:
+        templated = _render(enable_thinking=False)
+    except TypeError:
+        try:
+            templated = _render()
+        except Exception:  # noqa: BLE001 - fall back to the untemplated prompt
+            return text
     except Exception:  # noqa: BLE001 - fall back to the untemplated prompt
         return text
     return templated if isinstance(templated, str) and templated.strip() else text
@@ -68,8 +86,8 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
             mode=spec.mode,
             config=spec.to_env_config(),
             context=spec.context,
-            reservoir_size=spec.reservoir_size,
-            evaluations_per_round=spec.evaluations_per_round,
+            seed=spec.seed,
+            **spec.real,
         )
     except Exception as exc:  # noqa: BLE001 - rollout must not crash the pool
         sample.status = Sample.Status.FAILED
@@ -157,6 +175,11 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
                 response += step.observation
                 response_token_ids += obs_token_ids
                 loss_mask += [0] * len(obs_token_ids)
+                # Environment feedback tokens are non-trainable; pad the
+                # rollout log-probs with zeros so their length stays aligned
+                # with response_length (the actor slices log_probs ==
+                # response_length during training).
+                rollout_log_probs += [0.0] * len(obs_token_ids)
                 sample.append_response_tokens(
                     args, tokens=obs_token_ids, trainable=False
                 )

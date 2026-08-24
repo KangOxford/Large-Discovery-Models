@@ -44,7 +44,23 @@ class FakeSample:
         text=None,
         update_terminal_info=True,
     ):
+        # Mirrors slime.utils.types.Sample.append_response_tokens so that
+        # contract bugs in bridge.generate surface here (e.g. non-trainable
+        # env feedback tokens must pad rollout_log_probs with zeros so its
+        # length stays aligned with response_length).
         tokens = [int(t) for t in tokens]
+        if log_probs is not None and len(log_probs) != len(tokens):
+            raise ValueError(
+                f"log_probs length {len(log_probs)} != tokens length {len(tokens)}"
+            )
+        if tokens and trainable and log_probs is None:
+            raise ValueError("trainable response tokens require rollout log probabilities.")
+        if tokens and not trainable:
+            if log_probs is not None:
+                raise ValueError(
+                    "non-trainable response tokens should not pass rollout log probabilities."
+                )
+            log_probs = [0.0] * len(tokens)
         if text is not None:
             self.response += text
         previous = self.response_length
@@ -135,6 +151,28 @@ def test_generate_runs_full_episode(fake_slime) -> None:
     assert any(mask == 0 for mask in out.loss_mask)
     assert any(mask == 1 for mask in out.loss_mask)
     assert out.rollout_log_probs is not None
+
+
+def test_rollout_log_probs_align_with_response(fake_slime) -> None:
+    """Regression guard for the multi-turn log-prob contract.
+
+    Each env feedback turn appends non-trainable tokens; their log-probs are
+    zeros, so ``len(rollout_log_probs)`` must equal ``response_length`` after a
+    full episode. A previous bridge bug dropped the env-turn zeros (only policy
+    tokens were recorded), which broke the Megatron actor's
+    ``log_prob length == response_length`` assertion during training.
+    """
+
+    sample = FakeSample(prompt=_ai4bio_episode(iterations=3))
+    out = asyncio.run(bridge.generate(_args(), sample, {"max_new_tokens": 512}))
+    assert out.response_length > 0
+    assert out.rollout_log_probs is not None
+    assert len(out.rollout_log_probs) == out.response_length
+    assert len(out.loss_mask) == out.response_length
+    # Every non-trainable (loss-mask 0) position has a zero log-prob.
+    for mask, log_prob in zip(out.loss_mask, out.rollout_log_probs):
+        if mask == 0:
+            assert log_prob == 0.0
 
 
 def test_reward_func_reads_filled_reward(fake_slime) -> None:

@@ -44,8 +44,14 @@ class EpisodeSpec:
     reward_failure: float = 0.0
     reward_invalid: float = 0.0
     max_empty_reservoir_rounds: int = 3
+    target_observations: int | None = None
+    target_successful_evaluations: int | None = None
+    max_evaluation_attempts: int | None = None
+    max_evaluation_attempts_per_round: int | None = None
+    replace_failed_evaluations: bool = False
     seed: int = 0
     context: dict[str, Any] = field(default_factory=dict)
+    real: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.task.strip():
@@ -56,11 +62,18 @@ class EpisodeSpec:
             raise ValueError(
                 f"unknown reward policy {self.reward!r}; expected one of {REWARD_POLICIES}"
             )
+        if self.mode == "mock" and self.real:
+            raise ValueError("mock episode must not carry real-evaluation kwargs")
         EnvConfig(  # validate shared bounds eagerly
             iterations=self.iterations,
             reservoir_size=self.reservoir_size,
             evaluations_per_round=self.evaluations_per_round,
             max_empty_reservoir_rounds=self.max_empty_reservoir_rounds,
+            target_observations=self.target_observations,
+            target_successful_evaluations=self.target_successful_evaluations,
+            max_evaluation_attempts=self.max_evaluation_attempts,
+            max_evaluation_attempts_per_round=self.max_evaluation_attempts_per_round,
+            replace_failed_evaluations=self.replace_failed_evaluations,
             reward=self.reward,
             reward_failure=self.reward_failure,
             reward_invalid=self.reward_invalid,
@@ -78,6 +91,11 @@ class EpisodeSpec:
             reservoir_size=self.reservoir_size,
             evaluations_per_round=self.evaluations_per_round,
             max_empty_reservoir_rounds=self.max_empty_reservoir_rounds,
+            target_observations=self.target_observations,
+            target_successful_evaluations=self.target_successful_evaluations,
+            max_evaluation_attempts=self.max_evaluation_attempts,
+            max_evaluation_attempts_per_round=self.max_evaluation_attempts_per_round,
+            replace_failed_evaluations=self.replace_failed_evaluations,
             reward=self.reward,
             reward_failure=self.reward_failure,
             reward_invalid=self.reward_invalid,
@@ -95,8 +113,14 @@ class EpisodeSpec:
             "reward_failure",
             "reward_invalid",
             "max_empty_reservoir_rounds",
+            "target_observations",
+            "target_successful_evaluations",
+            "max_evaluation_attempts",
+            "max_evaluation_attempts_per_round",
+            "replace_failed_evaluations",
             "seed",
             "context",
+            "real",
         }
         if unknown:
             raise ValueError("unknown episode field(s): " + ", ".join(sorted(unknown)))
@@ -136,9 +160,27 @@ def main(argv: list[str] | None = None) -> int:
         "--reward", choices=REWARD_POLICIES, default="improvement"
     )
     parser.add_argument("--seed-offset", type=int, default=0)
+    parser.add_argument(
+        "--real-kwargs",
+        default="",
+        help=(
+            "JSON object of task-specific real-evaluation kwargs for --mode real "
+            "(e.g. '{\"upstream_root\": \"/data/upstream\", \"data_dir\": \"/data\"}')."
+        ),
+    )
     args = parser.parse_args(argv)
     if args.count < 1:
         parser.error("--count must be positive")
+
+    real_kwargs: dict[str, Any] = {}
+    if args.real_kwargs.strip():
+        try:
+            parsed = json.loads(args.real_kwargs)
+        except json.JSONDecodeError as exc:
+            parser.error(f"--real-kwargs is not valid JSON: {exc}")
+        if not isinstance(parsed, dict):
+            parser.error("--real-kwargs must decode to a JSON object")
+        real_kwargs = dict(parsed)
 
     rows = make_prompt_rows(
         [
@@ -150,6 +192,7 @@ def main(argv: list[str] | None = None) -> int:
                 evaluations_per_round=args.evaluations_per_round,
                 reward=args.reward,
                 seed=args.seed_offset + index,
+                real=real_kwargs,
             )
             for index in range(args.count)
         ]
