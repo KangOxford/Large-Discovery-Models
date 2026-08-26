@@ -21,11 +21,12 @@ from typing import Any
 
 
 def build_rl_components(mode: str = "mock", **kwargs: Any) -> Any:
+    if mode == "real":
+        from tasks.small_molecule.core.rl_real import build_real_components
+
+        return build_real_components(**kwargs)
     if mode != "mock":
-        raise ValueError(
-            "small_molecule RL factory supports mock mode only; real mode needs "
-            "the vina binary plus the torch/gpytorch/gauche/rdkit runtime."
-        )
+        raise ValueError("small_molecule RL factory supports mock and real modes only.")
 
     import hashlib
 

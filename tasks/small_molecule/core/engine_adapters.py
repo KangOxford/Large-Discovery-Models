@@ -41,6 +41,7 @@ from ldm_tts.contracts import (
 from ldm_tts.engine.expansion import ExpansionRequest, ExpansionResult
 from ldm_tts.optimization.records import (
     BOObservation,
+    BOPrediction,
     BOSelectionResult,
     SurrogateVector,
 )
@@ -359,8 +360,17 @@ class TiltedAcquisitionSelector:
         needed = min(int(count), len(records))
         indices = gumbel_top_k(prob, needed, self.rng) if needed > 0 else []
         selected_ids = tuple(candidates[index].candidate_id for index in indices)
+        predictions = tuple(
+            BOPrediction(
+                candidate_id=candidate.candidate_id,
+                acquisition_score=(float(ehvi[i]) if np.isfinite(ehvi[i]) else None),
+                metadata={"ehvi": (float(ehvi[i]) if np.isfinite(ehvi[i]) else None)},
+            )
+            for i, candidate in enumerate(candidates)
+        )
         return BOSelectionResult(
             selected_candidate_ids=selected_ids,
+            predictions=predictions,
             fallback_reason=ehvi_result.fallback_reason,
             metadata={
                 "selection_mode": "ehvi_sir",

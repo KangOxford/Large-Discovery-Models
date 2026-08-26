@@ -81,14 +81,23 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
 
     try:
         spec = EpisodeSpec.from_json(str(sample.prompt))
-        env = build_env(
-            spec.task,
-            mode=spec.mode,
-            config=spec.to_env_config(),
-            context=spec.context,
-            seed=spec.seed,
-            **spec.real,
-        )
+        if spec.mode == "real":
+            from ldm_rl.remote_env import RemoteLDMEnv
+
+            task_python = str(
+                spec.real.get("task_python")
+                or "/mnt/data0/ys/LDM/tasks/small_molecule/.venv/bin/python"
+            )
+            env = RemoteLDMEnv(spec, task_python)
+        else:
+            env = build_env(
+                spec.task,
+                mode=spec.mode,
+                config=spec.to_env_config(),
+                context=spec.context,
+                seed=spec.seed,
+                **spec.real,
+            )
     except Exception as exc:  # noqa: BLE001 - rollout must not crash the pool
         sample.status = Sample.Status.FAILED
         sample.reward = 0.0
@@ -206,6 +215,9 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
         sample.metadata["env_terminated"] = last_step.terminated
         sample.metadata["env_truncated"] = last_step.truncated
         sample.metadata["env_incumbent"] = last_step.info.get("incumbent")
+    _close = getattr(env, "close", None)
+    if _close is not None:
+        _close()
     return sample
 
 

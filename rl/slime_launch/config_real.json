@@ -1,0 +1,43 @@
+{
+  "task": "small_molecule",
+  "mode": "real",
+  "gp_history_file": "/mnt/data0/ys/LDM/rl/sm_rl_gp_history.jsonl",
+  "warmup": {
+    "enabled": true,
+    "num_samples": 60,
+    "iterations": 1
+  },
+  "episodes": {
+    "count": 16,
+    "iterations": 20,
+    "reservoir_size": 2,
+    "evaluations_per_round": 1,
+    "reward": "acquisition"
+  },
+  "training": {
+    "num_rollout": 50,
+    "rollout_batch_size": 2,
+    "n_samples_per_prompt": 2,
+    "global_batch_size": 2,
+    "rollout_max_response_len": 8192,
+    "max_tokens_per_gpu": 8192,
+    "rollout_temperature": 0.8,
+    "lr": 1e-6,
+    "save_interval": 10
+  },
+  "real_kwargs": {
+    "vina_bin": "/mnt/data0/dock-project/bin/vina",
+    "nn_model_path": "/mnt/data0/ys/LDM/tasks/small_molecule/resources/models/best_g12d_model.joblib",
+    "vina_pdb_id": "8UN5",
+    "vina_chain_id": "A",
+    "method": "m1_stratified_direct_llm_sir",
+    "kernel": "sk",
+    "acq": "ehvi",
+    "acq_weights": "0.5,0.5",
+    "gp_device": "cpu",
+    "vina_exhaustiveness": 1,
+    "vina_n_poses": 1,
+    "vina_max_workers": 1,
+    "output_dir": "/tmp/sm_rl_real_run"
+  }
+}
