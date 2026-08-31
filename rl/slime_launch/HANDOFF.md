@@ -115,5 +115,5 @@ srun bash $LDM/rl/slime_launch/run_train_real_9b.sh
 - **TE / backward**:aarch64 上 TE 是 ABI 最敏感的一环;装完先按 §6 P0 用 1.5B 冒烟确认 backward 不 SIGSEGV,再上 9B。
 - **9B 是 hybrid**(线性注意力+MTP):转换/训练用 `qwen3.5-9B.sh` 的 spec(脚本已 source);先用 real 极小 count 冒烟。
 - **显存**:9B + TP2/4 + sglang 于 96GB/卡,宽裕;OOM 就升 TP 或降 `max_tokens_per_gpu`(recompute-full 已开)。
-- **docking 吞吐**:同步、`vina_max_workers=1` 会堵 rollout;`config_real.json` 里调大 workers + 开缓存。
+- **docking 吞吐**:`config_real.json` 已把 `vina_max_workers=32`(vina 纯 CPU;GH200 每节点 288 ARM 核,可并行大批 docking,按核数继续调大);配合 canonical-SMILES 缓存进一步降开销。vina 二进制记得用 **aarch64** 版(§2B)。
 - **代码架构无关**:`ldm_rl` + reward 是纯 Python,已验证(zsgpu 上 53 测试通过);移植只在底层运行时。

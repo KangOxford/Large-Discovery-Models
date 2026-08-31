@@ -37,7 +37,7 @@
     "gp_device": "cpu",
     "vina_exhaustiveness": 1,
     "vina_n_poses": 1,
-    "vina_max_workers": 1,
+    "vina_max_workers": 32,
     "output_dir": "/tmp/sm_rl_real_run"
   }
 }
