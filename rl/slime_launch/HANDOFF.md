@@ -18,11 +18,14 @@ cd rl/megatron-lm && git checkout 1dcf0dafa884ad52ffb243625717a3471643e087 && cd
 ```
 
 ### A2. 环境镜像（三选一，优先第 1）
-1. **能访问镜像仓库** → 直接拉：
+> `image.yangtzeailab.com` 是**私有 Harbor**(不能匿名 pull),需先登录。
+1. **拿到 Harbor 凭据(推荐:pull-only robot token)** → 登录后拉：
    ```bash
+   docker login image.yangtzeailab.com -u <robot名> -p <robot-token>
    docker pull image.yangtzeailab.com/opensandbox/ldm-slime-rl:latest
    ```
-2. **拿到镜像 tar** → 导入：`gunzip -c ldm-slime-rl.tar.gz | docker load`
+2. **没凭据但拿到镜像 tar** → 导入(有权限方 `docker save ... | gzip` 导出,约十几~几十 G)：
+   `gunzip -c ldm-slime-rl.tar.gz | docker load`
 3. **都不行** → 用 `rl/slime/build_conda.sh` 重建（torch 2.11 + TE 2.16.1 + 匹配 megatron/sglang commit），再按 `rl/SLIME_TRAINING.md` 打 6 个 patch。**最容易踩坑，尽量避免。**
 
 镜像里已备：conda env `/root/micromamba/envs/slime`、Megatron `/root/megatron-lm`、torch 2.11+cu129、匹配 TE、rdkit/meeko（docking 用）。
