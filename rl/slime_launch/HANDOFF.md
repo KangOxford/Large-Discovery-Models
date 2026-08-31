@@ -7,7 +7,11 @@
 
 ## A. 装环境（最关键，别跳）
 
-> ⚠️ 必须是**配平的 torch 2.11 + 匹配 TE** 栈，否则 GRPO backward 会 SIGSEGV。**强烈建议直接用我们的 Docker 镜像**，不要自己从头 pip 装。
+> ⚠️ 必须是**配平的 torch + 匹配 TE** 栈，否则 GRPO backward 会 SIGSEGV。
+>
+> **先看你的机器架构(`uname -m`)：**
+> - **x86_64** → 用我们的 Docker 镜像(本节 A2),最省事。
+> - **aarch64 / ARM(如 GH200 集群)** → Docker 镜像(x86)**用不了**,走 **§G 的 ARM 移植**。
 
 ### A1. 代码
 ```bash
@@ -106,3 +110,47 @@ bash run_warmup_real_slime.sh
 - **9B 是 hybrid**（线性注意力+MTP）：转换/训练用 `qwen3.5-9B.sh` 的 spec（脚本已 source）；先 mock 冒烟。
 - **显存**：9B+TP=2+sglang 于 4×80G；OOM 就升 TP 或降 `max_tokens_per_gpu`（recompute-full 已开）。
 - **docking 吞吐**：同步、`vina_max_workers=1` 会堵 rollout；`config_real.json` 里调大 workers + 开缓存。
+
+---
+
+## G. 在 GH200 (aarch64) 集群上跑 —— ARM 移植
+
+目标集群是 **NVIDIA GH200 Grace Hopper（aarch64/ARM）**，Slurm 调度。硬件很强、且没有 delta 那种"实例几分钟就被回收"的问题，**适合长时训练**；代价是**整套 x86 运行时都得换成 aarch64**。
+
+### G1. 集群速览
+| 项 | 值 |
+|---|---|
+| 规模 | 1,320 节点 / 5,280× GH200 |
+| 单节点 | 4× GH200（每个 = Grace CPU + Hopper H100，**GPU 96GB**），节点内 NVLink |
+| 调度 | Slurm，分区 `workq`，`MaxTime=UNLIMITED`（默认 4h，可申请更长） |
+| 驱动 / CUDA | **565.57.01 / CUDA 12.7**，compute capability 9.0 |
+| 已有环境 | `~/envs/ldm-venv`（LDM 共享层）、`~/envs/ldm-nanogpt`（torch 2.9.1+cu128） |
+
+### G2. 为什么不能直接用本仓库的 x86 资产
+- **`ldm-slime-rl` Docker 镜像是 x86** → GH200 跑不了(先 `docker manifest inspect` 确认它不是 multi-arch;基本是单 x86)。
+- **`vina` 二进制是 x86 ELF** → 要重编 **aarch64 版**(AutoDock Vina 支持 ARM 源码编译,或用 conda-forge 的 aarch64 包)。
+- **blessed torch 2.11 + TE 2.16.1 是 x86** → 换 **aarch64 + CUDA 12.7** 版,ABI 配平要在 ARM 上重做一遍。
+
+### G3. ⚠️ CUDA 版本红线
+驱动 565 = CUDA 12.7：**torch 轮子必须是 `+cu128` 或 `+cu129`**；**`+cu130` 装上去 `torch.cuda.is_available()` 直接 False**（PyPI 默认 torch 已切 CUDA 13，装前先看 `+cuXXX` 后缀）。
+
+### G4. 推荐移植路径
+**用 NVIDIA NGC 的 aarch64 PyTorch 容器当底座**（apptainer/enroot/pyxis 拉），它就是给 GH200 编的、torch+TE 已配平，直接躲开 ABI 地狱：
+1. 拉 NGC PyTorch(aarch64，CUDA≤12.7 对应 tag)容器。
+2. 在里面装 **slime + megatron-lm(checkout `1dcf0dafa…`) + sglang**(RL 特有、ARM 上要重装验证的部分)。
+3. **验 GRPO backward**（ARM 上重新确认不 SIGSEGV）——先用 1.5B mock 冒烟(HANDOFF §E P0/P1)。
+4. 编/装 **aarch64 vina**，`config_real.json` 的 `vina_bin` 指向它。
+5. 模型/数据同 §B–§C（模型从 HF 下,与架构无关）。
+
+### G5. Slurm 提交（示例）
+把 `run_train_real_9b.sh` 包进 sbatch;一个节点 4× GH200 → **TP 最多 4**(注意脚本里 `CUDA_VISIBLE_DEVICES` / `--rollout-num-gpus` / `--actor-num-gpus-per-node` 按 4 卡调):
+```bash
+#!/bin/bash
+#SBATCH -p workq -N 1 --gres=gpu:4 -t 24:00:00 -J ldm-rl-R2
+srun apptainer exec --nv ngc-pytorch-aarch64.sif \
+     bash /path/to/LDM/rl/slime_launch/run_train_real_9b.sh
+```
+> GH200 每卡 96GB,9B + TP2/TP4 显存宽裕(参考:GLM-5.3 FP8 TP4 单节点已验证,每卡 ~77GB)。
+
+### G6. 一句话
+集群本身很适合(稳、无限时长、海量 GH200);**唯一的活是 aarch64 移植**——主要就是"在 NGC aarch64 容器里把 slime/megatron/sglang/TE 跑通 + 编个 aarch64 vina"。代码(`ldm_rl` + reward)是架构无关的 Python,不用改。
