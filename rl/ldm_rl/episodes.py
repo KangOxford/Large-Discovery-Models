@@ -28,7 +28,7 @@ if __package__ in (None, ""):
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from ldm_rl.env import EnvConfig, REWARD_POLICIES
+from ldm_rl.env import ACQUISITION_AGGS, EnvConfig, REWARD_POLICIES
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,7 @@ class EpisodeSpec:
     reward: str = "improvement"
     reward_failure: float = 0.0
     reward_invalid: float = 0.0
+    acquisition_agg: str = "max"
     max_empty_reservoir_rounds: int = 3
     target_observations: int | None = None
     target_successful_evaluations: int | None = None
@@ -77,6 +78,7 @@ class EpisodeSpec:
             reward=self.reward,
             reward_failure=self.reward_failure,
             reward_invalid=self.reward_invalid,
+            acquisition_agg=self.acquisition_agg,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -99,6 +101,7 @@ class EpisodeSpec:
             reward=self.reward,
             reward_failure=self.reward_failure,
             reward_invalid=self.reward_invalid,
+            acquisition_agg=self.acquisition_agg,
         )
 
     @classmethod
@@ -112,6 +115,7 @@ class EpisodeSpec:
             "reward",
             "reward_failure",
             "reward_invalid",
+            "acquisition_agg",
             "max_empty_reservoir_rounds",
             "target_observations",
             "target_successful_evaluations",
@@ -159,6 +163,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--reward", choices=REWARD_POLICIES, default="improvement"
     )
+    parser.add_argument(
+        "--acquisition-agg",
+        choices=ACQUISITION_AGGS,
+        default="max",
+        help="How to aggregate per-round acquisition scores when reward=acquisition.",
+    )
     parser.add_argument("--seed-offset", type=int, default=0)
     parser.add_argument(
         "--real-kwargs",
@@ -191,6 +201,7 @@ def main(argv: list[str] | None = None) -> int:
                 reservoir_size=args.reservoir_size,
                 evaluations_per_round=args.evaluations_per_round,
                 reward=args.reward,
+                acquisition_agg=args.acquisition_agg,
                 seed=args.seed_offset + index,
                 real=real_kwargs,
             )

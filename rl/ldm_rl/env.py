@@ -48,6 +48,7 @@ from ldm_rl.parsing import call_text_parser, load_declared_parser
 from ldm_rl.prompts import render_reset_observation, render_step_observation
 
 REWARD_POLICIES = ("improvement", "raw", "binary", "acquisition")
+ACQUISITION_AGGS = ("max", "mean")
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,7 @@ class EnvConfig:
     reward: str = "improvement"
     reward_failure: float = 0.0
     reward_invalid: float = 0.0
+    acquisition_agg: str = "max"
 
     def __post_init__(self) -> None:
         if self.iterations < 0:
@@ -108,6 +110,11 @@ class EnvConfig:
         if self.reward not in REWARD_POLICIES:
             raise ValueError(
                 f"unknown reward policy {self.reward!r}; expected one of {REWARD_POLICIES}"
+            )
+        if self.acquisition_agg not in ACQUISITION_AGGS:
+            raise ValueError(
+                f"unknown acquisition_agg {self.acquisition_agg!r}; "
+                f"expected one of {ACQUISITION_AGGS}"
             )
 
 
@@ -636,9 +643,12 @@ class LDMEnv:
         if not scores:
             components["kind"] = "acquisition"
             components["scores"] = []
+            components["agg"] = self.config.acquisition_agg
             return 0.0, components
-        components.update({"kind": "acquisition", "scores": scores})
-        return max(scores), components
+        agg = self.config.acquisition_agg
+        value = sum(scores) / len(scores) if agg == "mean" else max(scores)
+        components.update({"kind": "acquisition", "scores": scores, "agg": agg})
+        return value, components
 
     # ------------------------------------------------------------------- run
 
