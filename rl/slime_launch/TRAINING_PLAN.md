@@ -29,7 +29,7 @@ SFT 已经把"acquisition-tilted 搜索策略"的**格式与行为**蒸馏进 Qw
 |---|---|---|---|
 | **R1** | base | acquisition-max | Group A |
 | **R2** | SFT | acquisition-max | Group A + B（枢轴） |
-| **R3** | SFT | 真实评估结果(improvement / ΔHV) | Group B |
+| **R3** | SFT | 真实评估结果(**hypervolume ΔHV**) | Group B |
 | **R4** | SFT | acquisition-mean | Group B |
 
 - **Group A — 模型消融**:R1 vs R2 → "SFT 打底对 RL 有没有用"。
@@ -65,7 +65,7 @@ SFT 已经把"acquisition-tilted 搜索策略"的**格式与行为**蒸馏进 Qw
 ## 6. 分阶段执行（带验证闸,细节见 HANDOFF §E）
 
 1. **P0**:1.5B 在真环境跑通 GRPO,验 **backward + docking + reward** 全链路。
-2. **P1**:9B **mock** 冒烟,验 hybrid backward / 显存。
+2. **P1**:9B **real 极小 count**(count=1、iterations=2)冒烟,验 hybrid backward / 显存。**训练全程 real,不用 mock。**
 3. **P2**:R1–R4 × seed 真训练(train G12D)。
 4. **评测**:离线在 C & D 上评,填对照表。
    - 前置(可并行):用 `train_g12c_qsar.py` + `g12c_docking_benchmark.csv` 训出 `best_g12c_model.joblib`(受体沿用 8UN5)。

@@ -32,6 +32,6 @@ gen rl_episodes_sm_warmup.jsonl   acquisition  max  "$WARMUP" "$WARMUP_ITERS"
 gen rl_episodes_sm_acqmax.jsonl   acquisition  max  "$COUNT"  "$ITERS"
 # R4: acquisition-mean
 gen rl_episodes_sm_acqmean.jsonl  acquisition  mean "$COUNT"  "$ITERS"
-# R3: real-outcome reward (improvement over incumbent)
-gen rl_episodes_sm_improve.jsonl  improvement  max  "$COUNT"  "$ITERS"
-echo "episodes written to $REPO_ROOT/rl_episodes_sm_{warmup,acqmax,acqmean,improve}.jsonl"
+# R3: real-outcome reward (Pareto hypervolume improvement over the observed front)
+gen rl_episodes_sm_hv.jsonl       hypervolume  max  "$COUNT"  "$ITERS"
+echo "episodes written to $REPO_ROOT/rl_episodes_sm_{warmup,acqmax,acqmean,hv}.jsonl"

@@ -9,7 +9,7 @@ the pivot:
 |-----|--------------------|--------|---------------|
 | **R1** | Qwen3.5-9B base | acquisition-**max** | `rl_episodes_sm_acqmax.jsonl` |
 | **R2** | SFT (no-GP) | acquisition-**max** | `rl_episodes_sm_acqmax.jsonl` |
-| **R3** | SFT (no-GP) | **improvement** (real outcome) | `rl_episodes_sm_improve.jsonl` |
+| **R3** | SFT (no-GP) | **hypervolume** (ΔHV, real outcome) | `rl_episodes_sm_hv.jsonl` |
 | **R4** | SFT (no-GP) | acquisition-**mean** | `rl_episodes_sm_acqmean.jsonl` |
 
 - R1 vs R2 isolates the **model** (base vs SFT-init).
@@ -39,7 +39,7 @@ MODEL_HF=$BASE MODEL_REF=$BASE_REF EPISODES=$R/../rl_episodes_sm_acqmax.jsonl  S
 # R2 sft, acq-max
 MODEL_HF=$SFT  MODEL_REF=$SFT_REF  EPISODES=$R/../rl_episodes_sm_acqmax.jsonl  SAVE=$R/qwen3.5-9B_rl_R2_sft_acqmax   WANDB_RUN=R2_sft_acqmax   bash run_train_real_9b.sh
 # R3 sft, real reward
-MODEL_HF=$SFT  MODEL_REF=$SFT_REF  EPISODES=$R/../rl_episodes_sm_improve.jsonl SAVE=$R/qwen3.5-9B_rl_R3_sft_improve  WANDB_RUN=R3_sft_improve  bash run_train_real_9b.sh
+MODEL_HF=$SFT  MODEL_REF=$SFT_REF  EPISODES=$R/../rl_episodes_sm_hv.jsonl      SAVE=$R/qwen3.5-9B_rl_R3_sft_hv       WANDB_RUN=R3_sft_hv       bash run_train_real_9b.sh
 # R4 sft, acq-mean
 MODEL_HF=$SFT  MODEL_REF=$SFT_REF  EPISODES=$R/../rl_episodes_sm_acqmean.jsonl SAVE=$R/qwen3.5-9B_rl_R4_sft_acqmean  WANDB_RUN=R4_sft_acqmean  bash run_train_real_9b.sh
 ```
@@ -48,16 +48,20 @@ MODEL_HF=$SFT  MODEL_REF=$SFT_REF  EPISODES=$R/../rl_episodes_sm_acqmean.jsonl S
 - `reward: acquisition`, `acquisition_agg: max|mean` — per-round reward is the
   max (or mean) EHVI acquisition score of the evaluated candidate(s); episode
   reward is the sum over rounds. (See `rl/ldm_rl/env.py::_acquisition_reward`.)
-- `reward: improvement` — per-round objective improvement over the incumbent
-  (real Vina + activity outcome), summed over rounds.
+- `reward: hypervolume` — per-round **Pareto-front hypervolume improvement (ΔHV)**
+  from the real Vina + activity outcomes, summed over rounds (telescopes to the
+  campaign's total HV gain). `reward_ref_point` (oriented space) fixes the ref,
+  else a per-round nadir is used. `reward: improvement` (sum of per-objective
+  gains) also available but gameable across objectives.
 
 ## 3. Notes / risks
-- **Env**: use the `ldm-slime-rl` image (torch 2.11 + matched TE); other stacks
-  SIGSEGV on GRPO backward.
-- **First 9B run**: smoke with `--mode mock` (edit episodes to mock) to confirm
-  the hybrid backward + memory before spending real docking.
-- **Memory**: 9B + TP=2 + sglang on 4×80G. If OOM, raise TP or drop
-  `max_tokens_per_gpu`; recompute-full is already on.
+- **Env**: use a matched torch + TE stack (see HANDOFF §2); a mismatched stack
+  SIGSEGVs on GRPO backward.
+- **First 9B run**: smoke with a **tiny real** episode set (count=1, iterations=2)
+  to confirm the hybrid backward + memory before scaling up. Training is always
+  real — do not use mock.
+- **Memory**: 9B + TP=2/4 + sglang on 4 GPUs (96GB each on GH200). If OOM, raise
+  TP or drop `max_tokens_per_gpu`; recompute-full is already on.
 - **Docking throughput** is the real bottleneck for real reward; enable the
   docking cache and raise `vina_max_workers` in `config_real.json` real_kwargs.
 - All 4 runs **train on G12D**; the G12C transfer number comes from the

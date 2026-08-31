@@ -44,6 +44,7 @@ class EpisodeSpec:
     reward_failure: float = 0.0
     reward_invalid: float = 0.0
     acquisition_agg: str = "max"
+    reward_ref_point: tuple[float, ...] | None = None
     max_empty_reservoir_rounds: int = 3
     target_observations: int | None = None
     target_successful_evaluations: int | None = None
@@ -79,6 +80,7 @@ class EpisodeSpec:
             reward_failure=self.reward_failure,
             reward_invalid=self.reward_invalid,
             acquisition_agg=self.acquisition_agg,
+            reward_ref_point=self.reward_ref_point,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -102,6 +104,7 @@ class EpisodeSpec:
             reward_failure=self.reward_failure,
             reward_invalid=self.reward_invalid,
             acquisition_agg=self.acquisition_agg,
+            reward_ref_point=self.reward_ref_point,
         )
 
     @classmethod
@@ -116,6 +119,7 @@ class EpisodeSpec:
             "reward_failure",
             "reward_invalid",
             "acquisition_agg",
+            "reward_ref_point",
             "max_empty_reservoir_rounds",
             "target_observations",
             "target_successful_evaluations",
@@ -169,6 +173,14 @@ def main(argv: list[str] | None = None) -> int:
         default="max",
         help="How to aggregate per-round acquisition scores when reward=acquisition.",
     )
+    parser.add_argument(
+        "--reward-ref-point",
+        default="",
+        help=(
+            "Comma-separated oriented-space reference point for reward=hypervolume "
+            "(e.g. '0,5'); empty -> per-round nadir."
+        ),
+    )
     parser.add_argument("--seed-offset", type=int, default=0)
     parser.add_argument(
         "--real-kwargs",
@@ -192,6 +204,13 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--real-kwargs must decode to a JSON object")
         real_kwargs = dict(parsed)
 
+    ref_point: tuple[float, ...] | None = None
+    if args.reward_ref_point.strip():
+        try:
+            ref_point = tuple(float(x) for x in args.reward_ref_point.split(","))
+        except ValueError:
+            parser.error("--reward-ref-point must be comma-separated floats, e.g. '0,5'")
+
     rows = make_prompt_rows(
         [
             EpisodeSpec(
@@ -202,6 +221,7 @@ def main(argv: list[str] | None = None) -> int:
                 evaluations_per_round=args.evaluations_per_round,
                 reward=args.reward,
                 acquisition_agg=args.acquisition_agg,
+                reward_ref_point=ref_point,
                 seed=args.seed_offset + index,
                 real=real_kwargs,
             )

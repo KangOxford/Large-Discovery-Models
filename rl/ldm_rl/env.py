@@ -47,7 +47,7 @@ from ldm_tts.optimization.records import (
 from ldm_rl.parsing import call_text_parser, load_declared_parser
 from ldm_rl.prompts import render_reset_observation, render_step_observation
 
-REWARD_POLICIES = ("improvement", "raw", "binary", "acquisition")
+REWARD_POLICIES = ("improvement", "raw", "binary", "acquisition", "hypervolume")
 ACQUISITION_AGGS = ("max", "mean")
 
 
@@ -68,6 +68,7 @@ class EnvConfig:
     reward_failure: float = 0.0
     reward_invalid: float = 0.0
     acquisition_agg: str = "max"
+    reward_ref_point: tuple[float, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.iterations < 0:
@@ -590,6 +591,9 @@ class LDMEnv:
         if self.config.reward == "acquisition":
             return self._acquisition_reward(new_observations, selection, components)
 
+        if self.config.reward == "hypervolume":
+            return self._hypervolume_reward(new_observations, components)
+
         new_values = [self._oriented(item.metrics) for item in succeeded]
         after = tuple(max(values[i] for values in new_values) for i in range(len(self.objectives.specs)))
 
@@ -649,6 +653,95 @@ class LDMEnv:
         value = sum(scores) / len(scores) if agg == "mean" else max(scores)
         components.update({"kind": "acquisition", "scores": scores, "agg": agg})
         return value, components
+
+    @staticmethod
+    def _hypervolume_2d(
+        points: Sequence[tuple[float, float]], ref: tuple[float, float]
+    ) -> float:
+        """Dominated hypervolume of a 2-objective (maximise) point set vs ``ref``.
+
+        ``ref`` is the lower-left reference corner in oriented space; only points
+        that strictly dominate it contribute.
+        """
+
+        rx, ry = ref
+        pts = [(a, b) for (a, b) in points if a > rx and b > ry]
+        if not pts:
+            return 0.0
+        # Pareto front: scan by x descending, keep strictly increasing y.
+        pts.sort(key=lambda p: (-p[0], -p[1]))
+        front: list[tuple[float, float]] = []
+        best_y = float("-inf")
+        for a, b in pts:
+            if b > best_y:
+                front.append((a, b))
+                best_y = b
+        front.reverse()  # -> x ascending, y descending
+        hv = 0.0
+        prev_x = rx
+        for a, b in front:
+            hv += (a - prev_x) * (b - ry)
+            prev_x = a
+        return hv
+
+    def _hypervolume_reward(
+        self,
+        new_observations: Sequence[Observation],
+        components: dict[str, Any],
+    ) -> tuple[float, dict[str, Any]]:
+        """Per-round Pareto-front hypervolume improvement from real outcomes.
+
+        Reward = HV(front after this round) - HV(front before), clipped at 0.
+        Uses measured objective values (unlike ``acquisition``), so it directly
+        rewards how much the round pushed the observed Pareto front. Two
+        objectives only; ``reward_ref_point`` (oriented space) fixes the
+        reference, else a per-round nadir is used consistently for before/after.
+        """
+
+        if len(self.objectives.specs) != 2:
+            raise ValueError(
+                "hypervolume reward supports exactly 2 objectives, got "
+                f"{len(self.objectives.specs)}"
+            )
+        new_ids = {id(o) for o in new_observations}
+        all_obs = list(self._state.observations)  # already includes this round
+        prior = [o for o in all_obs if id(o) not in new_ids]
+
+        def pts(observations: Sequence[Observation]) -> list[tuple[float, float]]:
+            out: list[tuple[float, float]] = []
+            for o in observations:
+                if o.evaluation.succeeded:
+                    v = self._oriented(o.metrics)
+                    out.append((float(v[0]), float(v[1])))
+            return out
+
+        after_pts = pts(all_obs)
+        before_pts = pts(prior)
+        if self.config.reward_ref_point is not None:
+            ref = (
+                float(self.config.reward_ref_point[0]),
+                float(self.config.reward_ref_point[1]),
+            )
+        elif after_pts:
+            eps = 1e-6
+            ref = (
+                min(p[0] for p in after_pts) - eps,
+                min(p[1] for p in after_pts) - eps,
+            )
+        else:
+            ref = (0.0, 0.0)
+        hv_after = self._hypervolume_2d(after_pts, ref)
+        hv_before = self._hypervolume_2d(before_pts, ref)
+        dhv = max(0.0, hv_after - hv_before)
+        components.update(
+            {
+                "kind": "hypervolume",
+                "hv_before": hv_before,
+                "hv_after": hv_after,
+                "ref_point": ref,
+            }
+        )
+        return dhv, components
 
     # ------------------------------------------------------------------- run
 

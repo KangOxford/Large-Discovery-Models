@@ -127,9 +127,13 @@ def test_small_molecule_mock_episode() -> None:
     assert result.total_reward > 0.0
 
 
-def test_small_molecule_real_mode_raises() -> None:
-    with pytest.raises(ValueError, match="mock mode only"):
-        build_env("small_molecule", mode="real")
+def test_small_molecule_real_mode_is_supported() -> None:
+    # Real mode is wired (tasks.small_molecule.core.rl_real.build_real_components),
+    # so the factory must NOT reject it; only an unknown mode is rejected.
+    from tasks.small_molecule.core.rl_adapter import build_rl_components
+
+    with pytest.raises(ValueError, match="mock and real modes only"):
+        build_rl_components(mode="bogus")
 
 
 def test_causal_discovery_mock_episode() -> None:
