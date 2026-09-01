@@ -70,8 +70,46 @@ ROLLOUT_ARGS=(
 )
 
 # 4 GPUs: TP=2 actor (2 GPUs) + 2 GPUs for the sglang rollout engine.
+# 卡的布局。默认是作者的分卡模式(actor 2 张 TP=2 + sglang 2 张)。
+#
+# 为什么需要 colocate:2026-09-01 在 4×GH200(95GB/卡)上实测,分卡模式的 actor 侧
+# **显存不够**。每个 TP rank 持 5,285,884,416 参数,按 Adam 的账
+#   bf16 权重 2 + fp32 主权重 4 + exp_avg 4 + exp_avg_sq 4 = 14 字节/参数
+#   5.29e9 x 14 ≈ 74 GB,再加激活与碎片就超过 95 GB。
+# 实际的 OOM 发生在 TE 的 fused_adam 惰性分配 exp_avg_sq 那一步:
+#   torch.OutOfMemoryError: Tried to allocate 1.89 GiB ... 95.00 GiB 中仅剩 490 MiB
+# 注意它**很晚才暴露** —— 模型加载、前向、反向(日志里有 run_backward)全过了,
+# 卡在第一次参数更新。所以 HANDOFF §7 的"9B + TP2/4 于 96GB/卡宽裕"不成立。
+#
+# colocate 让 actor 与 sglang 共用同一批卡:actor 用满 4 张(TP=4,每卡参数量减半),
+# sglang 也在这 4 张上,由 --offload(colocate 自动打开)在训练/生成之间换出显存。
+# 这正是 torch_memory_saver 的用途,也正是 GH200 的强项 —— NVLink-C2C 的
+# CPU<->GPU 带宽约 450 GB/s,比 x86 的 PCIe 快约 7 倍,换出代价小得多。
+#
+# --num-gpus-per-node 必须显式给:它默认 8,而本机每节点 4 张。不给不会报错,
+# 但 get_base_gpu_id 里的 % num_gpus_per_node 会算出错误的卡号(静默走错分支)。
+if [ "${SLIME_COLOCATE:-0}" = "1" ]; then
+   PLACEMENT_ARGS=(
+      --colocate
+      --num-gpus-per-node ${NUM_GPUS_PER_NODE:-4}
+      --actor-num-nodes 1
+      --actor-num-gpus-per-node ${ACTOR_GPUS:-4}
+      --rollout-num-gpus ${ROLLOUT_GPUS:-4}
+   )
+   : "${TP_SIZE:=${ACTOR_GPUS:-4}}"
+   echo "[layout] colocate:actor ${ACTOR_GPUS:-4} 卡 TP=${TP_SIZE} + sglang ${ROLLOUT_GPUS:-4} 卡(同一批),offload 自动开启"
+else
+   PLACEMENT_ARGS=(
+      --actor-num-nodes 1
+      --actor-num-gpus-per-node ${ACTOR_GPUS:-2}
+      --rollout-num-gpus ${ROLLOUT_GPUS:-2}
+   )
+   echo "[layout] 分卡:actor ${ACTOR_GPUS:-2} 卡 + sglang ${ROLLOUT_GPUS:-2} 卡"
+fi
+
 PERF_ARGS=(
-   --tensor-model-parallel-size 2
+   # TP 要与 actor 的卡数一致:colocate 下 actor 用 4 张,每卡参数量才减半到能放下。
+   --tensor-model-parallel-size ${TP_SIZE:-2}
    --pipeline-model-parallel-size 1 --context-parallel-size 1
    --use-distributed-optimizer
    --recompute-granularity full --recompute-method uniform --recompute-num-layers 1
@@ -151,7 +189,7 @@ RUNTIME_ENV_JSON="{\"env_vars\": {\"PYTHONPATH\": \"$MEGATRON_ROOT:$REPO_ROOT/rl
 if [ "${SLIME_LAUNCH_MODE:-jobsubmit}" = "direct" ]; then
    echo "[launch] 直接跑 train.py(跳过 ray job submit;单节点本地集群不需要 job server)"
    RAY_ADDRESS=auto python3 train.py \
-   --actor-num-nodes 1 --actor-num-gpus-per-node 2 --rollout-num-gpus 2 \
+   ${PLACEMENT_ARGS[@]} \
    ${MODEL_ARGS[@]} ${CKPT_ARGS[@]} ${ROLLOUT_ARGS[@]} \
    ${PERF_ARGS[@]} ${GRPO_ARGS[@]} ${OPTIMIZER_ARGS[@]} \
    ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]} ${WANDB_ARGS[@]}
@@ -159,7 +197,7 @@ else
 ray job submit --address="http://127.0.0.1:8265" \
    --runtime-env-json="$RUNTIME_ENV_JSON" \
    -- python3 train.py \
-   --actor-num-nodes 1 --actor-num-gpus-per-node 2 --rollout-num-gpus 2 \
+   ${PLACEMENT_ARGS[@]} \
    ${MODEL_ARGS[@]} ${CKPT_ARGS[@]} ${ROLLOUT_ARGS[@]} \
    ${PERF_ARGS[@]} ${GRPO_ARGS[@]} ${OPTIMIZER_ARGS[@]} \
    ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]} ${WANDB_ARGS[@]}
