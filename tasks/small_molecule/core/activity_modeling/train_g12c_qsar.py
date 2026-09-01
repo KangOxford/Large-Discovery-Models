@@ -1308,12 +1308,43 @@ def train_and_evaluate(
     return metrics_df, fitted_by_key, predictions_df
 
 
-def select_best_model(metrics_df: pd.DataFrame) -> tuple[str, str]:
-    available_splits = set(metrics_df["split"])
-    preferred_split = next(
-        (split for split in ("document", "scaffold", "assay", "random") if split in available_splits),
-        str(metrics_df["split"].iloc[0]),
-    )
+MIN_SELECTION_TEST_ROWS = 30
+
+
+def select_best_model(
+    metrics_df: pd.DataFrame, min_test_rows: int = MIN_SELECTION_TEST_ROWS
+) -> tuple[str, str]:
+    """Pick the winning model on the first priority split that can rank models.
+
+    A split whose held-out side is nearly empty ranks nothing: with G12D the
+    document split leaves one test molecule, so every model's RMSE is that
+    single residual and the winner is whichever happens to miss it least. The
+    run still prints "selected on document split" and saves the artifact, so
+    the failure is invisible downstream. Skip splits with fewer than
+    ``min_test_rows`` held-out rows before applying the name priority.
+    """
+
+    counts = metrics_df.groupby("split")["n_test"].max()
+    usable = {str(s) for s, n in counts.items() if pd.notna(n) and int(n) >= min_test_rows}
+    priority = ("document", "scaffold", "assay", "random")
+    preferred_split = next((s for s in priority if s in usable), None)
+    if preferred_split is None:
+        # Nothing clears the bar; fall back to the largest held-out set rather
+        # than to an arbitrary row, and say so.
+        preferred_split = str(counts.idxmax())
+        print(
+            f"WARNING: no split has >= {min_test_rows} test rows "
+            f"(sizes: {counts.to_dict()}); selecting on '{preferred_split}', "
+            "which is the largest. Treat the choice of model as unranked."
+        )
+    else:
+        skipped = [s for s in priority if s in set(metrics_df["split"]) and s not in usable]
+        for s in skipped:
+            if priority.index(s) < priority.index(preferred_split):
+                print(
+                    f"NOTE: skipping '{s}' split for model selection "
+                    f"(n_test={int(counts[s])} < {min_test_rows}, cannot rank models)"
+                )
     subset = metrics_df[metrics_df["split"] == preferred_split].sort_values(["rmse", "mae", "spearman"], ascending=[True, True, False])
     best = subset.iloc[0]
     return str(best["model"]), str(best["split"])
