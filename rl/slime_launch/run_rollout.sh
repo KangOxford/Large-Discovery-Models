@@ -61,6 +61,13 @@ LOCAL_IMPL_ARGS=(
 )
 
 SGLANG_ARGS=(
+   # 注意力后端:sglang 不指定时会自选 fa3,而 **aarch64 版的 sglang-kernel 轮子里
+   # 没有编 FA3 内核** —— 运行到建引擎那一步才报
+   #   ImportError: Can not import FA3 in sgl_kernel
+   # 而 pip install 与 import sgl_kernel 都是成功的,所以这件事只有跑起来才暴露。
+   # GH200 上实测可用:triton 3.6.0 与 flashinfer 0.6.12。取 triton —— 它与架构
+   # 无关,也是 slime 自己的 Dockerfile 在绕不过 FlashQLA 时用的那个。
+   --sglang-attention-backend ${SGLANG_ATTENTION_BACKEND:-triton}
    --rollout-num-gpus 2 --sglang-mem-fraction-static 0.7
 )
 
