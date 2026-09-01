@@ -6,6 +6,11 @@ REPO_ROOT=${REPO_ROOT:-/mnt/data0/ys/LDM}
 SLIME_ROOT=$REPO_ROOT/rl/slime
 MEGATRON_ROOT=${MEGATRON_ROOT:-/root/megatron-lm}
 CONDA_PREFIX=${CONDA_PREFIX:-/root/micromamba/envs/slime}
+# 与 run_train_real_9b.sh 一致的可覆盖入口。gen_episodes_runs.sh 现在按 run 产出
+# rl_episodes_sm_{warmup,acqmax,acqmean,hv}.jsonl,不再产出单一的 _real.jsonl,
+# 所以这里必须能从外面指定用哪个。
+EPISODES=${EPISODES:-$REPO_ROOT/rl_episodes_sm_real.jsonl}
+
 
 # Block the system CUDA 13.0 libcudart.so.13 (visible via ldconfig) so the
 # cudnn-frontend check inside transformer_engine only finds libcudart.so.12.

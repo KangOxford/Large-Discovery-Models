@@ -9,6 +9,11 @@ REPO_ROOT=${REPO_ROOT:-/mnt/data0/ys/LDM}
 SLIME_ROOT=$REPO_ROOT/rl/slime
 MEGATRON_ROOT=${MEGATRON_ROOT:-/root/megatron-lm}
 CONDA_PREFIX=${CONDA_PREFIX:-/root/micromamba/envs/slime}
+# 与 run_train_real_9b.sh 一致的可覆盖入口。gen_episodes_runs.sh 现在按 run 产出
+# rl_episodes_sm_{warmup,acqmax,acqmean,hv}.jsonl,不再产出单一的 _real.jsonl,
+# 所以这里必须能从外面指定用哪个。
+EPISODES=${EPISODES:-$REPO_ROOT/rl_episodes_sm_real.jsonl}
+
 CONFIG=${CONFIG:-$REPO_ROOT/rl/slime_launch/config_real.json}
 
 mkdir -p ${CUDART_BLOCK:-/root/cudart_block}
@@ -48,7 +53,7 @@ CKPT_ARGS=(
 )
 
 ROLLOUT_ARGS=(
-   --prompt-data $REPO_ROOT/rl_episodes_sm_real.jsonl
+   --prompt-data "$EPISODES"
    --input-key prompt --label-key label
    --num-rollout "$NUM_ROLLOUT" --rollout-batch-size "$ROLLOUT_BATCH" --n-samples-per-prompt "$N_SAMPLES"
    --rollout-max-response-len "$RESP_LEN" --rollout-temperature "$TEMPERATURE"
