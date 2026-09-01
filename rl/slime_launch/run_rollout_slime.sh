@@ -61,18 +61,29 @@ ray stop --force 2>/dev/null || true
 sleep 3
 ray start --head --node-ip-address 127.0.0.1 --num-gpus 2 --disable-usage-stats
 
-# `ray start` 返回只表示 raylet 起来了,**不表示 job 提交服务已经能收请求**。
-# 2026-09-01 在 GH200 上实测:ray start 07:30:48 报成功,6 秒后 ray job submit
-# 拿到 504 Gateway Timeout —— 端口在听,后面的 dashboard agent 还没起。
-# 作者机器上启动快,撞不上;换台机器就是必挂。所以显式等它就绪。
-_ray_addr=${RAY_DASHBOARD:-http://127.0.0.1:8265}
-for _i in $(seq 1 60); do
-    if curl -s -o /dev/null -w "%{http_code}" --max-time 3 "$_ray_addr/api/version" 2>/dev/null | grep -q "^200$"; then
-        echo "[ray] job 提交服务就绪($_ray_addr,等了 $((_i*2))s)"; break
-    fi
-    [ "$_i" = 60 ] && { echo "FATAL: 等了 120s,$_ray_addr 仍未就绪"; exit 3; }
-    sleep 2
-done
+# `ray start` 返回只表示 raylet 进程起来了,**不表示它已经能接受 worker 注册**。
+# 2026-09-01 在 GH200 上量过:ray start 返回之后还要 **约 66 秒**驱动才连得上。
+# 落在这个窗口里的驱动**不会超时报错,而是无限期阻塞** —— 实测 P0 与暖机两次
+# 都停在 ray._raylet.CoreWorker(...) 构造里,主线程的内核等待点是
+# unix_stream_read_generic(在等 raylet 经 Unix socket 的回复),CPU 0%、GPU 全空、
+# 日志一行不出。所以它看起来像死锁而不像竞态。
+#
+# 注意 `ray status` **不能**当就绪判据:实测它在驱动还连不上的时候就已经能通了
+# (它只经 GCS)。唯一可靠的判据是**真的用驱动连一次**,也就是下面这个探针。
+_ray_wait_ready() {
+    local i t0 addr
+    t0=$(date +%s)
+    for i in $(seq 1 40); do
+        if timeout 20 python3 -c "import ray; ray.init(address='auto', log_to_driver=False); ray.shutdown()" \
+             >/dev/null 2>&1; then
+            echo "[ray] 驱动可连(ray start 返回后 $(( $(date +%s) - t0 ))s)"
+            return 0
+        fi
+    done
+    echo "FATAL: ray start 之后 $(( $(date +%s) - t0 ))s 驱动仍连不上"
+    return 1
+}
+_ray_wait_ready || exit 3
 
 
 RUNTIME_ENV_JSON="{\"env_vars\": {\"PYTHONPATH\": \"$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT\", \"LD_LIBRARY_PATH\": \"$CONDA_PREFIX/lib\", \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\"}}"
