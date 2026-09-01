@@ -19,7 +19,7 @@ REPO_ROOT=${REPO_ROOT:-/mnt/data0/ys/LDM}
 SLIME_ROOT=$REPO_ROOT/rl/slime
 MEGATRON_ROOT=${MEGATRON_ROOT:-/root/megatron-lm}
 CONDA_PREFIX=${CONDA_PREFIX:-/root/micromamba/envs/slime}
-CONFIG=$REPO_ROOT/rl/slime_launch/config_real.json
+CONFIG=${CONFIG:-$REPO_ROOT/rl/slime_launch/config_real.json}
 
 MODEL_HF=${MODEL_HF:-/mnt/data0/hf_models/models/Qwen3.5-9B}
 MODEL_REF=${MODEL_REF:-$REPO_ROOT/rl/qwen3.5-9B_torch_dist}

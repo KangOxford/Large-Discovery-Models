@@ -9,7 +9,7 @@ REPO_ROOT=${REPO_ROOT:-/mnt/data0/ys/LDM}
 SLIME_ROOT=$REPO_ROOT/rl/slime
 MEGATRON_ROOT=${MEGATRON_ROOT:-/root/megatron-lm}
 CONDA_PREFIX=${CONDA_PREFIX:-/root/micromamba/envs/slime}
-CONFIG=$REPO_ROOT/rl/slime_launch/config_real.json
+CONFIG=${CONFIG:-$REPO_ROOT/rl/slime_launch/config_real.json}
 
 mkdir -p ${CUDART_BLOCK:-/root/cudart_block}
 touch ${CUDART_BLOCK:-/root/cudart_block}/libcudart.so.13
