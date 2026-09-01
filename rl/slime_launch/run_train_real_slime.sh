@@ -96,6 +96,26 @@ done
 
 RUNTIME_ENV_JSON="{\"env_vars\": {\"PYTHONPATH\": \"$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT\", \"LD_LIBRARY_PATH\": \"${CUDART_BLOCK:-/root/cudart_block}:$CONDA_PREFIX/lib\", \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\"}}"
 
+# 两条路径,由 SLIME_LAUNCH_MODE 选。默认 jobsubmit(作者原样)。
+#
+# 为什么需要 direct:在 GH200 上 `ray job submit` 两次都以
+#   RuntimeError: Request failed with status code 504
+# 结束。dashboard 的访问日志显示 GET /api/version 返回 200,之后**没有**
+# POST /api/jobs/ 完成 —— 创建作业那个请求在 dashboard 的 JobHead 子进程模块
+# 那里超时了(第二次等了 5 分钟)。JobHead 自身启动正常、无报错。
+#
+# 而在**单节点本地集群**上,job-server 这一层买不到任何东西:同一个进程
+# 直接 ray.init 连上已起的集群就能跑,runtime_env 里那几个环境变量本来
+# 就已经在当前 shell 里 export 过,本地起的 worker 直接继承。
+# 所以 direct 不是绕过,是把一个多余的环节去掉。
+if [ "${SLIME_LAUNCH_MODE:-jobsubmit}" = "direct" ]; then
+   echo "[launch] 直接跑 train.py(跳过 ray job submit;单节点本地集群不需要 job server)"
+   RAY_ADDRESS=auto python3 train.py \
+      --actor-num-nodes 1 --actor-num-gpus-per-node 1 --rollout-num-gpus 2 \
+      ${MODEL_ARGS[@]} ${CKPT_ARGS[@]} ${ROLLOUT_ARGS[@]} \
+      ${PERF_ARGS[@]} ${GRPO_ARGS[@]} ${OPTIMIZER_ARGS[@]} \
+      ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]}
+else
 ray job submit --address="http://127.0.0.1:8265" \
    --runtime-env-json="$RUNTIME_ENV_JSON" \
    -- python3 train.py \
@@ -103,3 +123,4 @@ ray job submit --address="http://127.0.0.1:8265" \
    ${MODEL_ARGS[@]} ${CKPT_ARGS[@]} ${ROLLOUT_ARGS[@]} \
    ${PERF_ARGS[@]} ${GRPO_ARGS[@]} ${OPTIMIZER_ARGS[@]} \
    ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]}
+fi
