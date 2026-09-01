@@ -77,9 +77,22 @@ done
 
 RUNTIME_ENV_JSON="{\"env_vars\": {\"PYTHONPATH\": \"$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT\", \"LD_LIBRARY_PATH\": \"$CONDA_PREFIX/lib\", \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\"}}"
 
+# 两条路径,由 SLIME_LAUNCH_MODE 选。默认 jobsubmit(作者原样)。
+# 本机上 `ray job submit` 以 504 结束:创建作业的 POST 在 dashboard 的 JobHead
+# 子进程模块里超时(实测等 5 分钟),而 raylet/gcs_server 一直健康 —— 集群没问题,
+# 只有提交这条路不通。单节点本地集群不需要 job server:同一个进程 ray.init 连上
+# 已起的集群即可,runtime_env 里那几个环境变量本来就在当前 shell 里 export 过。
+if [ "${SLIME_LAUNCH_MODE:-jobsubmit}" = "direct" ]; then
+   echo "[launch] 直接跑 train.py(跳过 ray job submit;单节点本地集群不需要 job server)"
+   RAY_ADDRESS=auto python3 train.py \
+   --actor-num-nodes 1 --actor-num-gpus-per-node 0 --rollout-num-gpus 2 \
+   ${MODEL_ARGS[@]} ${CKPT_ARGS[@]} ${ROLLOUT_ARGS[@]} \
+   ${PERF_ARGS[@]} ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]}
+else
 ray job submit --address="http://127.0.0.1:8265" \
    --runtime-env-json="$RUNTIME_ENV_JSON" \
    -- python3 train.py \
    --actor-num-nodes 1 --actor-num-gpus-per-node 0 --rollout-num-gpus 2 \
    ${MODEL_ARGS[@]} ${CKPT_ARGS[@]} ${ROLLOUT_ARGS[@]} \
    ${PERF_ARGS[@]} ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]}
+fi
