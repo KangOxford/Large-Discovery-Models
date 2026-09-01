@@ -5,7 +5,7 @@
 # the real-evaluation kwargs (vina/nn/target), and stamps gp_history_file into
 # each episode's real kwargs so the shared warm GP is wired automatically.
 set -eu
-REPO_ROOT=/mnt/data0/ys/LDM
+REPO_ROOT=${REPO_ROOT:-/mnt/data0/ys/LDM}
 CONFIG=$REPO_ROOT/rl/slime_launch/config_real.json
 export PYTHONPATH=$REPO_ROOT/rl:$REPO_ROOT:${PYTHONPATH:-}
 EP=rl.ldm_rl.episodes

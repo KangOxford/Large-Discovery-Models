@@ -1,13 +1,13 @@
 #!/bin/bash
 # Convert a Qwen3.5-9B HF checkpoint -> Megatron torch_dist (ref-load format).
 # Usage:
-#   MODEL_HF=/mnt/data0/hf_models/models/Qwen3.5-9B \
-#   SAVE=/mnt/data0/ys/LDM/rl/qwen3.5-9B_torch_dist  bash convert_9b.sh
+#   MODEL_HF=${HF_MODELS:-/mnt/data0/hf_models/models}/Qwen3.5-9B \
+#   SAVE=$REPO_ROOT/rl/qwen3.5-9B_torch_dist  bash convert_9b.sh
 set -ex
-REPO_ROOT=/mnt/data0/ys/LDM
+REPO_ROOT=${REPO_ROOT:-/mnt/data0/ys/LDM}
 SLIME_ROOT=$REPO_ROOT/rl/slime
-MEGATRON_ROOT=/root/megatron-lm
-CONDA_PREFIX=/root/micromamba/envs/slime
+MEGATRON_ROOT=${MEGATRON_ROOT:-/root/megatron-lm}
+CONDA_PREFIX=${CONDA_PREFIX:-/root/micromamba/envs/slime}
 
 MODEL_HF=${MODEL_HF:-/mnt/data0/hf_models/models/Qwen3.5-9B}
 SAVE=${SAVE:-$REPO_ROOT/rl/qwen3.5-9B_torch_dist}

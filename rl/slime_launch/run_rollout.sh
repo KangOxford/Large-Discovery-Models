@@ -14,7 +14,7 @@ set -ex
 export PYTHONUNBUFFERED=1
 
 # --- Overridable environment (defaults are placeholders, not real paths) ---
-REPO_ROOT="${LDM_REPO_ROOT:-/path/to/LDM}"
+REPO_ROOT=${REPO_ROOT:-"${LDM_REPO_ROOT:-/path/to/LDM}"}
 CONDA_BIN="${CONDA_ENV_BIN:-/path/to/conda_env/bin}"
 HF_CHECKPOINT="${HF_CHECKPOINT:-/path/to/Qwen2.5-1.5B-Instruct}"
 TORCH_DIST_CKPT="${TORCH_DIST_CKPT:-$REPO_ROOT/rl/qwen2.5-1.5B_torch_dist}"

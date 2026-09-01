@@ -2,18 +2,18 @@
 set -ex
 export PYTHONUNBUFFERED=1
 
-REPO_ROOT=/mnt/data0/ys/LDM
+REPO_ROOT=${REPO_ROOT:-/mnt/data0/ys/LDM}
 SLIME_ROOT=$REPO_ROOT/rl/slime
-MEGATRON_ROOT=/root/megatron-lm
-CONDA_PREFIX=/root/micromamba/envs/slime
+MEGATRON_ROOT=${MEGATRON_ROOT:-/root/megatron-lm}
+CONDA_PREFIX=${CONDA_PREFIX:-/root/micromamba/envs/slime}
 
 # Block the system CUDA 13.0 libcudart.so.13 (visible via ldconfig) for the
 # SLIME-side processes only; the task-venv worker strips this itself.
-mkdir -p /root/cudart_block
-touch /root/cudart_block/libcudart.so.13
+mkdir -p ${CUDART_BLOCK:-/root/cudart_block}
+touch ${CUDART_BLOCK:-/root/cudart_block}/libcudart.so.13
 
 export PATH=$CONDA_PREFIX/bin:$PATH
-export LD_LIBRARY_PATH=/root/cudart_block:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${CUDART_BLOCK:-/root/cudart_block}:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT:$PYTHONPATH
 export CUDA_HOME=$CONDA_PREFIX
 export CUDA_VISIBLE_DEVICES=1,2,3
@@ -29,14 +29,14 @@ MODEL_ARGS=(
 )
 
 CKPT_ARGS=(
-   --hf-checkpoint /mnt/data0/hf_models/models/Qwen2.5-1.5B-Instruct
-   --ref-load /mnt/data0/ys/LDM/rl/qwen2.5-1.5B_torch_dist_te
-   --save /mnt/data0/ys/LDM/rl/qwen2.5-1.5B_slime_train_real
+   --hf-checkpoint ${HF_MODELS:-/mnt/data0/hf_models/models}/Qwen2.5-1.5B-Instruct
+   --ref-load $REPO_ROOT/rl/qwen2.5-1.5B_torch_dist_te
+   --save $REPO_ROOT/rl/qwen2.5-1.5B_slime_train_real
    --save-interval 10
 )
 
 ROLLOUT_ARGS=(
-   --prompt-data /mnt/data0/ys/LDM/rl_episodes_sm_real.jsonl
+   --prompt-data $REPO_ROOT/rl_episodes_sm_real.jsonl
    --input-key prompt --label-key label
    --num-rollout 16 --rollout-batch-size 2 --n-samples-per-prompt 1
    --rollout-max-response-len 8192 --rollout-temperature 0.8
@@ -75,7 +75,7 @@ ray stop --force 2>/dev/null || true
 sleep 3
 ray start --head --node-ip-address 127.0.0.1 --num-gpus 3 --disable-usage-stats
 
-RUNTIME_ENV_JSON="{\"env_vars\": {\"PYTHONPATH\": \"$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT\", \"LD_LIBRARY_PATH\": \"/root/cudart_block:$CONDA_PREFIX/lib\", \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\"}}"
+RUNTIME_ENV_JSON="{\"env_vars\": {\"PYTHONPATH\": \"$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT\", \"LD_LIBRARY_PATH\": \"${CUDART_BLOCK:-/root/cudart_block}:$CONDA_PREFIX/lib\", \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\"}}"
 
 ray job submit --address="http://127.0.0.1:8265" \
    --runtime-env-json="$RUNTIME_ENV_JSON" \

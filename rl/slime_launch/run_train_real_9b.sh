@@ -15,10 +15,10 @@
 set -ex
 export PYTHONUNBUFFERED=1
 
-REPO_ROOT=/mnt/data0/ys/LDM
+REPO_ROOT=${REPO_ROOT:-/mnt/data0/ys/LDM}
 SLIME_ROOT=$REPO_ROOT/rl/slime
-MEGATRON_ROOT=/root/megatron-lm
-CONDA_PREFIX=/root/micromamba/envs/slime
+MEGATRON_ROOT=${MEGATRON_ROOT:-/root/megatron-lm}
+CONDA_PREFIX=${CONDA_PREFIX:-/root/micromamba/envs/slime}
 CONFIG=$REPO_ROOT/rl/slime_launch/config_real.json
 
 MODEL_HF=${MODEL_HF:-/mnt/data0/hf_models/models/Qwen3.5-9B}
@@ -28,11 +28,11 @@ SAVE=${SAVE:-$REPO_ROOT/rl/qwen3.5-9B_slime_train}
 WANDB_PROJECT=${WANDB_PROJECT:-ldm-sm-rl}
 WANDB_RUN=${WANDB_RUN:-$(basename "$SAVE")}
 
-mkdir -p /root/cudart_block
-touch /root/cudart_block/libcudart.so.13
+mkdir -p ${CUDART_BLOCK:-/root/cudart_block}
+touch ${CUDART_BLOCK:-/root/cudart_block}/libcudart.so.13
 
 export PATH=$CONDA_PREFIX/bin:$PATH
-export LD_LIBRARY_PATH=/root/cudart_block:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${CUDART_BLOCK:-/root/cudart_block}:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 export PYTHONPATH=$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT:$PYTHONPATH
 export CUDA_HOME=$CONDA_PREFIX
 export CUDA_VISIBLE_DEVICES=0,1,2,3
@@ -109,7 +109,7 @@ ray stop --force 2>/dev/null || true
 sleep 3
 ray start --head --node-ip-address 127.0.0.1 --num-gpus 4 --disable-usage-stats
 
-RUNTIME_ENV_JSON="{\"env_vars\": {\"PYTHONPATH\": \"$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT\", \"LD_LIBRARY_PATH\": \"/root/cudart_block:$CONDA_PREFIX/lib\", \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\"}}"
+RUNTIME_ENV_JSON="{\"env_vars\": {\"PYTHONPATH\": \"$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT\", \"LD_LIBRARY_PATH\": \"${CUDART_BLOCK:-/root/cudart_block}:$CONDA_PREFIX/lib\", \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\"}}"
 
 ray job submit --address="http://127.0.0.1:8265" \
    --runtime-env-json="$RUNTIME_ENV_JSON" \

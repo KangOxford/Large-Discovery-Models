@@ -2,10 +2,10 @@
 set -ex
 export PYTHONUNBUFFERED=1
 
-REPO_ROOT=/mnt/data0/ys/LDM
+REPO_ROOT=${REPO_ROOT:-/mnt/data0/ys/LDM}
 SLIME_ROOT=$REPO_ROOT/rl/slime
-MEGATRON_ROOT=/root/megatron-lm
-CONDA_PREFIX=/root/micromamba/envs/slime
+MEGATRON_ROOT=${MEGATRON_ROOT:-/root/megatron-lm}
+CONDA_PREFIX=${CONDA_PREFIX:-/root/micromamba/envs/slime}
 
 export PATH=$CONDA_PREFIX/bin:$PATH
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
@@ -24,12 +24,12 @@ MODEL_ARGS=(
 )
 
 CKPT_ARGS=(
-   --hf-checkpoint /mnt/data0/hf_models/models/Qwen2.5-1.5B-Instruct
-   --ref-load /mnt/data0/ys/LDM/rl/qwen2.5-1.5B_torch_dist_te
+   --hf-checkpoint ${HF_MODELS:-/mnt/data0/hf_models/models}/Qwen2.5-1.5B-Instruct
+   --ref-load $REPO_ROOT/rl/qwen2.5-1.5B_torch_dist_te
 )
 
 ROLLOUT_ARGS=(
-   --prompt-data /mnt/data0/ys/LDM/rl_episodes_sm.jsonl
+   --prompt-data $REPO_ROOT/rl_episodes_sm.jsonl
    --input-key prompt --label-key label
    --num-rollout 1 --rollout-batch-size 1 --n-samples-per-prompt 1
    --rollout-max-response-len 512 --rollout-temperature 0.8
