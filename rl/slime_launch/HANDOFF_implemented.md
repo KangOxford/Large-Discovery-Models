@@ -1,198 +1,203 @@
-# 小分子 RL 交接指南 —— 实施进度对照
+# 交接的活干到哪了
 
-对照 [`HANDOFF.md`](HANDOFF.md) 逐条列出交接方要求的事项与当前状态。
-在 **Isambard-AI**（GH200 / aarch64 / 驱动 565 / CUDA 12.7，分区 `workq`）上执行。
+对着 [`HANDOFF.md`](HANDOFF.md) 一条一条说：哪些做完了，哪些没做完，没做完的卡在哪。
+机器是 Isambard-AI（GH200，aarch64，驱动 565 / CUDA 12.7，分区 `workq`）。
 
-**读法**：~~划掉的是已完成的~~；**未完成的加粗并链接到一个 notebook**，
-每个未完成项对应一个文件，里面有图、数据和判定标准。
+~~划掉的做完了~~；**没做完的加粗，点进去是一个 notebook**，里面有图、有数、
+还有一句「怎么算过了」——那句话是在测之前写的，不是看完结果再补的。
 
 ---
 
-## 总览
+## 一眼看完
 
-| HANDOFF 章节 | 事项 | 状态 |
+| HANDOFF | 要做的事 | 现在 |
 |---|---|---|
-| §0 | 硬件前置 | ~~完成~~ |
-| §1 | CUDA 红线（cu128/cu129） | ~~完成~~ |
-| §2A | 训练栈（torch / TE / Megatron / Slime / sglang） | ~~完成~~ |
-| §2B | 评测栈（docking + GP + activity） | ~~完成~~ |
-| §2C | 仓库本体 | ~~完成~~ |
-| §3 | 资产（模型 / vina / 活性模型 / 受体） | ~~完成~~ |
-| §4 | 准备（转换 / 生成 episodes / 暖机 GP） | ~~完成~~ |
-| §5 | 怎么跑（4 个 run × ≥3–5 seed） | **未完成** · [03](handoff_notebooks/03_p2_training_matrix.ipynb) · [06](handoff_notebooks/06_seed_offset_missing.ipynb) |
-| §6 P0 | 1.5B 跑通 GRPO，验 backward + docking + **reward** | 部分 —— backward/docking ~~完成~~，**reward 未通过** · [01](handoff_notebooks/01_reward_always_zero.ipynb) |
-| §6 P1 | 9B real 极小 count 冒烟 | 部分 —— 冒烟 ~~成功过~~，**稳定性未完成** · [02](handoff_notebooks/02_9b_run_stability.ipynb) |
-| §6 P2 | R1–R4 × seed 真训练 | **未开始** · [03](handoff_notebooks/03_p2_training_matrix.ipynb) |
-| §6 步骤 4 | 离线在 C & D 上评测 | **未开始**（前置 QSAR ~~已完成~~）· [04](handoff_notebooks/04_offline_evaluation.ipynb) |
-| §7 | 已知坑 | ~~全部验证过~~，另有三条新的（见文末） |
-| — | GP kernel 选择与 EHVI 衰减 | HANDOFF 未涉及，但 P2 前必须定 · [05](handoff_notebooks/05_gp_kernel_and_ehvi_decay.ipynb) |
+| §0 | 机器够不够 | ~~够~~ |
+| §1 | torch 只能用 cu128/cu129 | ~~照做了~~ |
+| §2A | 训练那套（torch / TE / Megatron / Slime / sglang） | ~~都装上了~~ |
+| §2B | 打分那套（docking + GP + 活性模型） | ~~都装上了~~ |
+| §2C | 代码本体 | ~~拉下来了~~ |
+| §3 | 模型、vina、活性模型、受体 | ~~六样都有~~ |
+| §4 | 转格式、生成 episodes、暖 GP | ~~都跑过了~~ |
+| §5 | 四个 run，每个 ≥3–5 个种子 | **没做** · [03](handoff_notebooks/03_p2_training_matrix.ipynb)；而且 `--seed-offset` 这个参数压根不存在 · [06](handoff_notebooks/06_seed_offset_missing.ipynb) |
+| §6 P0 | 1.5B 跑通，验 backward + docking + **reward** | 前两样 ~~过了~~，**reward 这样没过** · [01](handoff_notebooks/01_reward_always_zero.ipynb) |
+| §6 P1 | 9B 小规模冒烟 | ~~冒烟成过一次~~，但 **29 个 9B run 没一个活下来** · [02](handoff_notebooks/02_9b_run_stability.ipynb) |
+| §6 P2 | R1–R4 × 种子，正式训练 | **一个都没起** · [03](handoff_notebooks/03_p2_training_matrix.ipynb) |
+| §6 第 4 步 | 在 C 和 D 上离线打分 | **没开始**；~~它要的 QSAR 模型倒是训好了~~ · [04](handoff_notebooks/04_offline_evaluation.ipynb) |
+| §7 | 六个已知的坑 | ~~都撞过一遍，确认属实~~，另外又踩出三个（见最后） |
+| — | GP 用哪个 kernel、EHVI 会衰减 | HANDOFF 没写，但 P2 之前必须定 · [05](handoff_notebooks/05_gp_kernel_and_ehvi_decay.ipynb) |
 
-**一句话结论**：环境和准备工作全部完成，1.5B 全链路跑通，9B 冒烟成功过；
-但 **GRPO 拿不到梯度**：环境 reward 是正常的（555 步里 87% 在 1e-6 以上，
-中位数 1e-2），坏掉的是**组内方差**——`advantage = (r − mean) / std`，
-一组轨迹拿到相同 reward 时分子分母同时为 0。所以 P2 现在跑也学不到东西，
-这是当前唯一需要先解决的事。
+**一句话**：装机器、备数据这些全做完了，1.5B 能从头跑到尾，9B 也冒烟成功过一次。
+**但 GRPO 现在拿不到梯度**——不是 reward 坏了（reward 好得很，771 步里 86% 都在
+1e-6 以上，中位数 1e-2），是**一组里几条轨迹拿到的 reward 一模一样**。
+GRPO 要除以组内的标准差，几条都一样就等于除以 0，reward 再大也没用。
+所以 P2 现在就算跑起来也学不到东西，**这是唯一挡在前面的事**。
 
 ---
 
-## §0 硬件前置
+## §0 机器
 
-- ~~`uname -m` → aarch64；驱动 565 / CUDA 12.7；4×GH200 每卡 96 GB~~
-- ~~磁盘：模型 + torch_dist + 中间产物均已落地~~
-- ~~能联网到 HuggingFace~~
+- ~~`uname -m` 是 aarch64，驱动 565 / CUDA 12.7，4 张 GH200 每张 96 GB~~
+- ~~盘够：模型、torch_dist、中间产物都放得下~~
+- ~~能连 HuggingFace~~
 
-## §1 ⚠️ CUDA 红线
+## §1 CUDA 那条红线
 
-- ~~torch 装的是 `+cu128`，`torch.cuda.is_available()` 为 True~~
+- ~~torch 装的是 `+cu128`，`torch.cuda.is_available()` 是 True~~
 
-这条红线在别处踩到过并确认：cu130 的轮子跨 major 版本必挂，
-`is_available()` 直接 False，与 HANDOFF 描述一致。
+这条我们在别的项目上撞过：cu130 的轮子跨大版本一定挂，`is_available()` 直接
+返回 False，和 HANDOFF 写的一样。
 
 ## §2 装环境
 
-### 2A 训练栈
-- ~~torch（aarch64, cu128）~~
-- ~~Transformer Engine —— 装成，**且 backward 不 SIGSEGV**（§6 P0 已验）~~
-- ~~Megatron-LM checkout 到 `1dcf0daf`~~
+### 2A 训练那套
+- ~~torch（aarch64，cu128）~~
+- ~~Transformer Engine：装上了，**而且反向传播不 SIGSEGV**（P0 已经验过）~~
+- ~~Megatron-LM 切到 `1dcf0daf`~~
 - ~~Slime + ray~~
-- ~~sglang（aarch64 可用版本）~~
-- ~~APEX：未装，脚本走 `--no-gradient-accumulation-fusion`，按 HANDOFF 说明可省~~
+- ~~sglang（aarch64 能用的版本）~~
+- ~~APEX 没装，脚本走 `--no-gradient-accumulation-fusion`，HANDOFF 说可以省~~
 
-TE 这一环是 HANDOFF 点名「ABI 最敏感」的，实测在 aarch64 上装成且
-反向传播正常——**HANDOFF 担心的那个风险没有发生**。
+TE 是 HANDOFF 特意点出来「ABI 最容易出问题」的一环。实测在 aarch64 上装得上，
+反向也正常——**HANDOFF 担心的那件事没发生**。
 
-### 2B 评测栈
-- ~~gpytorch / gauche / lightgbm / scikit-learn / joblib / rdkit / meeko / gemmi …~~
-- ~~vina 二进制（aarch64），路径已填进 `config_real.json:vina_bin`~~
-- ~~`vina_max_workers` 已按 288 核调~~
+### 2B 打分那套
+- ~~gpytorch / gauche / lightgbm / scikit-learn / joblib / rdkit / meeko / gemmi 这些~~
+- ~~vina 的 aarch64 二进制，路径填进了 `config_real.json:vina_bin`~~
+- ~~`vina_max_workers` 按 288 核调过了~~
 
-docking 实测单次 `env.step` 4.09 秒，与 HANDOFF 预期的量级吻合。
+实测一次 `env.step` 4.09 秒，和 HANDOFF 说的差不多。
 
-### 2C 仓库本体
-- ~~clone + submodule + PYTHONPATH~~
+### 2C 代码本体
+- ~~clone、submodule、PYTHONPATH 都弄好了~~
 
-## §3 资产
+## §3 要准备的东西
 
-| 资产 | 状态 |
+| 东西 | 现在 |
 |---|---|
-| base Qwen3.5-9B | ~~已下载~~ |
-| SFT no-GP 模型（LDM-CoT-SFT） | ~~已下载~~ |
-| 冒烟用 Qwen2.5-1.5B-Instruct | ~~已下载~~ |
-| vina 二进制（aarch64） | ~~已装~~ |
-| G12D 活性模型 | ~~随 repo 提供~~ |
-| 8UN5 受体 | ~~已就位~~ |
+| base Qwen3.5-9B | ~~下好了~~ |
+| SFT 模型（LDM-CoT-SFT） | ~~下好了~~ |
+| 冒烟用的 Qwen2.5-1.5B-Instruct | ~~下好了~~ |
+| vina 二进制（aarch64） | ~~装好了~~ |
+| G12D 活性模型 | ~~repo 自带~~ |
+| 8UN5 受体 | ~~有~~ |
 
-## §4 准备（一次）
+## §4 一次性的准备工作
 
-- ~~`convert_9b.sh` 转 Megatron torch_dist —— base 与 SFT 各一次，两个目录都在~~
-- ~~`gen_episodes_runs.sh` 生成 4 个 run 的 episodes~~
-- ~~`run_warmup_real_slime.sh` 暖共享 GP —— 得到 63 行、41 个唯一分子~~
+- ~~`convert_9b.sh` 转 Megatron torch_dist，base 和 SFT 各转一次，两个目录都在~~
+- ~~`gen_episodes_runs.sh` 生成四个 run 的 episodes~~
+- ~~`run_warmup_real_slime.sh` 暖 GP，得到 63 行、41 个不重样的分子~~
 
-在此基础上，各 run 至今累计追加 **1751 次真实评测**，
-去重后的分子池已重建到 **1493 个唯一分子**。
+后来各个 run 又跑出 **1751 次真实评测**，去重之后分子池现在有 **1493 个**。
 
 ## §5 怎么跑
 
-- ~~单节点 4×GH200 的 TP / rollout-gpus / actor-gpus 已按 4 卡调~~
-- ~~Slurm 提交路径打通~~（实际改用 attach 到已有分配，见文末新坑第 2 条）
-- **每个 run ≥3–5 seed** → 未做，见 [03](handoff_notebooks/03_p2_training_matrix.ipynb)
-- **`--seed-offset` 这个参数不存在** → 见 [06](handoff_notebooks/06_seed_offset_missing.ipynb)
+- ~~单节点 4 卡的 TP、rollout-gpus、actor-gpus 都按 4 卡改过了~~
+- ~~sbatch 能提交~~（实际是 attach 到已有的分配上跑，原因见最后第 2 条）
+- **每个 run ≥3–5 个种子**：没做，见 [03](handoff_notebooks/03_p2_training_matrix.ipynb)
+- **`--seed-offset` 这个参数不存在**：见 [06](handoff_notebooks/06_seed_offset_missing.ipynb)
 
 ## §6 训练计划
 
-### ~~P0：1.5B 跑通 GRPO~~ —— 三项里通过两项
+### P0：1.5B 跑通 —— 三样过了两样
 
-- ~~backward 在 ARM/TE 上不 SIGSEGV~~
-- ~~docking 全链路通~~
-- **reward 未通过** → [01_reward_always_zero.ipynb](handoff_notebooks/01_reward_always_zero.ipynb)
+- ~~ARM 上 backward 不 SIGSEGV~~
+- ~~docking 从头到尾能跑~~
+- **reward 这样没过** → [01](handoff_notebooks/01_reward_always_zero.ipynb)
 
-  全链路能跑 **≠** 训练能学。**先纠正我自己一次读错字段**：
-  `rollout/rewards` 是 GRPO 归一化之后的 advantage，不是环境 reward；
-  环境 reward 在同一个字典里叫 `raw_reward`。读对之后：
-  **34 个 run、555 步，环境 reward 有 87% 在 `1e-6` 以上、中位数 `1e-2`**，
-  完全正常。
+  **从头跑到尾不报错，不等于模型在学东西。**
 
-  坏的是**组内方差**：`advantage = (r − mean) / std`，一组轨迹拿到相同
-  reward 时分子分母同时为 0，梯度为零——**reward 再大也没用**。
-  实测零方差组累计 **409 次**。一个成因是解析失败率约 81%
-  （观测被裸拼进对话破坏了 chat 格式，round 1 之后模型不再输出 JSON），
-  整组一起失败就一起拿 0。
+  先说我自己看错的一个地方：我一直盯着 `rollout/rewards`，看它总在 1e-8 上下，
+  就断定 reward 是零。**那个字段不是环境给的 reward**，是 GRPO 归一化之后的
+  advantage，`(r − mean) / std`。环境 reward 在同一个字典里，叫 `raw_reward`。
 
-  **格式修复已验证，但只解决了一半**：把观测包成独立的 user turn 之后，
-  **解析失败率 81.1% → 0.5%**（1249 次失败基本清零）。
-  而**零方差组没有下降**：0.69 → 0.84 每步，反而略升。
+  看对地方之后：**43 个 run、771 步，环境 reward 有 86% 在 1e-6 以上，
+  中位数 1e-2**，正是 EHVI 该有的大小。reward 一点毛病没有。
 
-  我先前在这里报过「降 43%（0.69 → 0.39）」，那是**只跑了 36 步时**的读数，
-  步数涨到 147 之后翻转。口径已改成只计步数 ≥15 的 run——
-  只跑几步的 run 的 `zero_std/step` 噪声极大（0.00 与 1.00 都出现过）。
+  出问题的是**一组里几条轨迹的 reward 全一样**。GRPO 要拿组内的标准差去除，
+  几条一样就是除以 0，这一组对参数更新一点贡献都没有——reward 再大也白搭。
+  771 步里这样的组累计出现 **565 次**。
 
-  按预登记的判定标准，这个结果指向明确的下一步：**解析失败几乎不是
-  零方差的成因**（失败率 0.5% 时零方差仍是 0.84），成因在
-  `n_samples_per_prompt`（当前是 2，一组只有两条轨迹）或候选去重。
-  `n=8` 的对照正在跑。
+  **本来以为是解析失败导致的，测下来不是。** 之前发现有八成的轮次解析不出
+  候选（环境给的观测直接接在模型上一轮回答后面，把 chat 格式弄坏了，
+  从第 1 轮起模型就不再输出 JSON），一组里全失败就全拿 0。把观测包成
+  一个独立的 user turn 之后：
 
-### P1：9B real 极小 count 冒烟 —— 冒烟成功，稳定性未完成
+  | | 旧代码 | 新代码 |
+  |---|---:|---:|
+  | 解析失败率 | 78.3% | **0.4%** |
+  | 每步零方差组 | 0.68 | **0.82** |
 
-- ~~hybrid backward 与显存验证通过~~：双节点分卡布局下 `needs_offload=False`，
-  绕开了 `torch_memory_saver` 那个断言；`R2-nonanguard` 单个 run 产出 500 次真实评测
-- **29 个 9B run 至今零存活** → [02_9b_run_stability.ipynb](handoff_notebooks/02_9b_run_stability.ipynb)
+  **解析失败基本清零了，零方差反而略升。** 按事先写好的那句标准，
+  这个结果说明**解析失败几乎不是零方差的原因**，得往别处找：
+  `n_samples_per_prompt` 现在是 2，一组只有两条轨迹，两条撞出同一个分子太容易；
+  再就是候选去重可能把不同轨迹并成了同一个。`n=8` 那一组正在跑。
 
-  45% 死于 GPU 显存被邻居占用，21% 死于**主机内存 OOM**（限制在 job 级 cgroup，
-  同一分配下所有 step 共享 449 GB）。后者可以事先查，前者在
-  `nodelock` 被禁用后规则内无法预留。
+  （中间我报过一次「零方差降了 43%」，那是新代码只跑了 36 步时的读数，
+  跑到 180 步就翻过来了。统计时已经改成只算跑够 15 步的 run——
+  只跑几步的 run，这个数噪声大到没意义，0.00 和 1.00 都出现过。）
 
-### P2：R1–R4 × seed 真训练 —— **未开始**
+### P1：9B 冒烟 —— 冒烟成了，但 run 活不下来
 
-→ [03_p2_training_matrix.ipynb](handoff_notebooks/03_p2_training_matrix.ipynb)
+- ~~hybrid 的 backward 和显存都验过~~：双节点分卡的摆法下 `needs_offload=False`，
+  绕开了 `torch_memory_saver` 那个断言；`R2-nonanguard` 一个 run 就跑出 500 次真实评测
+- **29 个 9B run 到现在一个都没活下来** → [02](handoff_notebooks/02_9b_run_stability.ipynb)
 
-七项技术准备已就绪（kernel、分卡布局、跨分配起 run、独立 GP/seed/输出目录、
-编排活过会话、节点排除、主机内存预检），**挡着的是 reward 有效性、
-9B 存活率、以及同时凑出 16 个空节点**。
+  45% 是显存被邻居占满，21% 是**主机内存被 OOM killer 杀掉**（上限在 job 这一级的
+  cgroup 上，同一个分配里所有 step 一起分 449 GB）。后面这种起跑前能查出来，
+  前面那种在 `nodelock` 被禁之后没法预留，只能认。
 
-### 步骤 4：离线在 C & D 上评测 —— **未开始**
+### P2：R1–R4 × 种子 —— **一个都没起**
 
-→ [04_offline_evaluation.ipynb](handoff_notebooks/04_offline_evaluation.ipynb)
+→ [03](handoff_notebooks/03_p2_training_matrix.ipynb)
 
-- ~~前置：`train_g12c_qsar.py` 训出的 QSAR 模型已完成~~
-  （`g12c_qsar_20260901T010923Z/best_model.joblib` 与 `g12d_qsar_matched_.../best_model.joblib`）
-- 评测本身缺的只是被评对象——P2 还没产出检查点
+技术上该弄的弄好了七项（kernel 选定、分卡摆法、跨分配起 run、每个 run 独立的
+GP/种子/输出目录、编排能活过会话、排掉自己在用的节点、起跑前查主机内存）。
+**挡着的是三件**：GRPO 拿不到梯度、9B 活不下来、以及凑不出 16 个空节点。
 
-## §7 已知坑 —— 原有的都验证过
+### 第 4 步：在 C 和 D 上离线打分 —— **没开始**
 
-- ~~CUDA 红线：确认 cu130 不可用~~
-- ~~TE / backward：aarch64 上装成，1.5B 冒烟通过~~
-- ~~9B 是 hybrid：转换/训练用 `qwen3.5-9B.sh` 的 spec，走通~~
-- ~~显存：9B + 分卡布局在 96 GB/卡上宽裕，每 rank 37.06 GiB 与预算逐位吻合~~
-- ~~docking 吞吐：`vina_max_workers=32` 生效，aarch64 vina 正常~~
-- ~~代码架构无关：`ldm_rl` 的 61 个测试在这里全过~~
+→ [04](handoff_notebooks/04_offline_evaluation.ipynb)
 
-### 新增三条
+- ~~HANDOFF 说可以并行做的那件前置（`train_g12c_qsar.py` 训 QSAR）已经做完~~
+  （`g12c_qsar_20260901T010923Z/best_model.joblib`，还有配套的 G12D 那个）
+- 缺的只是**要打分的东西**——P2 还没训出检查点
 
-1. **`--rollout-num-gpus 4` 会起 4 个独立 sglang 引擎**，每个都把完整的 9B
-   读进主机内存，这是主机内存 OOM 的直接来源。降到 2 个能减半，代价是一半推理吞吐。
-2. **`setsid nohup` 保护不了 Slurm step**：它只让编排脚本脱离会话，
-   而 srun 是它的子进程，step 的生命周期绑在 srun 客户端上。会话切换时
-   所有这样起的 run 会被 `srun: forcing job termination` 收割。要放 tmux。
-3. **`ehvi_all.py` 有一个 bare `except Exception: return _fallback(...)`**，
-   GP 出任何问题都会静默返回全零 EHVI。这次证据表明它没有触发
-   （`fallback_reason` 全是 None），但它是一个会把建模问题伪装成
-   「reward 就是 0」的静默失败点。
+## §7 HANDOFF 列的六个坑，都撞过
+
+- ~~cu130 确实不能用~~
+- ~~TE 在 aarch64 上装得上，1.5B 冒烟通过~~
+- ~~9B 是 hybrid，转换和训练都用 `qwen3.5-9B.sh` 的 spec，走通了~~
+- ~~显存宽裕：分卡之后每个 rank 37.06 GiB，和算出来的一分不差~~
+- ~~docking 吞吐：`vina_max_workers=32` 生效，aarch64 的 vina 正常~~
+- ~~代码本身与架构无关：`ldm_rl` 的 61 个测试在这台机器上全过~~
+
+### 我们又踩出三个
+
+1. **`--rollout-num-gpus 4` 会起四个各自独立的 sglang 引擎**，每个都要把整个 9B
+   读进主机内存——主机内存被杀就是这么来的。改成两个能减一半，代价是推理吞吐减半。
+2. **`setsid nohup` 保不住 Slurm step。** 它只让编排脚本脱离会话，可 srun 是这个
+   脚本的子进程，而 step 的命跟着 srun 走。会话一换，这样起的 run 全被
+   `srun: forcing job termination` 收走。得放进 tmux。
+3. **`ehvi_all.py` 里有一个 `except Exception: return _fallback(...)`**，
+   GP 但凡出点问题，它就悄悄返回一整片 0 的 EHVI。这次的证据说明它没被触发过
+   （`fallback_reason` 全是 None），但它是个会把建模问题装扮成「reward 就是 0」的地方。
 
 ---
 
-## 每个未完成项的详细说明
+## 六个 notebook 分别讲什么
 
 | # | notebook | 讲什么 |
 |---|---|---|
-| 01 | [GRPO 组内零方差](handoff_notebooks/01_reward_always_zero.ipynb) | 环境 reward 正常（87% >1e-6），零方差组 409 次；成因与判定标准 |
-| 02 | [9B 训练不稳定](handoff_notebooks/02_9b_run_stability.ipynb) | 两类 OOM 的区分与各自修法；job 级 cgroup 的 449 GB 限制 |
-| 03 | [P2 训练矩阵](handoff_notebooks/03_p2_training_matrix.ipynb) | 十项前置的就绪度；矩阵规模与代价 |
-| 04 | [离线评测](handoff_notebooks/04_offline_evaluation.ipynb) | 前置已完成；不依赖 P2 的两件可先做的事 |
-| 05 | [GP kernel 与 EHVI 衰减](handoff_notebooks/05_gp_kernel_and_ehvi_decay.ipynb) | sk 阶 2.68 生产不可用；EHVI 随历史趋零是 P2 的隐患 |
-| 06 | [`--seed-offset` 不存在](handoff_notebooks/06_seed_offset_missing.ipynb) | 三个 seed 是三件不同的事；HANDOFF 该怎么改 |
+| 01 | [GRPO 拿不到梯度](handoff_notebooks/01_reward_always_zero.ipynb) | reward 是好的（86% 在 1e-6 以上），是一组里几条轨迹的 reward 全一样；565 次 |
+| 02 | [9B run 活不下来](handoff_notebooks/02_9b_run_stability.ipynb) | 两种 OOM 得反着修；job 级 cgroup 那 449 GB 是怎么分的 |
+| 03 | [P2 矩阵](handoff_notebooks/03_p2_training_matrix.ipynb) | 十项准备各是什么状态；这个矩阵要多少机器、跑多久 |
+| 04 | [离线打分](handoff_notebooks/04_offline_evaluation.ipynb) | 前置已经做完；不等 P2 也能先做的两件事 |
+| 05 | [GP kernel 和 EHVI 衰减](handoff_notebooks/05_gp_kernel_and_ehvi_decay.ipynb) | sk 涨得太快（2.68 次方），生产规模跑不完；EHVI 会随历史变 0 |
+| 06 | [`--seed-offset` 不存在](handoff_notebooks/06_seed_offset_missing.ipynb) | 有三个 seed，管的是三件不同的事；HANDOFF 该怎么改 |
 
-完整的调查记录（含每条结论的证据与被推翻的中间结论）在
+完整的过程记录（每条结论的证据，以及后来被自己推翻的那些）在
 `/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_rl/results/FINDINGS.md`。
 
-四个已修的代码缺陷已开 PR：
+改掉的四个代码问题已经开了 PR：
 <https://github.com/YihangChen9/Large-Discovery-Models/pull/1>
