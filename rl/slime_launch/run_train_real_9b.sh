@@ -236,7 +236,7 @@ if [ "${SLIME_SPLIT_NODES:-0}" = "1" ]; then
    _need_gpus=$(( ${ACTOR_GPUS:-4} + ${ROLLOUT_GPUS:-4} ))
    echo "[ray] 等集群凑满 ${_need_gpus} 张卡..."
    _t0=$(date +%s)
-   for _i in $(seq 1 60); do
+   for _i in $(seq 1 ${RAY_WAIT_TRIES:-60}); do   # 高负载下 5 分钟不够,可用 RAY_WAIT_TRIES 延长
       _have=$(RAY_ADDRESS=auto timeout 20 python3 -c "
 import ray; ray.init(address='auto', log_to_driver=False)
 print(int(ray.cluster_resources().get('GPU', 0))); ray.shutdown()" 2>/dev/null | tail -1)
@@ -254,6 +254,10 @@ print(int(ray.cluster_resources().get('GPU', 0))); ray.shutdown()" 2>/dev/null |
 fi
 
 
+# EXTRA_ARGS：临时诊断用的额外命令行参数(空格分隔的一串)。
+# 排在最后,所以它可以覆盖前面数组里的同名参数 —— argparse 取后者。
+# 例:EXTRA_ARGS="--no-check-for-nan-in-loss-and-grad" 关掉 Megatron 的 NaN 守卫,
+# 用来看 loss 本身是否有限(**只能当诊断**:NaN 梯度会污染参数)。
 RUNTIME_ENV_JSON="{\"env_vars\": {\"PYTHONPATH\": \"$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT\", \"LD_LIBRARY_PATH\": \"${CUDART_BLOCK:-/root/cudart_block}:$CONDA_PREFIX/lib\", \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\"}}"
 
 # 两条路径,由 SLIME_LAUNCH_MODE 选。默认 jobsubmit(作者原样)。
@@ -267,7 +271,7 @@ if [ "${SLIME_LAUNCH_MODE:-jobsubmit}" = "direct" ]; then
    ${PLACEMENT_ARGS[@]} \
    ${MODEL_ARGS[@]} ${CKPT_ARGS[@]} ${ROLLOUT_ARGS[@]} \
    ${PERF_ARGS[@]} ${GRPO_ARGS[@]} ${OPTIMIZER_ARGS[@]} \
-   ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]} ${WANDB_ARGS[@]}
+   ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]} ${WANDB_ARGS[@]} ${EXTRA_ARGS:-}
 else
 ray job submit --address="http://127.0.0.1:8265" \
    --runtime-env-json="$RUNTIME_ENV_JSON" \
@@ -275,5 +279,5 @@ ray job submit --address="http://127.0.0.1:8265" \
    ${PLACEMENT_ARGS[@]} \
    ${MODEL_ARGS[@]} ${CKPT_ARGS[@]} ${ROLLOUT_ARGS[@]} \
    ${PERF_ARGS[@]} ${GRPO_ARGS[@]} ${OPTIMIZER_ARGS[@]} \
-   ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]} ${WANDB_ARGS[@]}
+   ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]} ${WANDB_ARGS[@]} ${EXTRA_ARGS:-}
 fi

@@ -1,0 +1,155 @@
+#!/bin/bash
+# run_train_real_slime.sh 的可参数化副本（原文件第 50 行把三个 GRPO 关键参数硬写死：
+#   --num-rollout 16 --rollout-batch-size 2 --n-samples-per-prompt 1
+# 其中 n-samples-per-prompt=1 意味着每组只有一个样本，GRPO 在数学上不可能有梯度
+# —— 那是冒烟配置。config 里的 num_rollout=50 / n_samples_per_prompt=2 对这条路径无效。）
+#
+# 用 NUM_ROLLOUT_1P5B / ROLLOUT_BATCH_1P5B / N_SAMPLES_1P5B 覆盖，默认值 = 原来的硬写值，
+# 所以不设变量时行为与原脚本逐字相同。EXTRA_ARGS 排在命令行末尾（argparse 取后者）。
+set -ex
+export PYTHONUNBUFFERED=1
+
+REPO_ROOT=${REPO_ROOT:-/mnt/data0/ys/LDM}
+SLIME_ROOT=$REPO_ROOT/rl/slime
+MEGATRON_ROOT=${MEGATRON_ROOT:-/root/megatron-lm}
+CONDA_PREFIX=${CONDA_PREFIX:-/root/micromamba/envs/slime}
+# 与 run_train_real_9b.sh 一致的可覆盖入口。原来这里是命令行里的字面路径,
+# 外面 export SAVE= 到不了它 —— 实测 P0 那次就存到了脚本的默认目录。
+SAVE=${SAVE:-$REPO_ROOT/rl/qwen2.5-1.5B_slime_train_real}
+
+# 与 run_train_real_9b.sh 一致的可覆盖入口。gen_episodes_runs.sh 现在按 run 产出
+# rl_episodes_sm_{warmup,acqmax,acqmean,hv}.jsonl,不再产出单一的 _real.jsonl,
+# 所以这里必须能从外面指定用哪个。
+EPISODES=${EPISODES:-$REPO_ROOT/rl_episodes_sm_real.jsonl}
+
+
+# Block the system CUDA 13.0 libcudart.so.13 (visible via ldconfig) for the
+# SLIME-side processes only; the task-venv worker strips this itself.
+mkdir -p ${CUDART_BLOCK:-/root/cudart_block}
+touch ${CUDART_BLOCK:-/root/cudart_block}/libcudart.so.13
+
+export PATH=$CONDA_PREFIX/bin:$PATH
+export LD_LIBRARY_PATH=${CUDART_BLOCK:-/root/cudart_block}:$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+export PYTHONPATH=$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT:$PYTHONPATH
+export CUDA_HOME=$CONDA_PREFIX
+export CUDA_VISIBLE_DEVICES=1,2,3
+export CUDA_DEVICE_MAX_CONNECTIONS=1
+
+cd "$SLIME_ROOT"
+
+MODEL_ARGS=(
+   --swiglu --num-layers 28 --hidden-size 1536 --ffn-hidden-size 8960
+   --num-attention-heads 12 --use-rotary-position-embeddings --disable-bias-linear
+   --add-qkv-bias --normalization "RMSNorm" --norm-epsilon 1e-6 --rotary-base 1000000
+   --group-query-attention --num-query-groups 2 --vocab-size 151936
+)
+
+CKPT_ARGS=(
+   --hf-checkpoint ${HF_MODELS:-/mnt/data0/hf_models/models}/Qwen2.5-1.5B-Instruct
+   --ref-load $REPO_ROOT/rl/qwen2.5-1.5B_torch_dist_te
+   --save "$SAVE"
+   --save-interval 10
+)
+
+ROLLOUT_ARGS=(
+   --prompt-data "$EPISODES"
+   --input-key prompt --label-key label
+   --num-rollout ${NUM_ROLLOUT_1P5B:-16} --rollout-batch-size ${ROLLOUT_BATCH_1P5B:-2} --n-samples-per-prompt ${N_SAMPLES_1P5B:-1}
+   --rollout-max-response-len 8192 --rollout-temperature 0.8
+   --global-batch-size 2 --balance-data
+)
+
+PERF_ARGS=(
+   --tensor-model-parallel-size 1
+   --pipeline-model-parallel-size 1 --context-parallel-size 1
+   --use-dynamic-batch-size --max-tokens-per-gpu 8192
+)
+
+APEX_ARGS=(--no-gradient-accumulation-fusion)
+
+GRPO_ARGS=(
+   --advantage-estimator grpo
+   --use-kl-loss --kl-loss-coef 0.001 --kl-loss-type low_var_kl
+   --eps-clip 0.2 --eps-clip-high 0.28
+)
+
+OPTIMIZER_ARGS=(
+   --optimizer adam --lr 1e-6 --lr-decay-style constant
+   --weight-decay 0.01 --adam-beta1 0.9 --adam-beta2 0.98
+)
+
+SGLANG_ARGS=(
+   # 注意力后端:sglang 不指定时会自选 fa3,而 **aarch64 版的 sglang-kernel 轮子里
+   # 没有编 FA3 内核** —— 运行到建引擎那一步才报
+   #   ImportError: Can not import FA3 in sgl_kernel
+   # 而 pip install 与 import sgl_kernel 都是成功的,所以这件事只有跑起来才暴露。
+   # GH200 上实测可用:triton 3.6.0 与 flashinfer 0.6.12。取 triton —— 它与架构
+   # 无关,也是 slime 自己的 Dockerfile 在绕不过 FlashQLA 时用的那个。
+   --sglang-attention-backend ${SGLANG_ATTENTION_BACKEND:-triton}
+   --rollout-num-gpus 2 --sglang-mem-fraction-static 0.7
+)
+
+CUSTOM_ARGS=(
+   --custom-generate-function-path ldm_rl.bridge.generate
+   --custom-rm-path ldm_rl.bridge.reward_func
+)
+
+ray stop --force 2>/dev/null || true
+sleep 3
+ray start --head --node-ip-address 127.0.0.1 --num-gpus 3 --disable-usage-stats
+
+# `ray start` 返回只表示 raylet 进程起来了,**不表示它已经能接受 worker 注册**。
+# 2026-09-01 在 GH200 上量过:ray start 返回之后还要 **约 66 秒**驱动才连得上。
+# 落在这个窗口里的驱动**不会超时报错,而是无限期阻塞** —— 实测 P0 与暖机两次
+# 都停在 ray._raylet.CoreWorker(...) 构造里,主线程的内核等待点是
+# unix_stream_read_generic(在等 raylet 经 Unix socket 的回复),CPU 0%、GPU 全空、
+# 日志一行不出。所以它看起来像死锁而不像竞态。
+#
+# 注意 `ray status` **不能**当就绪判据:实测它在驱动还连不上的时候就已经能通了
+# (它只经 GCS)。唯一可靠的判据是**真的用驱动连一次**,也就是下面这个探针。
+_ray_wait_ready() {
+    local i t0 addr
+    t0=$(date +%s)
+    for i in $(seq 1 40); do
+        if timeout 20 python3 -c "import ray; ray.init(address='auto', log_to_driver=False); ray.shutdown()" \
+             >/dev/null 2>&1; then
+            echo "[ray] 驱动可连(ray start 返回后 $(( $(date +%s) - t0 ))s)"
+            return 0
+        fi
+    done
+    echo "FATAL: ray start 之后 $(( $(date +%s) - t0 ))s 驱动仍连不上"
+    return 1
+}
+_ray_wait_ready || exit 3
+
+
+RUNTIME_ENV_JSON="{\"env_vars\": {\"PYTHONPATH\": \"$MEGATRON_ROOT:$REPO_ROOT/rl:$REPO_ROOT\", \"LD_LIBRARY_PATH\": \"${CUDART_BLOCK:-/root/cudart_block}:$CONDA_PREFIX/lib\", \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\"}}"
+
+# 两条路径,由 SLIME_LAUNCH_MODE 选。默认 jobsubmit(作者原样)。
+#
+# 为什么需要 direct:在 GH200 上 `ray job submit` 两次都以
+#   RuntimeError: Request failed with status code 504
+# 结束。dashboard 的访问日志显示 GET /api/version 返回 200,之后**没有**
+# POST /api/jobs/ 完成 —— 创建作业那个请求在 dashboard 的 JobHead 子进程模块
+# 那里超时了(第二次等了 5 分钟)。JobHead 自身启动正常、无报错。
+#
+# 而在**单节点本地集群**上,job-server 这一层买不到任何东西:同一个进程
+# 直接 ray.init 连上已起的集群就能跑,runtime_env 里那几个环境变量本来
+# 就已经在当前 shell 里 export 过,本地起的 worker 直接继承。
+# 所以 direct 不是绕过,是把一个多余的环节去掉。
+if [ "${SLIME_LAUNCH_MODE:-jobsubmit}" = "direct" ]; then
+   echo "[launch] 直接跑 train.py(跳过 ray job submit;单节点本地集群不需要 job server)"
+   RAY_ADDRESS=auto python3 train.py \
+      --actor-num-nodes 1 --actor-num-gpus-per-node 1 --rollout-num-gpus 2 \
+      ${MODEL_ARGS[@]} ${CKPT_ARGS[@]} ${ROLLOUT_ARGS[@]} \
+      ${PERF_ARGS[@]} ${GRPO_ARGS[@]} ${OPTIMIZER_ARGS[@]} \
+      ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]} ${EXTRA_ARGS:-}
+else
+ray job submit --address="http://127.0.0.1:8265" \
+   --runtime-env-json="$RUNTIME_ENV_JSON" \
+   -- python3 train.py \
+   --actor-num-nodes 1 --actor-num-gpus-per-node 1 --rollout-num-gpus 2 \
+   ${MODEL_ARGS[@]} ${CKPT_ARGS[@]} ${ROLLOUT_ARGS[@]} \
+   ${PERF_ARGS[@]} ${GRPO_ARGS[@]} ${OPTIMIZER_ARGS[@]} \
+   ${APEX_ARGS[@]} ${SGLANG_ARGS[@]} ${CUSTOM_ARGS[@]} ${EXTRA_ARGS:-}
+fi
