@@ -29,7 +29,20 @@ def extract_json_object_text(text: str) -> str:
     if fenced:
         return fenced.group(1)
     if stripped.startswith("{"):
-        return stripped
+        # Take the FIRST complete object, not the whole remaining string.
+        #
+        # A policy's turn very often carries a tail after its JSON: the chat
+        # template's own end-of-turn marker, a second copy of the same object,
+        # or a trailing sentence. Handing the whole string to json.loads then
+        # fails with "Extra data: line 1 column N" even though the object that
+        # starts at column 0 is perfectly well-formed -- 2026-09-02 measured a
+        # 1.5B run where the model emitted exactly the requested shape and the
+        # round was still rejected for this reason.
+        try:
+            _, end = json.JSONDecoder().raw_decode(stripped)
+        except ValueError:
+            return stripped          # let json.loads produce the real message
+        return stripped[:end]
     start = stripped.find("{")
     end = stripped.rfind("}")
     if start < 0 or end <= start:
