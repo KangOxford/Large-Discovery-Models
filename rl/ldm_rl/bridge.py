@@ -21,6 +21,7 @@ Slime installed (unit tests inject fake dependencies instead).
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 
@@ -172,7 +173,22 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
                 sample.status = Sample.Status.TRUNCATED
                 break
 
-            step = env.step(cur_response)
+            # Slime schedules the trajectories of one rollout batch with
+            # ``asyncio.gather`` (sglang_rollout.py). ``env.step`` is blocking
+            # I/O -- ``RemoteLDMEnv.step`` writes to a subprocess stdin and
+            # blocks on ``stdout.readline`` -- so calling it directly holds the
+            # event loop for its full duration and every other trajectory in
+            # the batch stops. Measured on this cluster a single ``env.step``
+            # takes 4.09 s (docking dominates) and accounts for ~98% of a
+            # training step, so the loop spends nearly all of its time
+            # serialised on one trajectory.
+            #
+            # Each sample builds its own env above, so there is no shared
+            # state between the threads; the shared GP history file is
+            # guarded by flock in ``rl_real_shared.py``.
+            step = await asyncio.get_running_loop().run_in_executor(
+                None, env.step, cur_response
+            )
             last_step = step
             total_reward += step.reward
             sample.metadata["env_steps"].append(step.info)
