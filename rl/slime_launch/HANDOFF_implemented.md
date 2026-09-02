@@ -28,7 +28,8 @@
 | — | GP kernel 选择与 EHVI 衰减 | HANDOFF 未涉及，但 P2 前必须定 · [05](handoff_notebooks/05_gp_kernel_and_ehvi_decay.ipynb) |
 
 **一句话结论**：环境和准备工作全部完成，1.5B 全链路跑通，9B 冒烟成功过；
-但 **reward 从来没有非零过**，所以 P2 现在跑也学不到东西——
+但 **reward 没有产生过正向学习信号**（534 个取值里只有 1 个越过 1e-6，
+而它是负的，而 EHVI 理论非负），所以 P2 现在跑也学不到东西——
 这是当前唯一需要先解决的事。
 
 ---
@@ -104,8 +105,11 @@ docking 实测单次 `env.step` 4.09 秒，与 HANDOFF 预期的量级吻合。
 - ~~docking 全链路通~~
 - **reward 未通过** → [01_reward_always_zero.ipynb](handoff_notebooks/01_reward_always_zero.ipynb)
 
-  全链路能跑 **≠** reward 有效。实测 **31 个 run、479 个 reward 取值，
-  没有一个超过 `1e-6`**。根因是环境观测被裸拼进对话、破坏了 chat 格式，
+  全链路能跑 **≠** reward 有效。实测 **31 个 run、534 个 reward 取值，
+  只有 1 个越过 `1e-6`，而它是负的（`-1.848e-04`）——acquisition reward
+  就是 EHVI，理论上非负，所以那是估计噪声。**正向信号的个数是 0。**
+
+  根因是环境观测被裸拼进对话、破坏了 chat 格式，
   导致 round 1 之后模型不再输出 JSON（一个 run 里 231 次解析失败对 52 次成功）。
   修复已写好并通过 61 个单元测试，**正在真实 run 上验证**。
 
@@ -162,7 +166,7 @@ docking 实测单次 `env.step` 4.09 秒，与 HANDOFF 预期的量级吻合。
 
 | # | notebook | 讲什么 |
 |---|---|---|
-| 01 | [reward 从来没有非零过](handoff_notebooks/01_reward_always_zero.ipynb) | 479 个取值全在 1e-6 以下；根因是 chat 格式；修复与判定标准 |
+| 01 | [reward 没有正向信号](handoff_notebooks/01_reward_always_zero.ipynb) | 534 个取值里正向信号 0 个；根因是 chat 格式；修复与判定标准 |
 | 02 | [9B 训练不稳定](handoff_notebooks/02_9b_run_stability.ipynb) | 两类 OOM 的区分与各自修法；job 级 cgroup 的 449 GB 限制 |
 | 03 | [P2 训练矩阵](handoff_notebooks/03_p2_training_matrix.ipynb) | 十项前置的就绪度；矩阵规模与代价 |
 | 04 | [离线评测](handoff_notebooks/04_offline_evaluation.ipynb) | 前置已完成；不依赖 P2 的两件可先做的事 |
