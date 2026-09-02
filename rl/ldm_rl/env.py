@@ -440,6 +440,13 @@ class LDMEnv:
         incumbent_after = self.objectives.incumbent(self._state.observations) if len(
             self.objectives.specs
         ) == 1 else None
+        # 多目标时 incumbent 恒为 None,但「没有单一最优」与「一次都没成功」是
+        # 两件事。把成功计数一并交给渲染层 —— 否则观测会告诉模型它白干了
+        # (2026-09-02 实测:同一屏里 "mol-xxx: SUCCEEDED" 与
+        # "no successful evaluation yet" 并存,此后模型整个 episode 不再输出)。
+        succeeded_total = sum(
+            1 for o in self._state.observations if o.evaluation.succeeded
+        )
 
         self._state.next_round = round_idx + 1
         truncated = not terminated and self._state.next_round >= self.config.iterations
@@ -455,6 +462,7 @@ class LDMEnv:
             rejections=rejections,
             evaluations=new_observations,
             incumbent=incumbent_after,
+            succeeded_total=succeeded_total,
         )
         info = _jsonable(
             {

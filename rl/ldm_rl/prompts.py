@@ -169,8 +169,14 @@ def render_step_observation(
     rejections: Sequence[Any],
     evaluations: Sequence[Any],
     incumbent: Observation | None,
+    succeeded_total: int | None = None,
 ) -> str:
-    """Render the post-step feedback appended to the policy transcript."""
+    """Render the post-step feedback appended to the policy transcript.
+
+    ``succeeded_total`` is the number of successful evaluations so far in this
+    episode. It exists because ``incumbent`` being ``None`` means two very
+    different things, and the old text conflated them (see below).
+    """
 
     lines = [f"<round {round_idx}>"]
     if parse_error:
@@ -202,6 +208,18 @@ def render_step_observation(
             f"  candidate: {_brief_payload(incumbent.candidate.payload)}",
             f"  metrics: {json.dumps(dict(incumbent.metrics), sort_keys=True)}",
         ]
+    elif succeeded_total:
+        # env.py:440 computes an incumbent only for single-objective tasks --
+        # with two objectives there is no single best point, just a Pareto set.
+        # That is correct, but rendering it as "no successful evaluation yet"
+        # states something else entirely, and it is false: on 2026-09-02 a run
+        # showed "mol-3ee8e371814d: SUCCEEDED" and "no successful evaluation
+        # yet" in the same observation, after which the policy stopped emitting
+        # anything at all for the rest of the episode.
+        lines.append(
+            f"Best so far: {succeeded_total} successful evaluation(s); "
+            "no single best with multiple objectives (a Pareto set, not a point)."
+        )
     else:
         lines.append("Best so far: none (no successful evaluation yet).")
     if remaining_rounds > 0:
