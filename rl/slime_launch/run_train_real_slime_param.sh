@@ -86,7 +86,11 @@ SGLANG_ARGS=(
    # GH200 上实测可用:triton 3.6.0 与 flashinfer 0.6.12。取 triton —— 它与架构
    # 无关,也是 slime 自己的 Dockerfile 在绕不过 FlashQLA 时用的那个。
    --sglang-attention-backend ${SGLANG_ATTENTION_BACKEND:-triton}
-   --rollout-num-gpus 2 --sglang-mem-fraction-static 0.7
+   # 两个都必须可覆盖。0.7 的显存占用在竞争激烈时抢不到卡——同一批实验里
+   # 5 个 run 死于 CUDA OOM。调低到 0.35 就能和一个 60 GB 的邻居共存，
+   # 代价是 KV cache 变小、吞吐下降，对只要步数的实验无所谓。
+   --rollout-num-gpus ${ROLLOUT_GPUS_1P5B:-2} \
+   --sglang-mem-fraction-static ${SGLANG_MEM_FRACTION:-0.7}
 )
 
 CUSTOM_ARGS=(
