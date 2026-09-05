@@ -182,3 +182,41 @@ The trained arm's exclusions were never diagnosed to this level — no sacct rec
 for them — so the two arms' completion rates are not decomposed the same way. That is a
 further reason the rates are reported as observed quantities rather than treated as an
 estimate of anything.
+
+
+## Final result, 2026-09-05 12:05Z — all five attempts resolved
+
+| # | run | proposals | state | reached K |
+|---|---|---:|---|---|
+| 1 | `LR0-…034032Z` | 842 | COMPLETED | yes |
+| 2 | `LR0c2-…072457Z` | 685 | COMPLETED | yes |
+| 3 | `LR0c3-…091137Z` | 670 | COMPLETED | yes |
+| 4 | `LR0c4-…110212Z` | 11 | FAILED (CUDA OOM, 16:07) | no |
+| 5 | `LR0c5-…111823Z` | 404+ | RUNNING, past K | yes |
+
+Reaching K: **7/20 trained against 4/5 control**, Fisher p = 0.133. Not evidence of equal
+completion rates.
+
+**These are three separate verdicts. None implies another.**
+
+**1. Difference — not detected.** Trained +0.0286 (n=7, sd 0.0552) against control +0.0946
+(n=4, sd 0.0536); difference −0.0660, 95% CI [−0.1475, +0.0155], Welch t = −1.94, df = 6.5,
+**p = 0.0961**. Not significant at the frozen alpha. Note the interval barely contains zero
+and all four control runs read positive, so "not detected" is not "absent".
+
+**2. Equivalence — not established, and one-sided only.** TOST at the frozen margin 0.10:
+upper p = **0.0011** (the control is not higher than the trained arm by 0.10 or more),
+lower p = 0.176 (**cannot** exclude the control being lower by 0.10 or more). One side
+holds, the other does not, so equivalence within ±0.10 is not established.
+
+**3. Power — short of the frozen margin.** Pooled SD re-estimates to 0.0544, close to the
+0.0552 prior used for sizing. The margin needs 4.6 runs per arm and the smaller arm has 4;
+achieved resolvable |delta| is **0.108** against the frozen 0.10. Underpowered, reported as
+such, not resized.
+
+**What the numbers are.** A descriptive difference between two conditionally-selected
+groups. Not a treatment effect on a common population — the selection criterion is
+downstream of the treatment and the arms complete at different observed rates.
+
+**Budget.** 20.1 GPU-hours of the 27.5 authorised across five attempts, with the fifth still running. The 2x2 matrix
+remains stopped and no run outside these five was started.
