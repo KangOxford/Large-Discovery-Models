@@ -1,7 +1,30 @@
 # Pre-specification: additional lr=0 control runs
 
-Frozen 2026-09-05 06:00Z, **before** any additional control run is launched. Everything
-below is fixed from this point; nothing here may be re-chosen after seeing new data.
+Frozen 2026-09-05 06:00Z, before the second control run started.
+
+## Scope, stated first because it limits everything below
+
+**This is prospective for the four ADDITIONAL control runs only. It is not a
+pre-specification of the comparison as a whole.**
+
+The trained arm's 7 qualifying runs already existed when K, the inclusion rule and the
+sizing SD were chosen, and they were inspected in the course of choosing them — the SD
+oscillates with K (0.153 to 0.034 across K = 100 to 500) and K=400 was picked from that
+curve. So:
+
+| element | status |
+|---|---|
+| the four new control runs | **genuinely prospective** — the rules below were fixed before they produced data |
+| the first control run `LR0-20260905T034032Z` | retrospective; it is what motivated the design |
+| the 7 trained runs | retrospective; they were used to choose K and to estimate the SD |
+| the comparison's overall type-I error | **not controlled at the nominal 0.05** — one arm and the analysis choices were selected with the other arm's data in view |
+
+The correct reading of any result here is: the control arm was collected under fixed
+rules, and it is compared against a trained arm that was not. That is weaker than a
+pre-registered two-arm trial and must not be reported as one.
+
+Everything below is fixed from this point for the four new control runs; nothing may be
+re-chosen after seeing their data.
 
 ## Why this document exists
 
@@ -72,3 +95,26 @@ restarted. Anything beyond these 4 runs is out of budget and must be raised sepa
 Even fully executed, this design tests one cell of four. It says nothing about the
 acquisition objective or about n=2. And a null result licenses only the equivalence claim
 at |delta| < 0.10 -- not "no difference".
+
+
+## Selection effect the inclusion rule creates, recorded 2026-09-05 07:55Z
+
+Applying the frozen rule to the trained arm keeps **7 of 25** `dhv/n=4` run directories.
+The 18 exclusions are not evenly spread:
+
+| reason | runs |
+|---|---:|
+| 0 proposals after warm-start | 8 |
+| between 8 and 285 proposals, under K=400 | 5 |
+| `argv n_samples == 1` (cannot produce a gradient) | 4 |
+| argv unreadable | 1 |
+
+So `K = 400` does two things at once. It matches length, which is what it was chosen for.
+It also **filters out most of the early failed and short runs**, leaving the subset that
+ran long and ran to completion. The trained arm is therefore not a random sample of
+attempts; it is the surviving tail. The control arm is being collected under the same rule,
+so the comparison is still like-for-like on this axis, but neither arm represents "a run of
+this configuration" in general.
+
+This was not written down when the rule was frozen. It is recorded here rather than used
+to re-choose K.
