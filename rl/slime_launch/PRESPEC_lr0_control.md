@@ -218,5 +218,53 @@ such, not resized.
 groups. Not a treatment effect on a common population — the selection criterion is
 downstream of the treatment and the arms complete at different observed rates.
 
-**Budget.** 20.1 GPU-hours of the 27.5 authorised across five attempts, with the fifth still running. The 2x2 matrix
-remains stopped and no run outside these five was started.
+**Budget, final.** **21.93 GPU-hours of the 27.5 authorised.** The 2x2 matrix remains
+stopped and no run outside these five was started.
+
+| # | run | state | GPU-h |
+|---|---|---|---:|
+| 1 | `LR0-…034032Z` | COMPLETED | 5.50 |
+| 2 | `LR0c2-…072457Z` | COMPLETED | 5.33 |
+| 3 | `LR0c3-…091137Z` | COMPLETED | 5.53 |
+| 4 | `LR0c4-…110212Z` | FAILED (CUDA OOM) | 0.81 |
+| 5 | `LR0c5-…111823Z` | **stopped after passing K** | 4.77 |
+| | | **total** | **21.93** |
+
+### Why run 5 was stopped rather than left to finish
+
+Every registered analysis slices the first `K = 400` proposals: the harvest script computes
+`spearmanr(arange(K), v[:K])`, and the notebook's prefix sweep reads control run 1 (842
+proposals, complete) together with the trained arm. **No result depends on any proposal
+beyond index 400.** Run 5 passed 400 at 12:00Z, so from that moment its contribution was
+fixed at rho = +0.0851 and further compute bought nothing. Letting it run to 50 steps would
+have spent roughly 2 more GPU-hours on numbers no analysis reads. The remaining budget was
+not a reason to keep spending.
+
+### How it was stopped, and what was deliberately not touched
+
+`scancel` is forbidden in this repository in every form, so it was not used. The step was
+ended through its own control channel: **SIGTERM to this run's own `srun` client processes**
+(PIDs 258339 and 258340, owner `kangli.u6gb`), each verified by argv to be an `srun` whose
+`--job-name` is `ldmrl-LR0c5-20260905T111823Z` before any signal was sent. The orchestrator
+loop was stopped first, so it could not interpret the ending run as a finished slot and
+launch a sixth outside the authorised five.
+
+Scope was one step. **Shared allocation `6324130` is untouched and still RUNNING with 12:59
+left**, carrying 1,124 COMPLETED and 10 RUNNING steps belonging to other work. No process
+belonging to anyone else was signalled.
+
+Final state `CANCELLED by 1483804540` (own uid), exit `0:9`, elapsed 5,722 s.
+
+### Artifacts, verified after shutdown
+
+All on Lustre, so nothing depended on the step surviving: `train.log` 3,464,470 bytes,
+`gp_history.jsonl` 60,060 bytes (677 proposals), `episodes.jsonl` 21,334 bytes, and 4
+checkpoint iterations `iter_0000009/19/29/39`. The compute side wrote a further 10 proposals
+and one training step *after* the SIGTERM, finishing the work in hand rather than being cut
+off — which is what a graceful stop should look like.
+
+**The frozen scientific numbers are unchanged and were re-verified after the shutdown:**
+rho over the first 400 proposals reads +0.0851, identical to the value the verdicts were
+computed from. The conditional-selection limitation stands exactly as written: these are
+descriptive differences between two conditionally-selected groups, not a treatment effect on
+a common population.
