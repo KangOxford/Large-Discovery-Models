@@ -133,10 +133,52 @@ two control runs the test has almost no power, and the point estimates differ by
 of nearly three. Pre-filter lengths: trained `[0,0,0,0,0,0,0,8,20,61,177,253,285,426,493,
 501,574,588,619,654]`, control `[523, 842]`.
 
-**Consequence for the main claim.** Any result from this comparison is about **runs that
-reached 400 proposals**, not about runs of this configuration in general. K is not changed
-after the fact; the claim is narrowed to the population the frozen rule actually defines,
-and the completion rates are reported alongside it every time.
+**Consequence for the main claim, and narrowing the population is not enough.**
+
+~~The claim is narrowed to the population the frozen rule defines, and that makes it valid
+for that population.~~ **It does not.** Filtering *each arm* to `>= 400` does not produce
+one population observed under two treatments; it produces **two different populations**,
+each selected by a criterion that the treatment itself may have influenced. Re-labelling
+the target as "runs that reached 400 proposals" does not fix this — "runs that reached 400
+proposals **under lr=0**" and "runs that reached 400 proposals **under lr=1e-6**" are not
+the same set of runs, and no amount of narrowing makes them one.
+
+So the contrast this design can report is **descriptive**: the difference between two
+observed, conditionally-selected groups. It is **not** a treatment effect on a common
+population, and it must never be written as one. The wording used throughout is "the
+observed difference between the qualifying groups", not "the effect of lr=0".
+
+Recovering a causal contrast would need something this design does not have — an outcome
+defined on every run regardless of length (so nothing is conditioned away), or a completion
+model that is itself identified. Neither is in scope here.
+
+K is not changed after the fact, and completion rates are reported alongside every number.
 
 This was not written down when the rule was frozen. It is recorded here rather than used
 to re-choose K.
+
+
+## Attempt-level record of the five control runs, 2026-09-05 11:40Z
+
+Every attempt is listed, including the one that failed, because failures are data about the
+completion rate and removing them by reason would be selecting on the outcome.
+
+| # | run | proposals | Slurm state | GPU-h | reached K=400 | note |
+|---|---|---:|---|---:|---|---|
+| 1 | `LR0-20260905T034032Z` | 842 | COMPLETED | 5.50 | yes | |
+| 2 | `LR0c2-20260905T072457Z` | 685 | COMPLETED | 5.33 | yes | |
+| 3 | `LR0c3-20260905T091137Z` | 670 | COMPLETED | 5.53 | yes | |
+| 4 | `LR0c4-20260905T110212Z` | 11 | **FAILED** (exit 1:0, 967 s) | 0.81 | no | `torch.OutOfMemoryError`, tried to allocate 3.70 GiB on a card with a co-tenant |
+| 5 | `LR0c5-20260905T111823Z` | running | RUNNING | — | pending | |
+
+**`LR0c4` failed for a reason unrelated to the treatment** — CUDA OOM from contention on a
+shared card — and its lr knob had arrived (`--lr 0 --lr-decay-style constant
+--weight-decay 0`, and the `[lr-knob]` line is in its log). It is nevertheless **kept in the
+denominator** of the completion rate. Dropping it because its cause looks environmental
+would be selecting on the outcome, which is the failure this whole section is about. The
+cause is recorded so a reader can weigh it; it is not used to adjust the count.
+
+The trained arm's exclusions were never diagnosed to this level — no sacct record survives
+for them — so the two arms' completion rates are not decomposed the same way. That is a
+further reason the rates are reported as observed quantities rather than treated as an
+estimate of anything.

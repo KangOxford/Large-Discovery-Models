@@ -97,8 +97,11 @@ if _a_n and _b_n:
     print(f"  reaching K: {_a_ok}/{_a_n} trained against {_b_ok}/{_b_n} control, Fisher p={_p:.3f}")
     print("  A non-significant p here is NOT evidence the arms complete at the same rate;")
     print("  with this many control runs the test has almost no power.")
-print("  => every verdict below is about runs that REACHED 400 proposals, not about runs")
-print("     of this configuration in general.")
+print("  => The verdicts below are DESCRIPTIVE: a difference between two observed,")
+print("     conditionally-selected groups. Filtering each arm to >=400 does not give one")
+print("     population under two treatments; it gives two different populations, each")
+print("     selected by a criterion the treatment may have moved. NOT a treatment effect")
+print("     on a common population, and not to be reported as one.")
 for arm, kept, drop in (("TRAINED (lr=1e-6)", trained, tr_drop), ("CONTROL (lr=0)", control, ct_drop)):
     print(f"\n{arm}: {len(kept)} qualifying")
     for n_, r_, L in kept:
