@@ -72,6 +72,33 @@ control, ct_drop = collect(("runs/LR0-*","runs/LR0c*"), "control")
 print("="*76)
 print(f"lr=0 control arm, frozen rules: K={K}, warm-start {WARM} dropped, argv n_samples==4")
 print("="*76)
+
+def rates(kept, dropped, label):
+    """Reaching K is a POST-TREATMENT variable. If the learning rate affects whether a run
+    gets there, conditioning on it selects a different sub-population per arm and the same
+    rule applied to both does not restore exchangeability. So the completion rate is printed
+    with every verdict, never separately."""
+    eligible = len(kept) + sum(1 for _,w,_ in dropped if "proposals <" in w)
+    return len(kept), eligible
+
+print("\nINCLUSION CENSUS (reaching K is downstream of the treatment; read the rates first)")
+print(f"{'arm':22}{'dirs':>6}{'no gp':>7}{'argv n!=4':>11}{'short of K':>12}{'qualifying':>12}{'reached K':>11}")
+for label, kept, drop in (("trained lr=1e-6", trained, tr_drop), ("control lr=0", control, ct_drop)):
+    nogp  = sum(1 for _,w,_ in drop if "no gp_history" in w)
+    badn  = sum(1 for _,w,_ in drop if "argv n_samples" in w)
+    short = sum(1 for _,w,_ in drop if "proposals <" in w)
+    elig  = len(kept) + short
+    rate  = len(kept)/elig if elig else float("nan")
+    print(f"{label:22}{len(kept)+len(drop):>6}{nogp:>7}{badn:>11}{short:>12}{len(kept):>12}{rate:>10.1%}")
+_a_ok = len(trained); _a_n = _a_ok + sum(1 for _,w,_ in tr_drop if "proposals <" in w)
+_b_ok = len(control); _b_n = _b_ok + sum(1 for _,w,_ in ct_drop if "proposals <" in w)
+if _a_n and _b_n:
+    _odds, _p = stats.fisher_exact([[_a_ok,_a_n-_a_ok],[_b_ok,_b_n-_b_ok]])
+    print(f"  reaching K: {_a_ok}/{_a_n} trained against {_b_ok}/{_b_n} control, Fisher p={_p:.3f}")
+    print("  A non-significant p here is NOT evidence the arms complete at the same rate;")
+    print("  with this many control runs the test has almost no power.")
+print("  => every verdict below is about runs that REACHED 400 proposals, not about runs")
+print("     of this configuration in general.")
 for arm, kept, drop in (("TRAINED (lr=1e-6)", trained, tr_drop), ("CONTROL (lr=0)", control, ct_drop)):
     print(f"\n{arm}: {len(kept)} qualifying")
     for n_, r_, L in kept:

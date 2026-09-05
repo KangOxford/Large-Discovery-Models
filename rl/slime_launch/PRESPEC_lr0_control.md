@@ -111,10 +111,32 @@ The 18 exclusions are not evenly spread:
 
 So `K = 400` does two things at once. It matches length, which is what it was chosen for.
 It also **filters out most of the early failed and short runs**, leaving the subset that
-ran long and ran to completion. The trained arm is therefore not a random sample of
-attempts; it is the surviving tail. The control arm is being collected under the same rule,
-so the comparison is still like-for-like on this axis, but neither arm represents "a run of
-this configuration" in general.
+ran long and ran to completion.
+
+~~The control arm is collected under the same rule, so the comparison is still like-for-like
+on this axis.~~ **That does not follow, and it is withdrawn.** Reaching 400 proposals is a
+**post-treatment** variable. If the learning rate affects whether a run gets there — through
+throughput, through crashes, through anything — then conditioning on `>= 400` selects a
+different sub-population in each arm, and applying the same rule to both does not restore
+exchangeability. Identical rules do not make selected groups comparable when the selection
+criterion is itself downstream of the treatment.
+
+The observed rates are already suggestive and are reported rather than dismissed:
+
+| arm | directories | no gp_history | argv n != 4 | shorter than K | qualifying | reached K |
+|---|---:|---:|---:|---:|---:|---:|
+| trained, lr=1e-6 | 25 | 0 | 5 | 13 | 7 | **35.0%** |
+| control, lr=0 | 2 | 0 | 0 | 0 | 2 | **100%** |
+
+Fisher exact p = 0.156 on 7/20 against 2/2. **That is not evidence of no difference** — with
+two control runs the test has almost no power, and the point estimates differ by a factor
+of nearly three. Pre-filter lengths: trained `[0,0,0,0,0,0,0,8,20,61,177,253,285,426,493,
+501,574,588,619,654]`, control `[523, 842]`.
+
+**Consequence for the main claim.** Any result from this comparison is about **runs that
+reached 400 proposals**, not about runs of this configuration in general. K is not changed
+after the fact; the claim is narrowed to the population the frozen rule actually defines,
+and the completion rates are reported alongside it every time.
 
 This was not written down when the rule was frozen. It is recorded here rather than used
 to re-choose K.
