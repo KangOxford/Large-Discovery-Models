@@ -1,0 +1,29 @@
+LR0c5 shutdown record
+recorded  : 2026-09-05T12:53:17Z
+step      : 6324130.1122|ldmrl-LR0c5-20260905T111823Z|RUNNING|2026-09-05T11:18:23|5694|nid010569
+rundir    : /lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_rl/runs/LR0c5-20260905T111823Z_20260905T111823Z
+filesystem: 2206@kfi,2271@kfi:2270@kfi,2889@kfi:/lfs1aip2 mounted at /lus/lfs1aip2  [Lustre — artifacts survive the step]
+
+artifacts before shutdown:
+        4096  ckpt
+       21334  episodes.jsonl
+       59251  gp_history.jsonl
+           0  srun_client.log
+     3416284  train.log
+  ckpt iterations: 4  -> iter_0000009 iter_0000019 iter_0000029 iter_0000039 
+  proposals (post warm-start): 667
+  training steps logged      : 42
+
+frozen scientific value (unchanged by shutdown; rule uses first K=400 only):
+  rho over first 400 proposals = +0.0851
+
+why stopping: no registered analysis in PRESPEC_lr0_control.md uses any proposal
+  beyond index 400. The harvest script slices v[:K]; the notebook's prefix sweep
+  reads control run 1 (842, complete) and the trained arm. Continuing would spend
+  GPU-hours that no result depends on.
+
+shutdown method: SIGTERM to this run's OWN srun client processes, which is the
+  step's normal termination path. Not scancel, which this repo forbids in every
+  form. Scope is one step; the shared allocation 6324130 and every other step on
+  it are untouched.
+  srun client PIDs: 258339 258340 (owner kangli.u6gb, job-name ldmrl-LR0c5-...)
