@@ -1,0 +1,64 @@
+{
+ "scope": "ldm_rl/runs/*/gp_history.jsonl (+ env_out/vina_cache where present)",
+ "excluded_source": "real_80 harness artifact -- different code, different dedupe semantics (B1 progress.md 380-388); cannot arbitrate this dispute",
+ "prior_rows": 63,
+ "rdkit_available": true,
+ "runs": {
+  "LR0-20260905T034032Z_20260905T034032Z": {
+   "file_sha256_16": "61422cecfef3ce71",
+   "total_rows": 905,
+   "post_prior_rows": 842,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 86,
+   "B1_post_prior_seeded_raw": 90,
+   "B3_file_start_raw": 102,
+   "B4_post_prior_no_seed_canon": 86,
+   "B1_post_prior_seeded_canon": 90,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "LR0c2-20260905T072457Z_20260905T072457Z": {
+   "file_sha256_16": "d819b398156ad11a",
+   "total_rows": 748,
+   "post_prior_rows": 685,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 81,
+   "B1_post_prior_seeded_raw": 85,
+   "B3_file_start_raw": 106,
+   "B4_post_prior_no_seed_canon": 81,
+   "B1_post_prior_seeded_canon": 85,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "LR0c3-20260905T091137Z_20260905T091137Z": {
+   "file_sha256_16": "eabc7b2e2d3921f1",
+   "total_rows": 733,
+   "post_prior_rows": 670,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 86,
+   "B1_post_prior_seeded_raw": 92,
+   "B3_file_start_raw": 109,
+   "B4_post_prior_no_seed_canon": 86,
+   "B1_post_prior_seeded_canon": 92,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "LR0c5-20260905T111823Z_20260905T111823Z": {
+   "file_sha256_16": "2f1330aef352e412",
+   "total_rows": 740,
+   "post_prior_rows": 677,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 83,
+   "B1_post_prior_seeded_raw": 88,
+   "B3_file_start_raw": 106,
+   "B4_post_prior_no_seed_canon": 83,
+   "B1_post_prior_seeded_canon": 88,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  }
+ }
+}
