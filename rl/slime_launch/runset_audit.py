@@ -49,7 +49,7 @@ for f in sorted(glob.glob(str(W/"assets/examples/**/summary.json"), recursive=Tr
     rec["artifact_sha256_16"] = sha(f)
     # only what the file actually carries
     rec["stop_reason"] = d.get("stop_reason") or d.get("early_stop_reason")
-    rec["succeeded_field"] = ("CONFIRMED_FROM_summary.json:successful_evaluation_count (AGGREGATE, not per-call)"
+    rec["succeeded_field"] = ("AGGREGATE_ONLY_summary.json:successful_evaluation_count -- not a per-call predicate; the per-call contract is engine_adapters.py:265-289 (vina AND activity non-None)"
                               if "successful_evaluation_count" in d
                               else "NOT_RECORDED_IN_FIELDS_READ")
     rec["successful_evaluation_count"] = d.get("successful_evaluation_count")

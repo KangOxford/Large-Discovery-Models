@@ -62,11 +62,24 @@ def cache_status(d):
             bad += 1; msgs[str(st)] = msgs.get(str(st), 0) + 1
     lig = len(list((Path(d)/"env_out/vina_cache/ligands").glob("*"))) \
           if (Path(d)/"env_out/vina_cache/ligands").is_dir() else None
-    return {"state": "CONFIRMED_FROM_vina_cache", "entries": ok+bad, "status_ok": ok,
+    # NOT the task success predicate. Traced 2026-09-06:
+    #   engine_adapters.py:265-289 SmilesCandidateEvaluator.evaluate returns "succeeded"
+    #   ONLY when BOTH vina and activity are non-None, else "failed"
+    #   ("non-finite objective score after retries");
+    #   rl_real_shared.py:98 appends to gp_history only on status == "succeeded".
+    # So docking status "ok" is NECESSARY BUT NOT SUFFICIENT: a molecule can dock fine and
+    # still fail on the QSAR/activity leg, never reaching gp_history. Label accordingly.
+    return {"state": "DOCKING_COMPONENT_STATUS_ONLY_not_task_success_predicate",
+            "task_success_predicate": "vina AND activity both non-None (engine_adapters.py:265-289)",
+            "entries": ok+bad, "status_ok": ok,
             "status_not_ok": bad, "non_ok_breakdown": msgs,
             "distinct_canonical_in_cache": len(ids - {None}),
             "ligands_prepared": lig,
-            "ligands_minus_cache": (lig - (ok+bad)) if lig is not None else None}
+            # An object-count difference between two directories. NOT a count of failed
+            # calls: duplicates, intermediate products, differing cache keys and in-flight
+            # work all produce it. Left UNKNOWN until traced.
+            "ligands_minus_cache_UNEXPLAINED": (lig - (ok+bad)) if lig is not None else None,
+            "ligands_minus_cache_is_NOT_failure_count": True}
 
 sel = sys.argv[1] if len(sys.argv) > 1 else "*"
 res = {"scope": "ldm_rl/runs/*/gp_history.jsonl (+ env_out/vina_cache where present)",

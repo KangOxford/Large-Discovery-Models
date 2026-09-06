@@ -1,0 +1,203 @@
+{
+ "scope": "ldm_rl/runs/*/gp_history.jsonl (+ env_out/vina_cache where present)",
+ "excluded_source": "real_80 harness artifact -- different code, different dedupe semantics (B1 progress.md 380-388); cannot arbitrate this dispute",
+ "prior_rows": 63,
+ "rdkit_available": true,
+ "runs": {
+  "R3a_20260903T113130Z": {
+   "file_sha256_16": "dc27c4e499513018",
+   "total_rows": 1273,
+   "post_prior_rows": 1210,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 80,
+   "B1_post_prior_seeded_raw": 81,
+   "B3_file_start_raw": 102,
+   "B4_post_prior_no_seed_canon": 80,
+   "B1_post_prior_seeded_canon": 81,
+   "success_predicate": {
+    "state": "CONFIRMED_FROM_vina_cache",
+    "entries": 1123,
+    "status_ok": 1123,
+    "status_not_ok": 0,
+    "non_ok_breakdown": {},
+    "distinct_canonical_in_cache": 1123,
+    "ligands_prepared": 1135,
+    "ligands_minus_cache": 12
+   }
+  }
+ }
+}
+{
+ "scope": "ldm_rl/runs/*/gp_history.jsonl (+ env_out/vina_cache where present)",
+ "excluded_source": "real_80 harness artifact -- different code, different dedupe semantics (B1 progress.md 380-388); cannot arbitrate this dispute",
+ "prior_rows": 63,
+ "rdkit_available": true,
+ "runs": {
+  "R3f_20260903T114742Z": {
+   "file_sha256_16": "561a58d62fa4d9fc",
+   "total_rows": 960,
+   "post_prior_rows": 897,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 80,
+   "B1_post_prior_seeded_raw": 82,
+   "B3_file_start_raw": 102,
+   "B4_post_prior_no_seed_canon": 80,
+   "B1_post_prior_seeded_canon": 82,
+   "success_predicate": {
+    "state": "CONFIRMED_FROM_vina_cache",
+    "entries": 855,
+    "status_ok": 855,
+    "status_not_ok": 0,
+    "non_ok_breakdown": {},
+    "distinct_canonical_in_cache": 855,
+    "ligands_prepared": 862,
+    "ligands_minus_cache": 7
+   }
+  }
+ }
+}
+{
+ "scope": "ldm_rl/runs/*/gp_history.jsonl (+ env_out/vina_cache where present)",
+ "excluded_source": "real_80 harness artifact -- different code, different dedupe semantics (B1 progress.md 380-388); cannot arbitrate this dispute",
+ "prior_rows": 63,
+ "rdkit_available": true,
+ "runs": {
+  "R3j_20260903T121641Z": {
+   "file_sha256_16": "353516c8e6b9ab7d",
+   "total_rows": 680,
+   "post_prior_rows": 617,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 80,
+   "B1_post_prior_seeded_raw": 80,
+   "B3_file_start_raw": 102,
+   "B4_post_prior_no_seed_canon": 80,
+   "B1_post_prior_seeded_canon": 80,
+   "success_predicate": {
+    "state": "CONFIRMED_FROM_vina_cache",
+    "entries": 601,
+    "status_ok": 601,
+    "status_not_ok": 0,
+    "non_ok_breakdown": {},
+    "distinct_canonical_in_cache": 601,
+    "ligands_prepared": 604,
+    "ligands_minus_cache": 3
+   }
+  }
+ }
+}
+{
+ "scope": "ldm_rl/runs/*/gp_history.jsonl (+ env_out/vina_cache where present)",
+ "excluded_source": "real_80 harness artifact -- different code, different dedupe semantics (B1 progress.md 380-388); cannot arbitrate this dispute",
+ "prior_rows": 63,
+ "rdkit_available": true,
+ "runs": {
+  "R2-nonanguard_20260902T061759Z": {
+   "file_sha256_16": "f0b347fb4ba95af0",
+   "total_rows": 563,
+   "post_prior_rows": 500,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 83,
+   "B1_post_prior_seeded_raw": 87,
+   "B3_file_start_raw": 103,
+   "B4_post_prior_no_seed_canon": 83,
+   "B1_post_prior_seeded_canon": 87,
+   "success_predicate": {
+    "state": "CONFIRMED_FROM_vina_cache",
+    "entries": 460,
+    "status_ok": 460,
+    "status_not_ok": 0,
+    "non_ok_breakdown": {},
+    "distinct_canonical_in_cache": 460,
+    "ligands_prepared": 467,
+    "ligands_minus_cache": 7
+   }
+  }
+ }
+}
+{
+ "scope": "ldm_rl/runs/*/gp_history.jsonl (+ env_out/vina_cache where present)",
+ "excluded_source": "real_80 harness artifact -- different code, different dedupe semantics (B1 progress.md 380-388); cannot arbitrate this dispute",
+ "prior_rows": 63,
+ "rdkit_available": true,
+ "runs": {
+  "R2-clip001_20260902T073253Z": {
+   "file_sha256_16": "12a71a642dd1a603",
+   "total_rows": 272,
+   "post_prior_rows": 209,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 80,
+   "B1_post_prior_seeded_raw": 80,
+   "B3_file_start_raw": 102,
+   "B4_post_prior_no_seed_canon": 80,
+   "B1_post_prior_seeded_canon": 80,
+   "success_predicate": {
+    "state": "CONFIRMED_FROM_vina_cache",
+    "entries": 206,
+    "status_ok": 206,
+    "status_not_ok": 0,
+    "non_ok_breakdown": {},
+    "distinct_canonical_in_cache": 206,
+    "ligands_prepared": 206,
+    "ligands_minus_cache": 0
+   }
+  }
+ }
+}
+{
+ "scope": "ldm_rl/runs/*/gp_history.jsonl (+ env_out/vina_cache where present)",
+ "excluded_source": "real_80 harness artifact -- different code, different dedupe semantics (B1 progress.md 380-388); cannot arbitrate this dispute",
+ "prior_rows": 63,
+ "rdkit_available": true,
+ "runs": {
+  "R2-lr1e8_20260902T072304Z": {
+   "file_sha256_16": "e17305d978504d0a",
+   "total_rows": 274,
+   "post_prior_rows": 211,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 80,
+   "B1_post_prior_seeded_raw": 81,
+   "B3_file_start_raw": 102,
+   "B4_post_prior_no_seed_canon": 80,
+   "B1_post_prior_seeded_canon": 81,
+   "success_predicate": {
+    "state": "CONFIRMED_FROM_vina_cache",
+    "entries": 209,
+    "status_ok": 209,
+    "status_not_ok": 0,
+    "non_ok_breakdown": {},
+    "distinct_canonical_in_cache": 209,
+    "ligands_prepared": 214,
+    "ligands_minus_cache": 5
+   }
+  }
+ }
+}
+{
+ "scope": "ldm_rl/runs/*/gp_history.jsonl (+ env_out/vina_cache where present)",
+ "excluded_source": "real_80 harness artifact -- different code, different dedupe semantics (B1 progress.md 380-388); cannot arbitrate this dispute",
+ "prior_rows": 63,
+ "rdkit_available": true,
+ "runs": {
+  "R1-base-v2_20260902T081145Z": {
+   "file_sha256_16": "1e39dffc07bd7b96",
+   "total_rows": 190,
+   "post_prior_rows": 127,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 81,
+   "B1_post_prior_seeded_raw": 83,
+   "B3_file_start_raw": 105,
+   "B4_post_prior_no_seed_canon": 81,
+   "B1_post_prior_seeded_canon": 83,
+   "success_predicate": {
+    "state": "CONFIRMED_FROM_vina_cache",
+    "entries": 125,
+    "status_ok": 125,
+    "status_not_ok": 0,
+    "non_ok_breakdown": {},
+    "distinct_canonical_in_cache": 125,
+    "ligands_prepared": 127,
+    "ligands_minus_cache": 2
+   }
+  }
+ }
+}

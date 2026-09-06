@@ -14,7 +14,7 @@
    "prior_manifest": "NOT_CHECKED",
    "smiles_raw": "CONFIRMED_FROM_history.json",
    "smiles_canonical": "NOT_CHECKED",
-   "succeeded_field": "CONFIRMED_FROM_summary.json:successful_evaluation_count (AGGREGATE, not per-call)",
+   "succeeded_field": "AGGREGATE_ONLY_summary.json:successful_evaluation_count -- not a per-call predicate; the per-call contract is engine_adapters.py:265-289 (vina AND activity non-None)",
    "failure_types": "NOT_CHECKED",
    "budget_charge_per_call": "NOT_CHECKED",
    "upstream_dedupe": "CONFIRMED_FROM_summary.json:drop_counts.duplicate",
@@ -76,7 +76,7 @@
    "NOT_CHECKED"
   ],
   "succeeded_field": [
-   "CONFIRMED_FROM_summary.json:successful_evaluation_count (AGGREGATE, not per-call)"
+   "AGGREGATE_ONLY_summary.json:successful_evaluation_count -- not a per-call predicate; the per-call contract is engine_adapters.py:265-289 (vina AND activity non-None)"
   ],
   "failure_types": [
    "NOT_CHECKED"

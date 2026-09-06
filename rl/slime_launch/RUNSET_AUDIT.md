@@ -35,7 +35,19 @@ the prior-seeding rule, not the file and not the key:
 Raw and RDKit-canonical keys give identical answers here (80 / 81), so the dedupe key is
 **not** the explanation.
 
-**On the wider 13-run set** (9 `X-dhvn4-*`, 4 `LR0*`) the clean story breaks:
+**B4's 7 runs reproduce exactly, 7/7** (`results/dup_reconcile_B4set.jsonl`), under
+"post-prior window, prior NOT seeded into `seen`, raw key, read from `gp_history.jsonl`":
+80/80/80/83/80/80/81 against B4's published 80/80/80/83/80/80/81. **The owner has since
+verified the same counts independently against full SHA256 of all seven files, and this
+narrow raw-count dispute is CLOSED.** It fixes a counting convention only -- not scientific
+benefit, not budget authorization.
+
+My statement "B4's 0-3 is not reproduced on any of the 13" is **withdrawn as false on its
+own numbers**: that table contained 81 and 83, which are +1 and +3, inside 0-3. Range
+overlap across different populations is not reproduction either way -- B4's set is the 9B
+R-series and B3's is the 1.5B dhvn4/LR0 family.
+
+**On the 13-run dhvn4/LR0 set** (a different population):
 
 | convention | observed range | matches |
 |---|---|---|
@@ -48,7 +60,15 @@ Raw and RDKit-canonical keys give identical answers here (80 / 81), so the dedup
 one is **#2 different run set** — not #1 "different file", which B3 itself marked most
 likely. B4 must state its exact run ids and the file it read.
 
-## Success predicate — confirmed for one run, unchecked for the rest
+## Success predicate — SUPERSEDED by plan/SUCCESS_CONTRACT_AUDIT.md
+
+The section below labelled vina_cache `status=="ok"` as the confirmed success predicate.
+**Retracted.** Traced at source, the task predicate is `engine_adapters.py:265-289`
+(succeeded iff BOTH vina and activity non-None) and the write gate is
+`rl_real_shared.py:98`. Docking status is one leg, necessary but not sufficient. The
+1135-vs-1123 gap is an object-count difference, not failed calls. See the new audit.
+
+## (superseded) Success predicate — confirmed for one run, unchecked for the rest
 
 `vina_cache` exists **only** for R3a among the runs examined. There:
 
