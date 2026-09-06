@@ -9,50 +9,50 @@
    "G12C transfer"
   ],
   "status": "NOT-DONE",
-  "blocking_gap": "no 9B run has completed an optimizer step with a finite gradient (238/238 grad_norm nan or inf)"
+  "blocking_gap": "238 grad_norm records across seven 9B runs = 209 NaN, 0 Inf, 29 finite (corrected 2026-09-06). The 29 finite norms are NOT evidence of valid optimizer updates; no verified finite training output exists."
  },
  "nine_b_runs_with_checkpoints": {
   "R1-base-v2_20260902T081145Z": {
    "n_ckpt": 3,
    "last_iter": "iter_0000029",
    "hidden": 4096,
-   "finite_grad_steps": 0
+   "finite_grad_steps": "see CORRECTION_grad_norm_count.md; R2 runs 8/14/7, R1 none"
   },
   "R2-clip001_20260902T073253Z": {
    "n_ckpt": 2,
    "last_iter": "iter_0000019",
    "hidden": 4096,
-   "finite_grad_steps": 0
+   "finite_grad_steps": "see CORRECTION_grad_norm_count.md; R2 runs 8/14/7, R1 none"
   },
   "R2-lr1e8_20260902T072304Z": {
    "n_ckpt": 2,
    "last_iter": "iter_0000019",
    "hidden": 4096,
-   "finite_grad_steps": 0
+   "finite_grad_steps": "see CORRECTION_grad_norm_count.md; R2 runs 8/14/7, R1 none"
   },
   "R2-nonanguard_20260902T061759Z": {
    "n_ckpt": 4,
    "last_iter": "iter_0000039",
    "hidden": 4096,
-   "finite_grad_steps": 0
+   "finite_grad_steps": "see CORRECTION_grad_norm_count.md; R2 runs 8/14/7, R1 none"
   },
   "R3a_20260903T113130Z": {
    "n_ckpt": 3,
    "last_iter": "iter_0000029",
    "hidden": 4096,
-   "finite_grad_steps": 0
+   "finite_grad_steps": "see CORRECTION_grad_norm_count.md; R2 runs 8/14/7, R1 none"
   },
   "R3f_20260903T114742Z": {
    "n_ckpt": 2,
    "last_iter": "iter_0000019",
    "hidden": 4096,
-   "finite_grad_steps": 0
+   "finite_grad_steps": "see CORRECTION_grad_norm_count.md; R2 runs 8/14/7, R1 none"
   },
   "R3j_20260903T121641Z": {
    "n_ckpt": 1,
    "last_iter": "iter_0000009",
    "hidden": 4096,
-   "finite_grad_steps": 0
+   "finite_grad_steps": "see CORRECTION_grad_norm_count.md; R2 runs 8/14/7, R1 none"
   }
  },
  "scale_census": {
@@ -131,5 +131,10 @@
   "ldmrl_steps_running": 0,
   "orchestrators_running": 0,
   "note": "shared allocations belong to other work and were not touched"
+ },
+ "corrections_20260906": {
+  "grad_norm_census": "209 NaN / 0 Inf / 29 finite of 238",
+  "weight_evidence": "R2-nonanguard 648/753 tensors changed; R3a 0/753 -- opposite behaviour",
+  "runset_audit": "11 of 16 required provenance fields absent from every artifact"
  }
 }

@@ -34,8 +34,13 @@ either substitutes for a hypervolume number.
 
 ### The blocking gap, located precisely
 
-Across **all seven 9B runs that produced a checkpoint**, there are **238 logged gradient
-norms and every single one is nan or inf — zero finite values.** Those checkpoints are
+~~Across all seven 9B runs there are 238 logged gradient norms and every single one is nan
+or inf — zero finite values.~~ **Withdrawn 2026-09-06.** The correct census is **238 norms
+= 209 NaN, 0 Inf, 29 finite** (R2's three runs hold 8/14/7; R1 logs none). Zero Inf is its
+own fact: no overflow was ever recorded, a different signature from what "nan/inf"
+implied. **The 29 finite norms do not show valid optimizer updates or any RL benefit** — a
+logged norm is a logging-path observation, and magnitude alone cannot classify it without
+knowing scaled/unscaled and pre/post-clip. Those checkpoints are
 therefore "SFT weights plus some number of nan updates", not trained models. Initialisation
 was verified from expanded argv rather than run names: `R1-base-v2` loads
 `qwen3.5-9B_torch_dist` (base) and all R2/R3 runs load `qwen3.5-9B-sft_torch_dist` (SFT),
