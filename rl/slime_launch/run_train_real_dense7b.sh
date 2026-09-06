@@ -78,7 +78,7 @@ CUSTOM_ARGS=(--custom-generate-function-path ldm_rl.bridge.generate --custom-rm-
 WANDB_ARGS=()
 [[ -n "${WANDB_KEY:-}" ]] && WANDB_ARGS=(--use-wandb --wandb-project "$WANDB_PROJECT" --wandb-key "$WANDB_KEY" --wandb-run-name "$WANDB_RUN")
 
-echo "resolved: n_samples=$N_SAMPLES global_batch=$GLOBAL_BATCH (dense Qwen2.5-7B control, TP=2, fp32 optim state)"
+echo "resolved: n_samples=$N_SAMPLES global_batch=$GLOBAL_BATCH (dense Qwen2.5-7B control, TP=2, precision-aware bf16 momenta)"
 
 ray stop --force 2>/dev/null || true
 sleep 3
