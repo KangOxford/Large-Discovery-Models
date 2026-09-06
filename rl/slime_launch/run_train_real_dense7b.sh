@@ -60,12 +60,13 @@ ROLLOUT_ARGS=(
    --rollout-max-response-len "$RESP_LEN" --rollout-temperature "$TEMPERATURE"
    --global-batch-size "$GLOBAL_BATCH" --balance-data
 )
-# Single node, 4 GPUs: TP=2 actor + 2 sglang. Plain fp32 optimizer state (no
-# precision-aware / bf16 momenta) so this control isolates the ARCHITECTURE, not
-# the optimizer-dtype choice. 7B fp32 Adam state ~= 57.7 GB/rank on TP=2, fits 96GB.
+# Single node, 4 GPUs: TP=2 actor + 2 sglang. Same optimizer config as the real
+# 9B runs (precision-aware, bf16 momenta, master fp32) so the ONLY thing that
+# differs from the 9B is the architecture (dense vs hybrid).
 PERF_ARGS=(
    --tensor-model-parallel-size 2 --pipeline-model-parallel-size 1 --context-parallel-size 1
    --use-distributed-optimizer
+   --use-precision-aware-optimizer --exp-avg-dtype bf16 --exp-avg-sq-dtype bf16 --main-params-dtype fp32
    --recompute-granularity full --recompute-method uniform --recompute-num-layers 1
    --use-dynamic-batch-size --max-tokens-per-gpu "$MAX_TOKENS"
 )
