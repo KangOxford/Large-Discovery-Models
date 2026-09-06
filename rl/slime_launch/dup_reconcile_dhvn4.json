@@ -1,0 +1,134 @@
+{
+ "scope": "ldm_rl/runs/*/gp_history.jsonl (+ env_out/vina_cache where present)",
+ "excluded_source": "real_80 harness artifact -- different code, different dedupe semantics (B1 progress.md 380-388); cannot arbitrate this dispute",
+ "prior_rows": 63,
+ "rdkit_available": true,
+ "runs": {
+  "X-dhvn4-151710_20260904T151710Z": {
+   "file_sha256_16": "4e7f59a6183e251e",
+   "total_rows": 514,
+   "post_prior_rows": 451,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 89,
+   "B1_post_prior_seeded_raw": 93,
+   "B3_file_start_raw": 108,
+   "B4_post_prior_no_seed_canon": 89,
+   "B1_post_prior_seeded_canon": 93,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "X-dhvn4-170103_20260904T170103Z": {
+   "file_sha256_16": "3bfa97989852397b",
+   "total_rows": 316,
+   "post_prior_rows": 253,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 92,
+   "B1_post_prior_seeded_raw": 98,
+   "B3_file_start_raw": 107,
+   "B4_post_prior_no_seed_canon": 92,
+   "B1_post_prior_seeded_canon": 98,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "X-dhvn4-170233_20260904T170233Z": {
+   "file_sha256_16": "530fed7abbb995b8",
+   "total_rows": 556,
+   "post_prior_rows": 493,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 88,
+   "B1_post_prior_seeded_raw": 93,
+   "B3_file_start_raw": 105,
+   "B4_post_prior_no_seed_canon": 88,
+   "B1_post_prior_seeded_canon": 93,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "X-dhvn4-170533_20260904T170533Z": {
+   "file_sha256_16": "9e913c063cf73e99",
+   "total_rows": 637,
+   "post_prior_rows": 574,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 91,
+   "B1_post_prior_seeded_raw": 97,
+   "B3_file_start_raw": 111,
+   "B4_post_prior_no_seed_canon": 91,
+   "B1_post_prior_seeded_canon": 97,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "X-dhvn4-180409_20260904T180409Z": {
+   "file_sha256_16": "b0ed93fd39039c1b",
+   "total_rows": 682,
+   "post_prior_rows": 619,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 88,
+   "B1_post_prior_seeded_raw": 94,
+   "B3_file_start_raw": 107,
+   "B4_post_prior_no_seed_canon": 88,
+   "B1_post_prior_seeded_canon": 94,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "X-dhvn4-183036_20260904T183036Z": {
+   "file_sha256_16": "34cf4720082b62d3",
+   "total_rows": 564,
+   "post_prior_rows": 501,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 83,
+   "B1_post_prior_seeded_raw": 90,
+   "B3_file_start_raw": 110,
+   "B4_post_prior_no_seed_canon": 83,
+   "B1_post_prior_seeded_canon": 90,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "X-dhvn4-191154_20260904T191154Z": {
+   "file_sha256_16": "74a3d03f510d87f7",
+   "total_rows": 651,
+   "post_prior_rows": 588,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 83,
+   "B1_post_prior_seeded_raw": 87,
+   "B3_file_start_raw": 107,
+   "B4_post_prior_no_seed_canon": 83,
+   "B1_post_prior_seeded_canon": 87,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "X-dhvn4-193018_20260904T193018Z": {
+   "file_sha256_16": "6a6909625f47c379",
+   "total_rows": 489,
+   "post_prior_rows": 426,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 86,
+   "B1_post_prior_seeded_raw": 96,
+   "B3_file_start_raw": 108,
+   "B4_post_prior_no_seed_canon": 86,
+   "B1_post_prior_seeded_canon": 96,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  },
+  "X-dhvn4-202359_20260904T202359Z": {
+   "file_sha256_16": "29de1688f0c39209",
+   "total_rows": 717,
+   "post_prior_rows": 654,
+   "prior_distinct_raw": 41,
+   "B4_post_prior_no_seed_raw": 85,
+   "B1_post_prior_seeded_raw": 90,
+   "B3_file_start_raw": 105,
+   "B4_post_prior_no_seed_canon": 85,
+   "B1_post_prior_seeded_canon": 90,
+   "success_predicate": {
+    "state": "NOT_CHECKED_no_cache_dir"
+   }
+  }
+ }
+}
