@@ -58,6 +58,18 @@ class EpisodeSpec:
     def __post_init__(self) -> None:
         if not self.task.strip():
             raise ValueError("episode task must not be empty")
+        # JSON has no tuples, so a spec round-tripped through a prompt-data file
+        # comes back with a list here and quietly violates the declared type.
+        # Normalise so `reward_ref_point` is always a tuple of floats however
+        # the spec was built.
+        if self.reward_ref_point is not None and not isinstance(
+            self.reward_ref_point, tuple
+        ):
+            object.__setattr__(
+                self,
+                "reward_ref_point",
+                tuple(float(value) for value in self.reward_ref_point),
+            )
         if self.mode not in {"mock", "real"}:
             raise ValueError("episode mode must be 'mock' or 'real'")
         if self.reward not in REWARD_POLICIES:

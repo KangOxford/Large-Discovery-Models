@@ -21,6 +21,7 @@ Slime installed (unit tests inject fake dependencies instead).
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 
@@ -172,7 +173,15 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
                 sample.status = Sample.Status.TRUNCATED
                 break
 
-            step = env.step(cur_response)
+            # env.step is synchronous and, for a real evaluator, slow: nanoGPT
+            # measures a proposal by training for its full wall-clock budget
+            # (~300s), and RemoteLDMEnv waits on a blocking pipe read. Calling
+            # it directly would stall this worker's whole event loop, so every
+            # concurrent episode would serialise behind it and an evaluation
+            # GPU pool would never have more than one device busy. Hand it to a
+            # thread instead: the wait is I/O, so the loop keeps running and
+            # sibling episodes keep their evaluations in flight.
+            step = await asyncio.to_thread(env.step, cur_response)
             last_step = step
             total_reward += step.reward
             sample.metadata["env_steps"].append(step.info)
