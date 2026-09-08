@@ -121,6 +121,7 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
         sample.status = Sample.Status.FAILED
         sample.reward = 0.0
         sample.metadata["env_error"] = f"{type(exc).__name__}: {exc}"
+        sample.metadata["stop_reason"] = "episode_setup_failed"
         return sample
 
     state = _load_generate_state(args)
@@ -136,6 +137,13 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
     sample.prompt = prompt_text
     sample.metadata["episode_spec"] = spec.to_dict()
     sample.metadata["env_steps"] = []
+    # Written now and overwritten at the end, so a sample that dies mid-episode
+    # still carries a reason. slime aggregates this key into
+    # `rollout/stop_reason/*`, and that aggregation reports the fraction of
+    # samples that carried the key at all -- so every return path here sets it,
+    # or the denominator quietly turns "this episode broke" into "this run was
+    # not instrumented".
+    sample.metadata["stop_reason"] = "aborted_before_first_step"
     sample.tokens = list(prompt_token_ids)
     sample.loss_mask = []
 
@@ -305,6 +313,18 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
         sample.metadata["env_terminated"] = last_step.terminated
         sample.metadata["env_truncated"] = last_step.truncated
         sample.metadata["env_incumbent"] = last_step.info.get("incumbent")
+        # Same rule `run_episode` uses, from the same function, so the metric and
+        # the environment cannot drift apart. Only the last step matters, which is
+        # all `derive_stop_reason` reads.
+        from ldm_rl.env import derive_stop_reason
+
+        sample.metadata["stop_reason"] = derive_stop_reason([last_step])
+    if sample.metadata.get("episode_token_budget_hit"):
+        # The budget cut the episode short before the environment had a reason of
+        # its own; that is a distinct outcome and reading it as one of the
+        # environment's four would hide a configuration problem as an environment
+        # one.
+        sample.metadata["stop_reason"] = "episode_token_budget"
     _close = getattr(env, "close", None)
     if _close is not None:
         _close()

@@ -273,3 +273,58 @@ def test_env_var_overrides_the_budget(fake_slime, monkeypatch) -> None:
     out = asyncio.run(bridge.generate(args, sample, {"max_new_tokens": 512}))
     assert out.response_length <= 30, out.response_length
     assert out.metadata.get("episode_token_budget_hit") is True
+
+
+# --- stop_reason ------------------------------------------------------------
+#
+# The environment has always decided why an episode ended, but the value never
+# left `step.info`: "stop_reason" appears zero times in the most recent 1.5B
+# train.log, and no historical run holds per-round outputs to recover it from.
+# slime aggregates `sample.metadata["stop_reason"]` into `rollout/stop_reason/*`.
+
+
+def test_stop_reason_reaches_sample_metadata(fake_slime) -> None:
+    sample = FakeSample(prompt=_ai4bio_episode(iterations=3))
+    out = asyncio.run(bridge.generate(_args(), sample, {"max_new_tokens": 512}))
+
+    assert out.metadata["stop_reason"] in {
+        "completed",
+        "evaluation_attempt_budget",
+        "empty_reservoir_limit",
+        "iteration_budget",
+    }
+    assert out.metadata["stop_reason"] != "aborted_before_first_step"
+
+
+def test_stop_reason_is_the_same_rule_the_environment_uses(fake_slime) -> None:
+    """The bridge must not carry its own copy of the derivation."""
+    from ldm_rl.env import derive_stop_reason
+
+    last = SimpleNamespace(info={"stop_reason": "evaluation_attempt_budget"}, terminated=True)
+    assert derive_stop_reason([last]) == "evaluation_attempt_budget"
+    assert derive_stop_reason([SimpleNamespace(info={}, terminated=True)]) == "empty_reservoir_limit"
+    assert derive_stop_reason([SimpleNamespace(info={}, terminated=False)]) == "iteration_budget"
+    assert derive_stop_reason([]) == "iteration_budget"
+
+
+def test_stop_reason_is_set_on_every_return_path(fake_slime) -> None:
+    """A sample that dies early still carries a reason, not a missing key.
+
+    slime reports `stop_reason/reported_frac`, so a return path that leaves the
+    key unset does not read as "this episode broke" -- it reads as "this run was
+    never instrumented", which is the more alarming and wrong conclusion.
+    """
+    out = asyncio.run(bridge.generate(_args(), FakeSample(prompt="{not json"), {"max_new_tokens": 512}))
+
+    assert out.status == FakeSample.Status.FAILED
+    assert out.metadata.get("stop_reason") == "episode_setup_failed"
+
+
+def test_token_budget_reports_its_own_stop_reason(fake_slime) -> None:
+    """Hitting the token budget is a configuration outcome, not an env outcome."""
+    args = _args()
+    args.rollout_max_response_len = 400
+    out = asyncio.run(bridge.generate(args, FakeSample(prompt=_ai4bio_episode(iterations=20)), {"max_new_tokens": 512}))
+
+    assert out.metadata["episode_token_budget_hit"] is True
+    assert out.metadata["stop_reason"] == "episode_token_budget"
