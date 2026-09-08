@@ -187,3 +187,89 @@ def test_generate_marks_failed_on_bad_episode_spec(fake_slime) -> None:
     assert out.status == FakeSample.Status.FAILED
     assert out.reward == 0.0
     assert "env_error" in out.metadata
+
+
+# --- per-episode token budget -------------------------------------------------
+#
+# Added 2026-09-04. Every turn used to get the full ``max_new_tokens``, so an
+# episode of ``iterations`` turns could produce ``iterations * max_new_tokens``
+# trainable tokens plus every observation. With iterations=20 and
+# max_new_tokens=8192 that is a ~164k-token training sample against a
+# --max-tokens-per-gpu of 8192. slime's packer cannot split a sample, so it
+# landed alone in an over-cap micro-batch and the forward OOMed materialising
+# [tokens, vocab] fp32 logits (observed: 22,784 tokens, 12.90 GiB).
+
+
+def test_episode_token_budget_caps_total_response_length(fake_slime) -> None:
+    """``rollout_max_response_len`` bounds the whole episode, not one turn."""
+    budget = 400  # enough for one policy turn, not for 20
+    args = _args()
+    args.rollout_max_response_len = budget
+    sample = FakeSample(prompt=_ai4bio_episode(iterations=20))
+    out = asyncio.run(bridge.generate(args, sample, {"max_new_tokens": 512}))
+
+    # The bound is hard: tokens, loss mask and rollout log-probs all stop at it.
+    assert out.response_length <= budget, out.response_length
+    assert len(out.loss_mask) == out.response_length
+    assert len(out.rollout_log_probs) == out.response_length
+    assert out.metadata.get("episode_token_budget_hit") is True
+    assert out.status == FakeSample.Status.TRUNCATED
+    # It really did stop early rather than never starting.
+    assert 1 <= len(out.metadata["env_steps"]) < 20
+
+    # Without the budget the same episode runs away: 20 turns of policy text
+    # plus 20 observations, which is what produced the over-cap micro-batches.
+    unbounded = asyncio.run(
+        bridge.generate(_args(), FakeSample(prompt=_ai4bio_episode(iterations=20)), {"max_new_tokens": 512})
+    )
+    assert unbounded.response_length > 10 * budget, unbounded.response_length
+
+
+def test_episode_token_budget_shrinks_max_new_tokens_each_turn(monkeypatch) -> None:
+    """Each turn asks for at most what the budget has left."""
+    seen: list[int] = []
+
+    async def fake_post(url, payload):
+        seen.append(payload["sampling_params"]["max_new_tokens"])
+        text = "x" * 10
+        return {
+            "text": text,
+            "meta_info": {
+                "finish_reason": {"type": "stop"},
+                "output_token_logprobs": [[-0.1, tid, 1.0, 1] for tid in _token_ids(text)],
+            },
+        }
+
+    monkeypatch.setattr(bridge, "_load_slime_deps", lambda: (fake_post, FakeSample))
+    monkeypatch.setattr(bridge, "_load_generate_state", lambda args: _FakeState(args))
+
+    args = _args()
+    args.rollout_max_response_len = 45
+    sample = FakeSample(prompt=_ai4bio_episode(iterations=20))
+    asyncio.run(bridge.generate(args, sample, {"max_new_tokens": 512}))
+
+    assert seen, "no generation request was made"
+    assert seen[0] == 45
+    # Strictly decreasing: every turn subtracts what the previous turns produced.
+    assert all(b < a for a, b in zip(seen, seen[1:])), seen
+    assert min(seen) > 0
+
+
+def test_budget_is_off_when_the_flag_is_absent(fake_slime) -> None:
+    """Configs without ``rollout_max_response_len`` keep the old behaviour."""
+    args = _args()
+    assert not hasattr(args, "rollout_max_response_len")
+    sample = FakeSample(prompt=_ai4bio_episode(iterations=3))
+    out = asyncio.run(bridge.generate(args, sample, {"max_new_tokens": 512}))
+    assert out.status == FakeSample.Status.COMPLETED
+    assert "episode_token_budget_hit" not in out.metadata
+
+
+def test_env_var_overrides_the_budget(fake_slime, monkeypatch) -> None:
+    monkeypatch.setenv("LDM_RL_EPISODE_TOKEN_BUDGET", "30")
+    args = _args()
+    args.rollout_max_response_len = 100000
+    sample = FakeSample(prompt=_ai4bio_episode(iterations=20))
+    out = asyncio.run(bridge.generate(args, sample, {"max_new_tokens": 512}))
+    assert out.response_length <= 30, out.response_length
+    assert out.metadata.get("episode_token_budget_hit") is True

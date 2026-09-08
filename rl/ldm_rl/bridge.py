@@ -21,7 +21,11 @@ Slime installed (unit tests inject fake dependencies instead).
 
 from __future__ import annotations
 
+import logging
+import os
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def _load_slime_deps() -> tuple[Any, Any]:
@@ -70,6 +74,21 @@ def _apply_chat_template(state: Any, text: str) -> str:
     except Exception:  # noqa: BLE001 - fall back to the untemplated prompt
         return text
     return templated if isinstance(templated, str) and templated.strip() else text
+
+
+def _budget_exhausted(sample, budget: int, turns: int, sample_cls) -> None:
+    """Mark a sample that hit the per-episode response-token budget."""
+    logger.warning(
+        "episode response-token budget %d exhausted after %d turn(s); stopping the "
+        "episode early. Raise LDM_RL_EPISODE_TOKEN_BUDGET (or "
+        "--rollout-max-response-len) for longer episodes, and raise "
+        "--max-tokens-per-gpu with it -- otherwise the sample will not fit a "
+        "training micro-batch.",
+        budget,
+        turns,
+    )
+    sample.metadata["episode_token_budget_hit"] = True
+    sample.status = sample_cls.Status.TRUNCATED
 
 
 async def generate(args, sample, sampling_params, evaluation: bool = False) -> Any:
@@ -129,11 +148,50 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
     last_finish = "stop"
     output = None
 
+    # --- per-episode response-token budget -------------------------------------
+    #
+    # sglang applies ``max_new_tokens`` per request, so an episode of
+    # ``spec.iterations`` turns could produce ``iterations * max_new_tokens``
+    # trainable tokens plus every environment observation, and nothing
+    # downstream bounded that. With iterations=20 and max_new_tokens=8192 the
+    # ceiling is ~164k tokens for one training sample.
+    #
+    # That breaks the training packer: ``slime.utils.dp_schedule.first_fit_pack``
+    # cannot split a sample, so a sample longer than ``--max-tokens-per-gpu``
+    # lands alone in an over-cap micro-batch, and the forward then materialises a
+    # ``[tokens, vocab]`` logits tensor several times over and OOMs. Observed:
+    # a 22,784-token micro-batch against a 8,192 cap, dying on a 12.90 GiB fp32
+    # allocation.
+    #
+    # slime's own multi-turn rollout (slime/rollout/sglang_rollout.py) subtracts
+    # the tokens already produced from ``max_new_tokens`` on every turn. Do the
+    # same, so ``--rollout-max-response-len`` means what it says: the most
+    # response tokens one training sample may contribute.
+    #
+    # Set LDM_RL_EPISODE_TOKEN_BUDGET to allow longer episodes -- and raise
+    # --max-tokens-per-gpu with it, or the schedule-time check in
+    # build_dp_schedule will stop the run and say so.
+    _env_budget = os.environ.get("LDM_RL_EPISODE_TOKEN_BUDGET", "").strip()
+    episode_token_budget = (
+        int(_env_budget) if _env_budget else int(getattr(args, "rollout_max_response_len", 0) or 0)
+    )
+    per_turn_max_new_tokens = int(sampling_params.get("max_new_tokens") or 0)
+
     try:
         for _turn_idx in range(spec.iterations):
+            turn_sampling_params = sampling_params
+            if episode_token_budget > 0:
+                remaining = episode_token_budget - len(response_token_ids)
+                if remaining <= 0:
+                    _budget_exhausted(sample, episode_token_budget, _turn_idx, Sample)
+                    break
+                turn_sampling_params = dict(sampling_params)
+                turn_sampling_params["max_new_tokens"] = (
+                    min(per_turn_max_new_tokens, remaining) if per_turn_max_new_tokens > 0 else remaining
+                )
             payload: dict[str, Any] = {
                 "text": prompt_text + response,
-                "sampling_params": sampling_params,
+                "sampling_params": turn_sampling_params,
                 "return_logprob": True,
             }
             output = await post(url, payload)
@@ -156,17 +214,32 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
                 item[0] for item in meta_info["output_token_logprobs"]
             ]
 
+            # Clamp against the budget rather than trusting the server to have
+            # honoured max_new_tokens. The packer needs a hard bound: one sample
+            # over --max-tokens-per-gpu cannot be split and OOMs the forward.
+            budget_hit = False
+            if episode_token_budget > 0:
+                room = max(episode_token_budget - len(response_token_ids), 0)
+                if len(cur_token_ids) >= room:
+                    cur_token_ids = cur_token_ids[:room]
+                    cur_log_probs = cur_log_probs[:room]
+                    budget_hit = True
+
             response += cur_response
-            response_token_ids += cur_token_ids
-            loss_mask += [1] * len(cur_token_ids)
-            rollout_log_probs += cur_log_probs
-            sample.append_response_tokens(
-                args,
-                tokens=cur_token_ids,
-                log_probs=cur_log_probs,
-                trainable=True,
-                meta_info=meta_info,
-            )
+            if cur_token_ids:
+                response_token_ids += cur_token_ids
+                loss_mask += [1] * len(cur_token_ids)
+                rollout_log_probs += cur_log_probs
+                sample.append_response_tokens(
+                    args,
+                    tokens=cur_token_ids,
+                    log_probs=cur_log_probs,
+                    trainable=True,
+                    meta_info=meta_info,
+                )
+            if budget_hit:
+                _budget_exhausted(sample, episode_token_budget, _turn_idx + 1, Sample)
+                break
 
             if last_finish == "length":
                 sample.status = Sample.Status.TRUNCATED
@@ -181,17 +254,34 @@ async def generate(args, sample, sampling_params, evaluation: bool = False) -> A
                 obs_token_ids = state.tokenizer(
                     step.observation, add_special_tokens=False
                 )["input_ids"]
+                # Observation tokens are part of the training sample, so they
+                # count against the same budget. A single environment message can
+                # be long enough to blow the cap on its own, which is why
+                # bounding max_new_tokens alone is not sufficient.
+                budget_hit = False
+                if episode_token_budget > 0:
+                    room = max(episode_token_budget - len(response_token_ids), 0)
+                    if len(obs_token_ids) >= room:
+                        obs_token_ids = obs_token_ids[:room]
+                        budget_hit = True
+                # The transcript keeps the whole observation even when its token
+                # stream was cut: the episode ends here, so nothing generates
+                # from it again.
                 response += step.observation
-                response_token_ids += obs_token_ids
-                loss_mask += [0] * len(obs_token_ids)
-                # Environment feedback tokens are non-trainable; pad the
-                # rollout log-probs with zeros so their length stays aligned
-                # with response_length (the actor slices log_probs ==
-                # response_length during training).
-                rollout_log_probs += [0.0] * len(obs_token_ids)
-                sample.append_response_tokens(
-                    args, tokens=obs_token_ids, trainable=False
-                )
+                if obs_token_ids:
+                    response_token_ids += obs_token_ids
+                    loss_mask += [0] * len(obs_token_ids)
+                    # Environment feedback tokens are non-trainable; pad the
+                    # rollout log-probs with zeros so their length stays aligned
+                    # with response_length (the actor slices log_probs ==
+                    # response_length during training).
+                    rollout_log_probs += [0.0] * len(obs_token_ids)
+                    sample.append_response_tokens(
+                        args, tokens=obs_token_ids, trainable=False
+                    )
+                if budget_hit:
+                    _budget_exhausted(sample, episode_token_budget, _turn_idx + 1, Sample)
+                    break
 
             if step.done:
                 break
