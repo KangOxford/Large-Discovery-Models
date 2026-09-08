@@ -3,4 +3,5 @@
 	url = https://github.com/hiyouga/LLaMA-Factory.git
 [submodule "rl/slime"]
 	path = rl/slime
-	url = https://github.com/THUDM/slime.git
+	url = https://github.com/KangOxford/slime.git
+	branch = isambard-ldm-rl

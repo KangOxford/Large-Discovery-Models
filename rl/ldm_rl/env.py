@@ -151,6 +151,21 @@ class EpisodeResult:
     rounds: int = 0
 
 
+def derive_stop_reason(steps) -> str:
+    """Why an episode stopped, from its step records.
+
+    Shared by :meth:`run_episode` and the slime bridge, which run their own
+    rollout loops. Two copies of this rule would agree today and disagree the
+    first time either loop changed, and the disagreement would show up only as a
+    metric that quietly stopped matching the environment.
+    """
+    if steps and steps[-1].info.get("stop_reason"):
+        return str(steps[-1].info["stop_reason"])
+    if steps and steps[-1].terminated:
+        return "empty_reservoir_limit"
+    return "iteration_budget"
+
+
 class LDMEnv:
     """Reset/step environment over one task's campaign adapters."""
 
@@ -771,12 +786,7 @@ class LDMEnv:
             observation = step.observation
             if step.done:
                 break
-        if steps and steps[-1].info.get("stop_reason"):
-            stop_reason = str(steps[-1].info["stop_reason"])
-        elif steps and steps[-1].terminated:
-            stop_reason = "empty_reservoir_limit"
-        else:
-            stop_reason = "iteration_budget"
+        stop_reason = derive_stop_reason(steps)
         incumbent = self.objectives.incumbent(self._state.observations) if len(
             self.objectives.specs
         ) == 1 else None
