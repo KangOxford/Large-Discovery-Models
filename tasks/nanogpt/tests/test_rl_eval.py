@@ -238,3 +238,25 @@ def test_run_dir_is_stable_across_processes(tmp_path):
     first = _evaluator(tmp_path / "a", script).evaluate_config(K.DEFAULTS)
     second = _evaluator(tmp_path / "b", script).evaluate_config(K.DEFAULTS)
     assert os.path.basename(first.run_dir) == os.path.basename(second.run_dir)
+
+
+def test_launch_failure_is_not_cached_as_final(tmp_path):
+    # A missing `uv` (or a bad run_command) describes the machine, not the
+    # config. Caching it would poison every config touched on a half-set-up
+    # machine and installing the missing piece would not recover.
+    runner = E.RealNanogptEvaluator(
+        output_dir=str(tmp_path),
+        run_command=["definitely-not-a-real-binary"],
+        eval_gpus="0",
+    )
+    outcome = runner.evaluate_config(K.DEFAULTS)
+    assert not outcome.ok and outcome.failure_kind == "launch_failed"
+    assert "definitely-not-a-real-binary" in outcome.error
+    assert runner.cache.get(outcome.canonical_key) is None
+    # ...so once the command works, the same config is measured for real.
+    fixed = E.RealNanogptEvaluator(
+        output_dir=str(tmp_path),
+        run_command=_fake_command(f"print({REAL_METRIC_BLOCK!r})"),
+        eval_gpus="0",
+    )
+    assert fixed.evaluate_config(K.DEFAULTS).ok

@@ -69,9 +69,19 @@ step = env.step(action_text)       # str -> EnvStep
 Reward policies (`EnvConfig.reward`):
 
 - `improvement` (default): increase of the oriented objective over the
-  previous best, clipped at 0; the first step is measured against 0.0. For
-  multi-objective tasks each objective is tracked component-wise against its
-  own best-so-far and the improvements are summed.
+  previous best, clipped at 0. For multi-objective tasks each objective is
+  tracked component-wise against its own best-so-far and the improvements are
+  summed.
+
+  **Pass `reward_ref_point` whenever the objective is expensive or minimised.**
+  It is a floor under the incumbent on every round, not just a round-1 seed.
+  Without it the per-round gains telescope to `(first measured - best
+  measured)`, so a policy is paid for opening with a deliberately bad candidate
+  and then "recovering"; with it the episode total is
+  `max(0, reference - best measured)`, which is path independent. Same defect,
+  same fix, as the moving nadir removed from `hypervolume`. The reference is in
+  *oriented* (maximisation) space, so a minimised metric needs its negation:
+  `reward_ref_point=(-reference_val,)`.
 - `raw`: oriented objective value of the best newly evaluated candidate.
 - `binary`: 1.0 only when the new candidate strictly improves the incumbent.
 - `acquisition`: the GP acquisition score (mean + beta * std for GP-UCB) of
@@ -154,7 +164,16 @@ custom generate function already set it).
 - The two wired tasks configure the campaign's own `RBFGPUCBSelector` +
   surrogate encoder, so selection and the `acquisition` reward use the same
   GP acquisition as the LDM campaign.
-- The env step is synchronous; long-running real evaluations block the rollout
-  worker. An async/actor-based evaluation backend is the natural next step.
-- Tasks without an `LDMEngine`-style adapter set (e.g. `nanogpt`) need their
-  own factory before they can be driven by this environment.
+- The env step is synchronous, but `bridge.generate` awaits it via
+  `asyncio.to_thread`, so a slow evaluation no longer stalls the rollout
+  worker's event loop and sibling episodes keep their evaluations in flight.
+  This matters once a step costs minutes: `nanogpt` trains a real model for its
+  full wall-clock budget per step. A true actor-based backend would still be
+  better for cross-process scheduling.
+- `nanogpt` is wired in both modes, and is the reference for an **expensive,
+  measured** objective: one step is one real training run scored by
+  `val_bpb`, with no analytic stand-in. See
+  `rl/slime_launch/NANOGPT_HANDOFF.md` -- in particular that the trainer and
+  the evaluator must hold disjoint GPUs, and that the reward needs a measured
+  `reward_ref_point`.
+- `antibody` still resolves to a placeholder adapter and fails fast.

@@ -1,0 +1,42 @@
+{
+  "task": "nanogpt",
+  "mode": "real",
+  "_comment": "Every number here is a starting point, not a tuned value. See NANOGPT_HANDOFF.md for what each one costs.",
+
+  "episodes": {
+    "count": 64,
+    "iterations": 4,
+    "reservoir_size": 2,
+    "evaluations_per_round": 1,
+    "reward": "improvement",
+    "free_knob_mode": "mixed",
+    "_iterations": "propose/measure rounds per episode. THE cost dial: episodes x n_samples x iterations real training runs per rollout step.",
+    "_reservoir_vs_evals": "propose 2, measure 1. The GP earns its keep by choosing which of the two proposals is worth a full training budget; measuring both would double the cost."
+  },
+
+  "evaluation": {
+    "budgets": "300",
+    "output_dir": "",
+    "eval_gpus": "",
+    "autoresearch_cache_dir": "",
+    "timeout_slack": 300.0,
+    "_budgets": "wall-clock seconds per training run. Comma-separate to vary it across instances; each distinct budget needs its own reference measurement.",
+    "_eval_gpus": "physical GPU indices for evaluation. MUST be disjoint from the trainer's GPUs.",
+    "_timeout_slack": "allowance over the budget before a run counts as a timeout. Startup + compile + the final val pass measured 28-51s on an H100."
+  },
+
+  "training": {
+    "num_rollout": 50,
+    "rollout_batch_size": 2,
+    "n_samples_per_prompt": 4,
+    "updates_per_rollout": 1,
+    "rollout_max_response_len": 4096,
+    "max_tokens_per_gpu": 8192,
+    "rollout_temperature": 1.0,
+    "lr": 1e-6,
+    "save_interval": 5,
+    "_response_len": "Measured: the reset prompt is 940-1780 tokens and a 4-round transcript adds ~1300, so 4096 is roughly 2x headroom. The bridge disables thinking (enable_thinking=False); if you re-enable it this must grow a lot.",
+    "_temperature": "1.0, not 0.8. GRPO needs within-group spread and a group here is only n_samples episodes; with a reward that is often exactly 0 (no improvement), low temperature risks zero-variance groups.",
+    "_save_interval": "5, not 10: a rollout step costs tens of GPU-minutes, so losing 10 of them to a crash is expensive."
+  }
+}

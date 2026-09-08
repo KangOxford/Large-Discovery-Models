@@ -66,9 +66,16 @@ FAILURE_KINDS = (
     "oom",                  # CUDA OOM
     "loss_diverged",        # train.py printed FAIL (NaN or loss > 100)
     "no_metrics",           # exited 0 but printed no val_bpb
+    "launch_failed",        # the trainer command could not be started at all
     "crashed",              # anything else non-zero
     "timed_out",
 )
+
+#: Marker written into the log when the trainer command cannot be spawned, so
+#: classification can tell "your environment is not set up" apart from "this
+#: config is bad". The distinction matters because the former must NOT be
+#: cached as a final answer.
+_LAUNCH_FAILURE_MARKER = "nanogpt-eval: could not launch trainer command"
 
 
 @dataclass
@@ -206,6 +213,8 @@ def classify_failure(log: str, returncode: int) -> tuple[str, str]:
         "AssertionError" in log and "tokens_per_fwdbwd" in log
     ):
         return "rejected_by_trainer", "TOTAL_BATCH_SIZE not divisible by device batch tokens"
+    if _LAUNCH_FAILURE_MARKER in log:
+        return "launch_failed", log.strip().splitlines()[-1][:300]
     if "OutOfMemoryError" in log or "CUDA out of memory" in log:
         return "oom", "CUDA out of memory"
     if re.search(r"^FAIL\s*$", log, re.M):
@@ -230,11 +239,20 @@ class ResultCache:
     Shared by every concurrent worker, so a config measured by one worker is
     never re-measured by another. Failures are cached too -- a config that OOMs
     or that the trainer rejects will do so again, and paying 20s to rediscover
-    that is still 20s of a GPU. ``timed_out`` is the one exception: a timeout
-    can be a transient node problem, so it is not treated as final.
+    that is still 20s of a GPU.
+
+    Two kinds are NOT final, because they describe the machine rather than the
+    config, and caching them would keep serving a stale failure after the
+    problem is fixed:
+
+    * ``timed_out`` -- can be a transient node problem;
+    * ``launch_failed`` -- the trainer command never started (missing ``uv``, a
+      bad ``run_command``, an unsynced dependency group). Without this, a first
+      run on a half-set-up machine would poison the cache for every config it
+      touched, and installing the missing piece would not recover it.
     """
 
-    RETRYABLE = frozenset({"timed_out"})
+    RETRYABLE = frozenset({"timed_out", "launch_failed"})
 
     def __init__(self, path: str):
         self.path = path
@@ -579,9 +597,16 @@ class RealNanogptEvaluator:
             if isinstance(partial, bytes):
                 partial = partial.decode("utf-8", "replace")
             return {"log": partial, "returncode": -1, "timed_out": True}
-        except FileNotFoundError as exc:
-            return {"log": f"could not launch {self.run_command[0]!r}: {exc}",
-                    "returncode": 127, "timed_out": False}
+        except (FileNotFoundError, PermissionError, OSError) as exc:
+            return {
+                "log": (
+                    f"{_LAUNCH_FAILURE_MARKER}\n"
+                    f"command: {' '.join(self.run_command)}\n"
+                    f"{type(exc).__name__}: {exc}"
+                ),
+                "returncode": 127,
+                "timed_out": False,
+            }
 
 
 __all__ = [

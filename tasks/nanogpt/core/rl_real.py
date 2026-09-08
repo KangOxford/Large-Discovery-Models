@@ -41,6 +41,7 @@ _STATUS_BY_FAILURE = {
     "oom": "failed",
     "loss_diverged": "failed",
     "no_metrics": "failed",
+    "launch_failed": "failed",
     "crashed": "failed",
 }
 
