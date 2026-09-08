@@ -26,7 +26,6 @@ regressions), so the only score this task recognises is a measured one. See
 from __future__ import annotations
 
 import json
-import math
 import os
 from typing import Any, Iterable
 
