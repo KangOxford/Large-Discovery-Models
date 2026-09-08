@@ -21,9 +21,14 @@ WIRED_MOCK_TASKS = {
     "causal_discovery_discrete",
     "small_molecule",
     "llm_kv_adaptive_quantization",
+    # nanogpt proposes a complete knob dictionary, which is self-contained, so
+    # it fits the stateless proposal model after all. (Its campaign adapters do
+    # pass state_id references around, and that is what made this task look
+    # incompatible; the RL path does not use them.)
+    "nanogpt",
 }
 # Tasks that resolve to a placeholder adapter and must raise a clear error.
-PLACEHOLDER_TASKS = {"antibody", "nanogpt"}
+PLACEHOLDER_TASKS = {"antibody"}
 
 
 def test_all_registered_tasks_resolve_to_an_adapter() -> None:

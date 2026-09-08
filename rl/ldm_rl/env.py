@@ -122,6 +122,8 @@ class EnvConfig:
                 "reward 'hypervolume' requires a fixed reward_ref_point "
                 "(oriented-space domain nadir); the moving nadir is disabled (PR #2)."
             )
+        if self.reward_ref_point is not None and not self.reward_ref_point:
+            raise ValueError("reward_ref_point must not be empty when provided")
 
 
 @dataclass(frozen=True)
@@ -607,8 +609,32 @@ class LDMEnv:
             reward = sum(after)
             return reward, components
 
+        # ``reward_ref_point`` (oriented space) is a FLOOR under the incumbent,
+        # not just a round-1 seed.
+        #
+        # Without it the per-round improvements telescope to
+        # (first measured - best measured), so a policy is paid for opening
+        # with a deliberately bad candidate and then "recovering": a worse
+        # round 1 raises the total. Seeding only round 1 does not fix that,
+        # because rounds 2+ still measure against the episode's own incumbent.
+        # Clamping the incumbent to the reference on every round makes the
+        # episode total telescope to max(0, reference - best measured), which
+        # is path independent -- so sandbagging earns exactly nothing.
+        #
+        # This is the same defect, and the same fix, as the moving nadir that
+        # PR #2 removed from the hypervolume reward.
+        reference = self.config.reward_ref_point
         if baseline is None:
-            baseline = tuple(0.0 for _ in self.objectives.specs)
+            baseline = (
+                tuple(float(value) for value in reference)
+                if reference is not None
+                else tuple(0.0 for _ in self.objectives.specs)
+            )
+        elif reference is not None:
+            baseline = tuple(
+                max(float(current), float(floor))
+                for current, floor in zip(baseline, reference, strict=True)
+            )
         improvements = tuple(max(0.0, a - b) for a, b in zip(after, baseline, strict=True))
         improvement = sum(improvements)
         if self.config.reward == "binary":
