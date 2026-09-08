@@ -14,7 +14,7 @@
 
 | 环节 | 状态 |
 |---|---|
-| 动作空间 / 约束 / 规范化标识 | ✅ 161 个测试，含对**真实 `train.py`** 的 patch 验证 |
+| 动作空间 / 约束 / 规范化标识 | ✅ 162 个测试，含对**真实 `train.py`** 的 patch 验证 |
 | 真实评估器（物化→运行→解析→分类→缓存→GPU 池） | ✅ 用假 trainer 完整验证；**真 trainer 从未在本机跑过** |
 | GP 特征编码 + 选择方向 | ✅ 单测覆盖，含方向 bug 的回归测试 |
 | 奖励语义（路径无关性） | ✅ 单测断言不变量 + 反向回归守卫 |
@@ -236,13 +236,16 @@ tasks/nanogpt/core/
   rl_real.py     real 模式装配（含把 GP 方向修正过来的 selector）
   rl_adapter.py  mock / real 分发
 tasks/nanogpt/scripts/
+  rl_smoke.py         无 GPU 冒烟（一个完整 mock episode）
   rl_reference.py     测量奖励参考点
   gen_rl_episodes.py  生成 episode prompt 数据（实例采样）
-tasks/nanogpt/tests/  89 个测试，全部无需 GPU
+tasks/nanogpt/tests/  100 个测试，全部无需 GPU
 rl/slime_launch/
   config_nanogpt.json           所有旋钮 + 每个旋钮的代价说明
   prepare_nanogpt.sh            一次性准备
   run_train_real_nanogpt.sh     训练启动器
+  NANOGPT_RL_TRAINING.md        线性 runbook（从零到开跑）<- 想直接跑就看这个
+  NANOGPT_RUNS.md               运行矩阵 / 评测协议
 ```
 
 改了 `rl_encoder.py` 的特征布局或归一化，**必须**同时 bump `FEATURE_VERSION`：
