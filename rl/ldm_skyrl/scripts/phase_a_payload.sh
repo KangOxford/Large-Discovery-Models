@@ -185,7 +185,23 @@ echo "--- causal-conv1d (compiles; sdist only on every platform) ---"
 # cause (three packages failing on a missing torch at build time), and I reported
 # it as verified in the same edit that introduced this gate. Fixing a cause and
 # confirming the fix are two acts.
-export CAUSAL_CONV1D_FORCE_BUILD=TRUE MAMBA_FORCE_BUILD=TRUE MAX_JOBS=${MAX_JOBS:-32}
+# The toolchain, by absolute path. The node's default is GCC 7.5.0 and torch
+# 2.11's headers reject it outright ("too old version of"), which is what was
+# actually failing all along. `module load gcc-native/12.3` does NOT fix it: the
+# modulefile declares prepend_path to /opt/cray/pe/gcc-native/12/bin, yet after
+# loading, `command -v gcc` still returns /usr/bin/gcc -- and the load prints
+# nothing at all, so its silence reads as success. Absolute paths, and the
+# version is printed below from the compiler itself rather than inferred from the
+# loader's exit code.
+_GCC12=/opt/cray/pe/gcc-native/12/bin
+if [ -x "$_GCC12/g++" ]; then
+  export PATH="$_GCC12:$PATH" CC="$_GCC12/gcc" CXX="$_GCC12/g++"
+  export NVCC_PREPEND_FLAGS="-ccbin $_GCC12/g++"   # nvcc picks its own host compiler otherwise
+  echo "host compiler for the CUDA extensions: $("$CXX" --version | head -1)"
+else
+  echo "WARNING: $_GCC12/g++ absent; the build will use $(g++ --version | head -1) and torch may reject it"
+fi
+export CAUSAL_CONV1D_FORCE_BUILD=TRUE MAMBA_FORCE_BUILD=TRUE MAX_JOBS=${MAX_JOBS:-16}
 # --reinstall-package, because the node-local env survives between landings and a
 # kernel-less causal_conv1d 1.7.0 from an earlier attempt already satisfies the
 # requirement -- uv skipped the build entirely ("Installed 1 package in 16ms",
@@ -197,8 +213,8 @@ export CAUSAL_CONV1D_FORCE_BUILD=TRUE MAMBA_FORCE_BUILD=TRUE MAX_JOBS=${MAX_JOBS
 # fine and failed at run time, the module sweep found nothing to do, and now this.
 # "Is it present" and "is it the right one" are different questions and only the
 # first is cheap to ask by accident.
-"${PIP[@]}" --no-build-isolation --reinstall-package causal-conv1d --no-binary causal-conv1d "causal-conv1d" 2>&1 | tail -6
-if "$VENV/bin/python" -c "import causal_conv1d_cuda" 2>/dev/null; then
+"${PIP[@]}" --no-build-isolation --refresh-package causal-conv1d --reinstall-package causal-conv1d --no-binary causal-conv1d "causal-conv1d" 2>&1 | tail -6
+if "$VENV/bin/python" -c "import torch, causal_conv1d_cuda" 2>/dev/null; then
   verdict S1b "causal-conv1d built AND causal_conv1d_cuda imports"
 else
   verdict S1b "causal_conv1d_cuda MISSING -- the python package may be installed but its CUDA kernel is not; A5 does not need it, A3 does"
@@ -397,18 +413,27 @@ fi   # end SKIP_A5 guard
 
 stamp "S3 add the megatron extras (mamba-ssm and megatron-bridge compile)"
 # Same reason as S1b: these compile against torch, so build isolation has to go.
-"${PIP[@]}" --no-build-isolation --reinstall-package mamba-ssm --no-binary mamba-ssm "mamba-ssm>=2.3.0" 2>&1 | tail -8
-"${PIP[@]}" "git+https://github.com/NVIDIA-NeMo/Megatron-Bridge@91a15142a4b4442a8d46ab539d1b923bd08570d0" 2>&1 | tail -6
+"${PIP[@]}" --no-build-isolation --refresh-package mamba-ssm --reinstall-package mamba-ssm --no-binary mamba-ssm "mamba-ssm>=2.3.0" 2>&1 | tail -8
+# --no-build-isolation here too. This is the THIRD site of the same cause, and I
+# fixed the first two and left this one beside them -- the identical mistake this
+# payload already documents for the dependency list and the exclusion list.
+# megatron-bridge pulls fast-hadamard-transform, which builds against torch, so
+# the isolated build environment kills it. Nothing checked the result, so A3 then
+# failed six minutes later on "No module named 'megatron.bridge'", which reads
+# like the package was never requested rather than like an install that failed.
+"${PIP[@]}" --no-build-isolation "git+https://github.com/NVIDIA-NeMo/Megatron-Bridge@91a15142a4b4442a8d46ab539d1b923bd08570d0" 2>&1 | tail -6
+"$VENV/bin/python" -c "
+import torch, megatron.bridge
+print('  megatron.bridge imports')
+" || { verdict S3 "FAIL - megatron.bridge does not import; A3 cannot be run on this env"; }
 # Import the CUDA extensions by name. mamba_ssm and causal_conv1d both import
 # cleanly with no kernel behind them, which is exactly how A3 got to S4 and then
 # died on `No module named selective_scan_cuda` six minutes later.
+# torch first, then the extensions, then the module A3 actually dies on.
 "$VENV/bin/python" -c "
-import importlib
-missing = [m for m in ('causal_conv1d_cuda', 'selective_scan_cuda')
-           if not importlib.util.find_spec(m)]
-import mamba_ssm, causal_conv1d
-assert not missing, f'python packages installed but CUDA kernels absent: {missing}'
-print('mamba-ssm and causal-conv1d import OK, and both CUDA extensions are present')
+import torch, causal_conv1d_cuda, selective_scan_cuda, mamba_ssm, causal_conv1d, importlib
+importlib.import_module('transformers.models.qwen3_next.modeling_qwen3_next')
+print('both CUDA extensions load, and transformers qwen3_next imports')
 "
 
 # --------------------------------------------------------- S4: A3, megatron

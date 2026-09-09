@@ -1,5 +1,5 @@
 {
-  "collected_utc": "2026-09-09T22:21:04Z",
+  "collected_utc": "2026-09-09T23:28:54Z",
   "a1": {
     "status": "PASS",
     "packages_resolved": 322,
@@ -198,21 +198,26 @@
   "a3": {
     "status": "FAIL",
     "criterion": "trainer.strategy=megatron reaches the first forward",
-    "root_cause": "the CUDA extensions of causal-conv1d and mamba-ssm are never compiled; the python packages install and import, but causal_conv1d_cuda and selective_scan_cuda do not exist",
-    "evidence": [
-      "import causal_conv1d_cuda / selective_scan_cuda -> ModuleNotFoundError",
-      "a forced source rebuild reports 'Built causal-conv1d==1.7.0' in 4 s wall time; a real kernel compile is minutes, so the extension is never attempted",
-      "the third symptom is the same cause wearing a disguise: megatron-bridge fails on \"Could not import module 'Qwen3NextForCausalLM'. Are this object's requirements defined correctly?\", which reads as a megatron-bridge/transformers version conflict. The underlying exception, recovered by importing the modeling module directly, is ModuleNotFoundError: No module named 'causal_conv1d_cuda'."
+    "root_cause": "a platform incompatibility one glibc minor version wide. megatron-bridge 0.6.0 at the pinned commit requires nvidia-resiliency-ext 0.6.0, which publishes only manylinux_2_39 wheels and no source distribution at all. The compute nodes run glibc 2.38 and accept manylinux_2_38_aarch64 at best.",
+    "layers": [
+      "1. the python packages install and import; only the CUDA extensions are absent, and transformers' lazy importer rewrites that into \"Could not import module 'Qwen3NextForCausalLM'. Are this object's requirements defined correctly?\" -- which reads as a version conflict and is not one",
+      "2. uv's build cache is keyed on (package, version) and not on the toolchain, so every rebuild reissued a kernel-less wheel in 4 s while printing Building and Built. --refresh-package moved the same build to 361 s: it had never been running",
+      "3. the default compiler is GCC 7.5.0 and torch 2.11's headers reject it outright. module load gcc-native/12.3 does not fix it -- after loading, command -v gcc still returns /usr/bin/gcc, and the load prints nothing, so its silence reads as success",
+      "4. the megatron-bridge install lacked --no-build-isolation. Two other install sites had been fixed and this one was left beside them",
+      "5. nvidia-resiliency-ext 0.6.0: wheels for manylinux_2_39 only, node glibc 2.38, no sdist"
     ],
-    "ruled_out": [
-      "build isolation hiding torch (fixed with --no-build-isolation; the build now runs)",
-      "a stale kernel-less copy satisfying the requirement (fixed with --reinstall-package; the build is now actually invoked)",
-      "CUDA_HOME unset (it is set to the venv, which holds bin/nvcc, include/cuda_runtime.h and lib/libcudart.so)",
-      "a missing $CUDA_HOME/lib64 (symlinked to lib; no change)",
-      "CAUSAL_CONV1D_FORCE_BUILD unset (set to TRUE; no change)",
-      "TORCH_CUDA_ARCH_LIST unset for Hopper (set to 9.0; no change)"
+    "cleared_and_verified_in_run": [
+      "host compiler for the CUDA extensions: g++ (SUSE Linux) 12.3.0",
+      "GATE S1b: causal-conv1d built AND causal_conv1d_cuda imports",
+      "Built mamba-ssm==2.3.2.post1 in 2m46s",
+      "both CUDA extensions load, and transformers qwen3_next imports (the disguised error is gone, because a kernel got built and not because a version changed)"
     ],
-    "open_question": "which condition in causal-conv1d's setup.py skips the extension. uv builds in a temporary directory and removes it, so setup.py is not on the node, and three attempts to surface its stdout returned uv's resolver debug instead. Naming that condition is where the next person should start.",
+    "recipe_that_builds_the_kernels": "CC/CXX set by absolute path to /opt/cray/pe/gcc-native/12/bin, NVCC_PREPEND_FLAGS=-ccbin on the same g++, --refresh-package to defeat the build cache, --no-build-isolation, and every extension check importing torch first (a bare import of causal_conv1d_cuda raises ImportError: libc10.so even when it is correct)",
+    "routes_not_taken": [
+      "an older megatron-bridge whose dependencies have manylinux_2_38 wheels",
+      "building nvidia-resiliency-ext from its git repository rather than PyPI",
+      "a container image with glibc >= 2.39"
+    ],
     "not_claimed": "that the megatron path is broken. Nothing here tests it; the run never reaches it."
   },
   "a4": {
