@@ -1,5 +1,5 @@
 {
-  "collected_utc": "2026-09-09T20:17:37Z",
+  "collected_utc": "2026-09-09T22:21:04Z",
   "a1": {
     "status": "PASS",
     "packages_resolved": 322,
@@ -197,7 +197,23 @@
   },
   "a3": {
     "status": "FAIL",
-    "reason": "ModuleNotFoundError: mamba_ssm \u2014 the megatron path needs it and it compiles from source; not attempted yet"
+    "criterion": "trainer.strategy=megatron reaches the first forward",
+    "root_cause": "the CUDA extensions of causal-conv1d and mamba-ssm are never compiled; the python packages install and import, but causal_conv1d_cuda and selective_scan_cuda do not exist",
+    "evidence": [
+      "import causal_conv1d_cuda / selective_scan_cuda -> ModuleNotFoundError",
+      "a forced source rebuild reports 'Built causal-conv1d==1.7.0' in 4 s wall time; a real kernel compile is minutes, so the extension is never attempted",
+      "the third symptom is the same cause wearing a disguise: megatron-bridge fails on \"Could not import module 'Qwen3NextForCausalLM'. Are this object's requirements defined correctly?\", which reads as a megatron-bridge/transformers version conflict. The underlying exception, recovered by importing the modeling module directly, is ModuleNotFoundError: No module named 'causal_conv1d_cuda'."
+    ],
+    "ruled_out": [
+      "build isolation hiding torch (fixed with --no-build-isolation; the build now runs)",
+      "a stale kernel-less copy satisfying the requirement (fixed with --reinstall-package; the build is now actually invoked)",
+      "CUDA_HOME unset (it is set to the venv, which holds bin/nvcc, include/cuda_runtime.h and lib/libcudart.so)",
+      "a missing $CUDA_HOME/lib64 (symlinked to lib; no change)",
+      "CAUSAL_CONV1D_FORCE_BUILD unset (set to TRUE; no change)",
+      "TORCH_CUDA_ARCH_LIST unset for Hopper (set to 9.0; no change)"
+    ],
+    "open_question": "which condition in causal-conv1d's setup.py skips the extension. uv builds in a temporary directory and removes it, so setup.py is not on the node, and three attempts to surface its stdout returned uv's resolver debug instead. Naming that condition is where the next person should start.",
+    "not_claimed": "that the megatron path is broken. Nothing here tests it; the run never reaches it."
   },
   "a4": {
     "status": "PARTIAL",
