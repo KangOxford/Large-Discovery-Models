@@ -1,0 +1,138 @@
+{
+  "collected_utc": "2026-09-09T05:48:30Z",
+  "a1": {
+    "status": "PASS",
+    "packages_resolved": 322,
+    "torch_version": "2.11.0+cu128",
+    "torch_delivery": "prebuilt aarch64 wheel",
+    "cu130_occurrences": 0,
+    "cu13_packages": 0,
+    "criterion": "uv lock succeeds and the resolved torch is a +cu128 or +cu129 build"
+  },
+  "delivery": [
+    {
+      "package": "torch",
+      "version": "2.11.0+cu128",
+      "delivery": "prebuilt aarch64 wheel"
+    },
+    {
+      "package": "vllm",
+      "version": "0.23.0+cu129",
+      "delivery": "prebuilt aarch64 wheel"
+    },
+    {
+      "package": "flash-attn",
+      "version": "2.8.3",
+      "delivery": "sdist only, compiled at install"
+    },
+    {
+      "package": "mamba-ssm",
+      "version": "2.3.1",
+      "delivery": "sdist only, compiled at install"
+    },
+    {
+      "package": "causal-conv1d",
+      "version": "1.6.1",
+      "delivery": "sdist only, compiled at install"
+    },
+    {
+      "package": "transformer-engine",
+      "version": "2.11.0",
+      "delivery": "pure-python wheel"
+    },
+    {
+      "package": "transformer-engine-torch",
+      "version": "2.11.0",
+      "delivery": "sdist only, compiled at install"
+    },
+    {
+      "package": "megatron-core",
+      "version": "0.19.0+71e418ea7",
+      "delivery": "git checkout, compiled at install"
+    },
+    {
+      "package": "megatron-bridge",
+      "version": "0.6.0+91a15142",
+      "delivery": "git checkout, compiled at install"
+    },
+    {
+      "package": "flashinfer-python",
+      "version": "0.6.12",
+      "delivery": "sdist only, compiled at install"
+    },
+    {
+      "package": "ray",
+      "version": "2.56.0",
+      "delivery": "prebuilt aarch64 wheel"
+    },
+    {
+      "package": "torchvision",
+      "version": "0.26.0+cu128",
+      "delivery": "prebuilt aarch64 wheel"
+    },
+    {
+      "package": "vllm-router",
+      "version": "0.1.14.post1",
+      "delivery": "prebuilt aarch64 wheel"
+    }
+  ],
+  "already_built_here": {
+    "env": "/home/u6gb/kangli.u6gb/envs/ldm-rl-train",
+    "versions": {
+      "torch": "2.11.0+cu129",
+      "transformer_engine": "2.16.0",
+      "transformer_engine_torch": "2.16.0",
+      "flash_attn": "2.8.3",
+      "mamba_ssm": null,
+      "causal_conv1d": null,
+      "vllm": null,
+      "megatron-core": "0.16.0rc0",
+      "ray": "2.58.0",
+      "flashinfer_python": "0.6.12"
+    }
+  },
+  "a2": {
+    "status": "PASS",
+    "log": "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_skyrl_nb/A2_vllm_6426448.log",
+    "node": "nid010771",
+    "driver": "565.57.01",
+    "torch": "2.11.0+cu128",
+    "vllm": "0.23.0+cu129",
+    "cuda_available": "True",
+    "device": "NVIDIA GH200 120GB",
+    "token_text": "' Paris'",
+    "flashinfer": "present",
+    "failed_steps": "none -- A2 PASSES",
+    "attention_backend": "FLASH_ATTN",
+    "backend_candidates": "'FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'",
+    "model_load": "2.98 GiB memory and 2.092806 seconds",
+    "job_id": "6426448",
+    "attempts": [
+      {
+        "job": 6426395,
+        "stopped_at": "install torch",
+        "cause": "uv index strategy is first-match: it found the torch NAME on PyPI and never looked at the pytorch index named one line above"
+      },
+      {
+        "job": 6426397,
+        "stopped_at": "create venv",
+        "cause": "the previous attempt left a valid empty venv behind; fixed with --allow-existing rather than by deleting it"
+      },
+      {
+        "job": 6426399,
+        "stopped_at": "generate one token",
+        "cause": "probe had no if __name__ == '__main__' guard, and vLLM v1 spawns its engine core, which re-imports the main module"
+      },
+      {
+        "job": 6426443,
+        "stopped_at": "generate one token",
+        "cause": "flashinfer JIT-compiles its sampling kernel at first use and found no CUDA toolkit; the only nvcc in the venv is a CUDA 13 one"
+      },
+      {
+        "job": 6426448,
+        "stopped_at": "passed",
+        "cause": ""
+      }
+    ]
+  }
+}
