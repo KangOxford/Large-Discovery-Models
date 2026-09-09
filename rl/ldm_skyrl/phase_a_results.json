@@ -134,5 +134,77 @@
         "cause": ""
       }
     ]
+  },
+  "blocked": {
+    "collected_utc": "2026-09-09T18:46:12Z",
+    "deadline_utc": "2026-09-10T05:00:00Z",
+    "note": "A3, A4 and A5 are implemented, staged and unit-checked, and have not run. What stops them is cluster capacity, and the two measurements below are why no amount of resizing or waiting fixes it inside the window.",
+    "scheduling": {
+      "measured_at_utc": "2026-09-09T18:24:32Z",
+      "rows": [
+        {
+          "request": "1 GPU, 1 h, shared node",
+          "predicted_start": "2026-09-11T12:48"
+        },
+        {
+          "request": "1 GPU, 2 h, shared node",
+          "predicted_start": "2026-09-11T12:48"
+        },
+        {
+          "request": "4 GPU, 2 h, exclusive",
+          "predicted_start": "2026-09-11T12:48"
+        },
+        {
+          "request": "4 GPU, 8 h, exclusive",
+          "predicted_start": "2026-09-11T12:03"
+        }
+      ],
+      "submitted_job_priority": 1,
+      "account_running_jobs": 174,
+      "account_pending_jobs": 168,
+      "account_nodes_held": 355
+    },
+    "capacity": {
+      "account_nodes_allocated": 238,
+      "nodes_with_no_slurm_step": 101,
+      "nodes_probed_with_nvidia_smi": 61,
+      "nodes_found_with_a_free_card": 1,
+      "median_used_mib_on_stepless_nodes": 91527,
+      "reason": "A node with no step can still be full. Session teardown kills the srun client while the compute processes keep running, so the step disappears from squeue and the memory stays allocated."
+    },
+    "staging": [
+      {
+        "finding": "/home is at its hard quota (101G of 101G)",
+        "consequence": "conda create --clone fails even when the destination is node-local, because it unpacks into $CONDA_ROOT/pkgs on /home",
+        "misleading_symptom": "reported as InvalidArchiveError, 'you probably need to delete and re-download', which points at a corrupt package rather than at a full filesystem"
+      },
+      {
+        "finding": "a plain cp -a of a conda env works",
+        "consequence": "19 GB in 13.5 min; the copy imports torch 2.11.0+cu129, transformer_engine 2.16.0, flash_attn 2.8.3, megatron-core 0.16.0rc0, ray 2.58.0 with sys.prefix resolved to the new location",
+        "misleading_symptom": ""
+      },
+      {
+        "finding": "--no-build applied to a whole requirement line is all-or-nothing",
+        "consequence": "func-timeout ships an sdist and no wheel, so the line became unsatisfiable and installed none of its packages",
+        "misleading_symptom": "surfaces much later as ModuleNotFoundError: jaxtyping from inside skyrl.train.trainer"
+      },
+      {
+        "finding": "causal-conv1d is not on the FSDP gate's path",
+        "consequence": "skyrl.train, RayPPOTrainer and FullyAsyncRayPPOTrainer all import without it; it is for Mamba-family models and A5 runs a plain transformer",
+        "misleading_symptom": "SkyRL's [fsdp] extra lists it, which suggests the only compile in phase A is unavoidable"
+      }
+    ]
+  },
+  "a3": {
+    "status": "not run",
+    "reason": "no GPU capacity reachable before the deadline"
+  },
+  "a4": {
+    "status": "not run",
+    "reason": "same; A4 is exercised by the A5 run"
+  },
+  "a5": {
+    "status": "not run",
+    "reason": "implemented and staged; blocked on capacity"
   }
 }
