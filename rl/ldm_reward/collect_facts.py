@@ -24,10 +24,17 @@ ARGS = RL / "slime" / "slime" / "utils" / "arguments.py"
 DATA_PY = RL / "slime" / "slime" / "backends" / "megatron_utils" / "data.py"
 RUNS = Path("/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_rl/runs")
 
+# Two logs per run, and the difference matters. The top-level file is the srun
+# orchestration log; the per-step metrics -- including the zero-variance counters
+# -- are only in runs/<RUN>/train.log. Reading only the former is what made an
+# earlier version of this file report the instrumentation as absent.
 RUN_LOGS = {
-    "9b-sft-a": RUNS / "9b_sft_split_20260909T071112Z.log",
-    "9b-sft-b": RUNS / "9b_sft_split_20260909T094237Z.log",
-    "9b-base": RUNS / "9b_base_split_20260909T073652Z.log",
+    "9b-sft-a": (RUNS / "9b_sft_split_20260909T071112Z.log",
+                 RUNS / "9b-sft_20260909T071143Z" / "train.log"),
+    "9b-sft-b": (RUNS / "9b_sft_split_20260909T094237Z.log",
+                 RUNS / "9b-sft-gbs2_20260909T094256Z" / "train.log"),
+    "9b-base": (RUNS / "9b_base_split_20260909T073652Z.log",
+                RUNS / "9b-base_20260909T073721Z" / "train.log"),
 }
 
 
@@ -46,15 +53,43 @@ def scalar_from_log(text: str, key: str) -> str | None:
     return m.group(1) if m else None
 
 
-def collect_run(name: str, path: Path) -> dict:
-    text = path.read_text(errors="replace")
+def zero_std_series(text: str, key: str) -> list[float]:
+    """slime emits these once per rollout, bucketed by reward value.
+
+    `count_0.0` is a bucket key, so it is present only on rollouts where at
+    least one group scored exactly zero; the other three are emitted every
+    rollout. Summing them is therefore only meaningful against the number of
+    groups, which is rollout_batch_size per step.
+    """
+    return [float(x) for x in
+            re.findall(rf"zero_std/{re.escape(key)}'?\s*:\s*([-0-9.eE+]+)", text)]
+
+
+def collect_run(name: str, paths: tuple[Path, Path]) -> dict:
+    orch, train = paths
+    text = orch.read_text(errors="replace")
+    ttext = train.read_text(errors="replace") if train.exists() else ""
     rewards = [float(x) for x in re.findall(r"'rollout/raw_reward': ([-0-9.eE+]+)", text)]
     n = len(rewards)
     half = n // 2
     zeros = [i for i, r in enumerate(rewards) if r == 0.0]
+    ng = zero_std_series(ttext, "count_no_gradient")
+    le = zero_std_series(ttext, "count_lt_eps")
+    c0 = zero_std_series(ttext, "count_0.0")
+    sf = zero_std_series(ttext, "mode_is_scale_free")
+    rb = scalar_from_log(text, "rollout_batch_size")
+    groups = (int(rb) * len(ng)) if (rb and rb.isdigit() and ng) else None
     return {
-        "log": str(path),
+        "log": str(orch),
+        "train_log": str(train),
         "steps": n,
+        # Measured directly, not inferred from the group mean.
+        "groups_total": groups,
+        "groups_no_gradient": int(sum(ng)) if ng else None,
+        "groups_lt_eps": int(sum(le)) if le else None,
+        "groups_exactly_zero": int(sum(c0)) if c0 else None,
+        "no_gradient_frac": (sum(ng) / groups) if (ng and groups) else None,
+        "mode_is_scale_free": sorted(set(sf)) if sf else None,
         # `rollout/raw_reward` is the MEAN over the rollout, not a per-sample value.
         "raw_reward_series_is_group_mean": True,
         "raw_reward": rewards,
@@ -84,8 +119,11 @@ def collect_run(name: str, path: Path) -> dict:
         "n_mean_below_1e5": sum(1 for r in rewards if 0.0 < r < 1e-5),
         "n_mean_below_1e6": sum(1 for r in rewards if 0.0 < r < 1e-6),
         "n_nonzero": sum(1 for r in rewards if r > 0.0),
-        "zero_std_keys_present": bool(re.search(r"'zero_std/", text)),
-        "reward_kind_present": bool(re.search(r"'kind': '", text)),
+        # Present in train.log, absent from the orchestration log. The earlier
+        # claim that they were absent everywhere came from checking only the latter.
+        "zero_std_keys_in_orch_log": "zero_std/" in text,
+        "zero_std_keys_in_train_log": "zero_std/" in ttext,
+        "reward_kind_in_train_log": bool(re.search(r"'kind': '", ttext)),
     }
 
 
@@ -122,7 +160,7 @@ facts = {
         "normalize_advantages_line": line_of(ARGS, r'"--normalize-advantages"'),
         "logged_value_is_mean_line": line_of(DATA_PY, r"log_dict\[key\] = \(val\.float\(\)\.mean\(\)"),
     },
-    "runs": {k: collect_run(k, v) for k, v in RUN_LOGS.items() if v.exists()},
+    "runs": {k: collect_run(k, v) for k, v in RUN_LOGS.items() if v[0].exists()},
     "derivation": {
         "note": "Arithmetic, not measurement. Both follow from the definitions above.",
         "k2_legacy_eps": (
@@ -153,5 +191,6 @@ out.write_text(json.dumps(facts, indent=2, sort_keys=False) + "\n")
 print(f"wrote {out}")
 for k, r in facts["runs"].items():
     print(f"  {k}: steps={r['steps']} zero={r['n_zero']} "
-          f"({r['zero_frac']:.0%})  n_samples={r['n_samples_per_prompt']} "
-          f"std_mode={r['grpo_advantage_std_mode']} norm_adv={r['normalize_advantages']}")
+          f"({r['zero_frac']:.0%})  no-gradient groups "
+          f"{r['groups_no_gradient']}/{r['groups_total']} "
+          f"exactly-zero {r['groups_exactly_zero']}")

@@ -1,5 +1,5 @@
 {
-  "collected_utc": "2026-09-09T18:56:26Z",
+  "collected_utc": "2026-09-09T19:56:19Z",
   "ldm_rl_head": "036f9df44b32608a60205dba46dc8e784b226699",
   "source": {
     "env_py": "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/LDM-rl/rl/ldm_rl/env.py",
@@ -30,7 +30,16 @@
   "runs": {
     "9b-sft-a": {
       "log": "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_rl/runs/9b_sft_split_20260909T071112Z.log",
+      "train_log": "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_rl/runs/9b-sft_20260909T071143Z/train.log",
       "steps": 50,
+      "groups_total": 100,
+      "groups_no_gradient": 49,
+      "groups_lt_eps": 49,
+      "groups_exactly_zero": 49,
+      "no_gradient_frac": 0.49,
+      "mode_is_scale_free": [
+        0.0
+      ],
       "raw_reward_series_is_group_mean": true,
       "raw_reward": [
         0.0,
@@ -97,12 +106,22 @@
       "n_mean_below_1e5": 3,
       "n_mean_below_1e6": 1,
       "n_nonzero": 36,
-      "zero_std_keys_present": false,
-      "reward_kind_present": false
+      "zero_std_keys_in_orch_log": true,
+      "zero_std_keys_in_train_log": true,
+      "reward_kind_in_train_log": false
     },
     "9b-sft-b": {
       "log": "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_rl/runs/9b_sft_split_20260909T094237Z.log",
+      "train_log": "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_rl/runs/9b-sft-gbs2_20260909T094256Z/train.log",
       "steps": 29,
+      "groups_total": 58,
+      "groups_no_gradient": 37,
+      "groups_lt_eps": 37,
+      "groups_exactly_zero": 37,
+      "no_gradient_frac": 0.6379310344827587,
+      "mode_is_scale_free": [
+        0.0
+      ],
       "raw_reward_series_is_group_mean": true,
       "raw_reward": [
         0.0,
@@ -148,12 +167,22 @@
       "n_mean_below_1e5": 0,
       "n_mean_below_1e6": 0,
       "n_nonzero": 16,
-      "zero_std_keys_present": false,
-      "reward_kind_present": false
+      "zero_std_keys_in_orch_log": true,
+      "zero_std_keys_in_train_log": true,
+      "reward_kind_in_train_log": false
     },
     "9b-base": {
       "log": "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_rl/runs/9b_base_split_20260909T073652Z.log",
+      "train_log": "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_rl/runs/9b-base_20260909T073721Z/train.log",
       "steps": 28,
+      "groups_total": 56,
+      "groups_no_gradient": 18,
+      "groups_lt_eps": 18,
+      "groups_exactly_zero": 18,
+      "no_gradient_frac": 0.32142857142857145,
+      "mode_is_scale_free": [
+        0.0
+      ],
       "raw_reward_series_is_group_mean": true,
       "raw_reward": [
         0.03257628742900092,
@@ -198,8 +227,9 @@
       "n_mean_below_1e5": 1,
       "n_mean_below_1e6": 0,
       "n_nonzero": 25,
-      "zero_std_keys_present": false,
-      "reward_kind_present": false
+      "zero_std_keys_in_orch_log": true,
+      "zero_std_keys_in_train_log": true,
+      "reward_kind_in_train_log": false
     }
   },
   "derivation": {
