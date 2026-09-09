@@ -1,0 +1,123 @@
+# Phase item A1: can the SkyRL 0.3.0 pin set resolve on aarch64?
+#
+# This is a resolve-only project. It exists to produce uv.lock and to answer one
+# question with a yes or a no, so it deliberately does not carry the LDM
+# application dependencies -- those live in the repository root pyproject.
+#
+# It mirrors the [tool.uv.*] blocks of Mercor-Intelligence/ApexAgents-SkyRL-Recipe,
+# because uv only honours the ROOT project's sources, indexes and overrides for a
+# path dependency; skyrl's own [tool.uv.*] is ignored. The recipe's harbor, Modal
+# and agent dependencies are dropped: that is its environment layer, and LDM's
+# environment is local docking plus a GP, with no sandbox.
+#
+# The x86_64-only wheel pins below (flash-attn, causal-conv1d, mamba-ssm,
+# transformer-engine-torch) are kept EXACTLY as the recipe has them. On aarch64
+# their markers do not match, so uv falls through to whatever PyPI offers. What
+# it falls through to is the finding A1 exists to record; papering over it here
+# would answer a different question.
+[project]
+name = "ldm-skyrl-pins"
+version = "0.1.0"
+description = "Resolve-only project for phase item A1: SkyRL 0.3.0 on GH200 / aarch64 / driver 565"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "skyrl[megatron]",
+    "ray",
+    "omegaconf",
+    "loguru",
+    "pyyaml",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.uv]
+# aarch64 is named explicitly. Without it uv may resolve only for the
+# interpreter's own platform and the answer would not be about this cluster.
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+no-build-isolation-package = [
+    "transformer-engine-torch",
+    "transformer-engine",
+    "nv-grouped-gemm",
+]
+override-dependencies = [
+    "nvidia-resiliency-ext; sys_platform == 'never'",
+    "transformer-engine[pytorch]==2.11.0; sys_platform == 'linux'",
+    "transformers>=5.6.1,<=5.8.0; sys_platform == 'linux'",
+    "megatron-core>=0.16.0; sys_platform == 'linux' and python_version >= '3.12'",
+    "ml_dtypes>=0.5.0; sys_platform == 'linux'",
+    # CUDA 13 variants are excluded by construction: driver 565 is CUDA 12.7,
+    # and a cu130 build installs cleanly and then reports
+    # torch.cuda.is_available() == False.
+    "transformer-engine-cu13; sys_platform == 'never'",
+    "nixl-cu13; sys_platform == 'never'",
+    "flashinfer-python==0.6.12; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "flashinfer-jit-cache==0.6.12; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "flashinfer-cubin==0.6.12; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[tool.uv.extra-build-dependencies]
+flash-attn = [{ requirement = "torch", match-runtime = true }]
+transformer-engine = [{ requirement = "torch", match-runtime = true }, "build_tools", "ninja"]
+transformer-engine-torch = [{ requirement = "torch", match-runtime = true }, "build_tools", "ninja"]
+
+[tool.uv.extra-build-variables]
+# These three publish sdists only, for every platform, so resolving them means
+# running their setup.py -- which by default probes for nvcc and can start a
+# multi-hour CUDA build just to answer "what is your version number". Each
+# project ships an escape hatch for exactly this; the recipe already uses
+# flash-attn's. Metadata preparation stays cheap and no compiler runs during
+# the resolve.
+flash-attn = { FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" }
+mamba-ssm = { MAMBA_SKIP_CUDA_BUILD = "TRUE", MAMBA_FORCE_BUILD = "FALSE" }
+causal-conv1d = { CAUSAL_CONV1D_SKIP_CUDA_BUILD = "TRUE", CAUSAL_CONV1D_FORCE_BUILD = "FALSE" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+explicit = true
+
+[[tool.uv.index]]
+name = "flashinfer-cu128"
+url = "https://flashinfer.ai/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "vllm-cu129"
+url = "https://wheels.vllm.ai/0.23.0/cu129"
+explicit = true
+
+[tool.uv.sources]
+# SkyRL at the exact 0.3.0 release commit. Checked out on Lustre so the lock is
+# reproducible from a path that outlives any one node.
+skyrl = { path = "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/oss/SkyRL-v0.3.0", editable = true }
+skyrl-gym = { path = "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/oss/SkyRL-v0.3.0/skyrl-gym", editable = true }
+flashinfer-jit-cache = { index = "flashinfer-cu128", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" }
+# vllm's PyPI wheel for 0.23.0 links libcudart.so.13; the cu129 wheel links
+# libcudart.so.12, which is what a 565 driver can load.
+vllm = [{ index = "vllm-cu129", marker = "sys_platform == 'linux'" }]
+# Verbatim from the recipe, x86_64 markers included. See the header.
+flash-attn = { url = "https://github.com/erictang000/flash-attention/releases/download/v2.8.3-torch2.11-clean/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.12' and platform_machine == 'x86_64'" }
+causal-conv1d = { url = "https://github.com/erictang000/causal-conv1d/releases/download/v1.6.1.post4-torch2.11/causal_conv1d-1.6.1-cp312-cp312-linux_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.12' and platform_machine == 'x86_64'" }
+mamba-ssm = { url = "https://github.com/erictang000/mamba/releases/download/v2.3.1-torch2.11/mamba_ssm-2.3.1-cp312-cp312-linux_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.12' and platform_machine == 'x86_64'" }
+transformer-engine-torch = { url = "https://github.com/erictang000/TransformerEngine/releases/download/v2.11.0-torch2.11/transformer_engine_torch-2.11.0-cp312-cp312-linux_x86_64.whl", marker = "sys_platform == 'linux' and python_version == '3.12' and platform_machine == 'x86_64'" }
+torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux'" }]
+megatron-bridge = { git = "https://github.com/NVIDIA-NeMo/Megatron-Bridge", rev = "91a15142a4b4442a8d46ab539d1b923bd08570d0", marker = "sys_platform == 'linux'" }
+megatron-core = { git = "https://github.com/NVIDIA/Megatron-LM", rev = "71e418ea7d7b3a6c9a53238c543c3e0b43e11026", marker = "sys_platform == 'linux'" }
+vllm-router = [
+    { url = "https://github.com/SumanthRH/router/releases/download/0.1.14.post1/vllm_router-0.1.14.post1-cp38-abi3-manylinux_2_35_x86_64.whl", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+    { url = "https://github.com/SumanthRH/router/releases/download/0.1.14.post1/vllm_router-0.1.14.post1-cp38-abi3-manylinux_2_28_aarch64.whl", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
+]
