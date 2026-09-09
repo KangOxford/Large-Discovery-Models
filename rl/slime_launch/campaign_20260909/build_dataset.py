@@ -10,7 +10,8 @@ out = {}
 
 # --- 1. controlled batch-size dose-response (single factor) -------------------
 scan = collections.defaultdict(list)
-for f in glob.glob(W + "/logs/bs2/*.log") + glob.glob(W + "/logs/scan_*.log"):
+for f in (glob.glob(W + "/logs/bs2/*.log") + glob.glob(W + "/logs/scan_*.log")
+          + glob.glob(W + "/logs/wave/*.log")):
     for l in open(f, errors="replace"):
         if not (l.startswith("BS2 TB=") or l.startswith("SCAN TB=")):
             continue
@@ -21,11 +22,19 @@ for f in glob.glob(W + "/logs/bs2/*.log") + glob.glob(W + "/logs/scan_*.log"):
         scan[int(m.group(1))].append({
             "val_bpb": float(m.group(2)), "mfu": float(m.group(3)),
             "steps": float(m.group(4)), "vram_at_claim": int(v.group(1)) if v else None})
-out["batch_scan"] = {str(k): v for k, v in sorted(scan.items())}
+# MFU is the DIRECT measurement of node contention (r = -0.93 against val_bpb).
+# vram_at_claim covers only OUR card and therefore misses a neighbour on the
+# node's other cards -- the wrong scope. Single-tenant band measured 34.35-35.57%.
+QUIET = 33.0
+out["batch_scan"] = {str(k): [c for c in v if c["mfu"] >= QUIET]
+                     for k, v in sorted(scan.items())}
+out["batch_scan_contended"] = {str(k): [c for c in v if c["mfu"] < QUIET]
+                               for k, v in sorted(scan.items())}
+out["quiet_mfu_cut"] = QUIET
 
 # --- 2. OOM contamination: was the card already occupied? --------------------
 oom = []
-for f in glob.glob(W + "/logs/bs2/*.log"):
+for f in glob.glob(W + "/logs/bs2/*.log") + glob.glob(W + "/logs/wave/*.log"):
     for l in open(f, errors="replace"):
         if l.startswith("BS2 TB=") and "OOM" in l:
             v = re.search(r"vram_at_claim=(\d+)", l)

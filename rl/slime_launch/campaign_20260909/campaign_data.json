@@ -26,30 +26,6 @@
     "vram_at_claim": 2
    },
    {
-    "val_bpb": 1.070961,
-    "mfu": 16.73,
-    "steps": 964.0,
-    "vram_at_claim": 4
-   },
-   {
-    "val_bpb": 1.070483,
-    "mfu": 16.85,
-    "steps": 964.0,
-    "vram_at_claim": 2
-   },
-   {
-    "val_bpb": 1.070398,
-    "mfu": 16.77,
-    "steps": 964.0,
-    "vram_at_claim": 4
-   },
-   {
-    "val_bpb": 1.068605,
-    "mfu": 16.9,
-    "steps": 964.0,
-    "vram_at_claim": 4
-   },
-   {
     "val_bpb": 0.993124,
     "mfu": 34.88,
     "steps": 1663.0,
@@ -74,28 +50,22 @@
     "vram_at_claim": 3
    },
    {
-    "val_bpb": 1.069926,
-    "mfu": 18.85,
-    "steps": 964.0,
+    "val_bpb": 0.993875,
+    "mfu": 34.46,
+    "steps": 1643.0,
     "vram_at_claim": 4
    },
    {
-    "val_bpb": 1.070889,
-    "mfu": 18.85,
-    "steps": 964.0,
+    "val_bpb": 0.993298,
+    "mfu": 34.69,
+    "steps": 1654.0,
     "vram_at_claim": 4
    },
    {
-    "val_bpb": 1.070646,
-    "mfu": 18.92,
-    "steps": 964.0,
+    "val_bpb": 0.993152,
+    "mfu": 34.98,
+    "steps": 1668.0,
     "vram_at_claim": 3
-   },
-   {
-    "val_bpb": 1.06943,
-    "mfu": 18.97,
-    "steps": 964.0,
-    "vram_at_claim": 4
    },
    {
     "val_bpb": 0.993202,
@@ -218,27 +188,27 @@
     "vram_at_claim": 2
    },
    {
-    "val_bpb": 1.020453,
-    "mfu": 22.01,
-    "steps": 1350.0,
-    "vram_at_claim": 5
-   },
-   {
-    "val_bpb": 1.020895,
-    "mfu": 21.91,
-    "steps": 1350.0,
-    "vram_at_claim": 3
-   },
-   {
-    "val_bpb": 1.020534,
-    "mfu": 22.08,
-    "steps": 1350.0,
+    "val_bpb": 0.993852,
+    "mfu": 34.51,
+    "steps": 1645.0,
     "vram_at_claim": 4
    },
    {
-    "val_bpb": 1.019708,
-    "mfu": 21.85,
-    "steps": 1350.0,
+    "val_bpb": 0.992959,
+    "mfu": 34.96,
+    "steps": 1667.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 0.993114,
+    "mfu": 34.96,
+    "steps": 1667.0,
+    "vram_at_claim": 2
+   },
+   {
+    "val_bpb": 0.992576,
+    "mfu": 35.23,
+    "steps": 1679.0,
     "vram_at_claim": 4
    },
    {
@@ -284,12 +254,6 @@
     "vram_at_claim": 12
    },
    {
-    "val_bpb": 1.021455,
-    "mfu": 23.58,
-    "steps": 1350.0,
-    "vram_at_claim": 5
-   },
-   {
     "val_bpb": 0.993257,
     "mfu": 34.74,
     "steps": 1656.0,
@@ -314,27 +278,9 @@
     "vram_at_claim": 5
    },
    {
-    "val_bpb": 1.019864,
-    "mfu": 22.53,
-    "steps": 1350.0,
-    "vram_at_claim": 4
-   },
-   {
     "val_bpb": 0.993698,
     "mfu": 34.5,
     "steps": 1645.0,
-    "vram_at_claim": 4
-   },
-   {
-    "val_bpb": 1.000888,
-    "mfu": 25.96,
-    "steps": 1542.0,
-    "vram_at_claim": 4
-   },
-   {
-    "val_bpb": 1.000608,
-    "mfu": 25.89,
-    "steps": 1542.0,
     "vram_at_claim": 4
    },
    {
@@ -366,24 +312,6 @@
     "mfu": 34.44,
     "steps": 1642.0,
     "vram_at_claim": 3
-   },
-   {
-    "val_bpb": 1.044174,
-    "mfu": 21.36,
-    "steps": 1158.0,
-    "vram_at_claim": 3
-   },
-   {
-    "val_bpb": 1.048412,
-    "mfu": 21.32,
-    "steps": 1158.0,
-    "vram_at_claim": 4
-   },
-   {
-    "val_bpb": 1.019402,
-    "mfu": 25.0,
-    "steps": 1350.0,
-    "vram_at_claim": 4
    },
    {
     "val_bpb": 0.992861,
@@ -470,18 +398,6 @@
     "vram_at_claim": 4
    },
    {
-    "val_bpb": 1.044979,
-    "mfu": 20.59,
-    "steps": 1158.0,
-    "vram_at_claim": 4
-   },
-   {
-    "val_bpb": 1.044538,
-    "mfu": 20.56,
-    "steps": 1158.0,
-    "vram_at_claim": 4
-   },
-   {
     "val_bpb": 0.994158,
     "mfu": 34.22,
     "steps": 1631.0,
@@ -504,6 +420,42 @@
     "mfu": 34.91,
     "steps": 1664.0,
     "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 0.993784,
+    "mfu": 34.47,
+    "steps": 1643.0,
+    "vram_at_claim": 31
+   },
+   {
+    "val_bpb": 0.992993,
+    "mfu": 35.0,
+    "steps": 1668.0,
+    "vram_at_claim": 105
+   },
+   {
+    "val_bpb": 0.994604,
+    "mfu": 33.9,
+    "steps": 1616.0,
+    "vram_at_claim": 176
+   },
+   {
+    "val_bpb": 0.992855,
+    "mfu": 35.05,
+    "steps": 1671.0,
+    "vram_at_claim": 115
+   },
+   {
+    "val_bpb": 0.993237,
+    "mfu": 34.79,
+    "steps": 1659.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 0.993107,
+    "mfu": 34.97,
+    "steps": 1667.0,
+    "vram_at_claim": 2
    },
    {
     "val_bpb": 0.99297,
@@ -636,6 +588,102 @@
     "mfu": 35.19,
     "steps": 1677.0,
     "vram_at_claim": null
+   },
+   {
+    "val_bpb": 0.992636,
+    "mfu": 35.2,
+    "steps": 1678.0,
+    "vram_at_claim": 6
+   },
+   {
+    "val_bpb": 0.993414,
+    "mfu": 34.71,
+    "steps": 1654.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 0.993367,
+    "mfu": 34.72,
+    "steps": 1655.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 0.993578,
+    "mfu": 34.6,
+    "steps": 1649.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 0.993298,
+    "mfu": 34.74,
+    "steps": 1656.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 0.994697,
+    "mfu": 33.94,
+    "steps": 1618.0,
+    "vram_at_claim": 2
+   },
+   {
+    "val_bpb": 0.993795,
+    "mfu": 34.5,
+    "steps": 1645.0,
+    "vram_at_claim": 2
+   },
+   {
+    "val_bpb": 0.993634,
+    "mfu": 34.56,
+    "steps": 1648.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 0.993296,
+    "mfu": 34.82,
+    "steps": 1660.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 0.992897,
+    "mfu": 35.1,
+    "steps": 1673.0,
+    "vram_at_claim": 2
+   },
+   {
+    "val_bpb": 0.992709,
+    "mfu": 35.16,
+    "steps": 1676.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 0.993519,
+    "mfu": 34.69,
+    "steps": 1653.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 0.993818,
+    "mfu": 34.44,
+    "steps": 1642.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 0.993973,
+    "mfu": 34.54,
+    "steps": 1646.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 0.99408,
+    "mfu": 34.32,
+    "steps": 1636.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 0.99454,
+    "mfu": 33.95,
+    "steps": 1619.0,
+    "vram_at_claim": 2
    }
   ],
   "524288": [
@@ -686,6 +734,24 @@
     "mfu": 35.06,
     "steps": 841.0,
     "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 1.003873,
+    "mfu": 34.91,
+    "steps": 837.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 1.003638,
+    "mfu": 34.93,
+    "steps": 838.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.006331,
+    "mfu": 34.36,
+    "steps": 824.0,
+    "vram_at_claim": 4
    },
    {
     "val_bpb": 1.003599,
@@ -756,6 +822,30 @@
    {
     "val_bpb": 1.003401,
     "mfu": 35.12,
+    "steps": 842.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.002861,
+    "mfu": 35.39,
+    "steps": 849.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.00759,
+    "mfu": 34.74,
+    "steps": 833.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.003331,
+    "mfu": 35.13,
+    "steps": 843.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 1.004324,
+    "mfu": 35.1,
     "steps": 842.0,
     "vram_at_claim": 5
    },
@@ -904,6 +994,42 @@
     "vram_at_claim": 5
    },
    {
+    "val_bpb": 1.004217,
+    "mfu": 34.58,
+    "steps": 829.0,
+    "vram_at_claim": 32
+   },
+   {
+    "val_bpb": 1.003565,
+    "mfu": 35.18,
+    "steps": 844.0,
+    "vram_at_claim": 105
+   },
+   {
+    "val_bpb": 1.006347,
+    "mfu": 34.07,
+    "steps": 817.0,
+    "vram_at_claim": 175
+   },
+   {
+    "val_bpb": 1.003152,
+    "mfu": 35.2,
+    "steps": 844.0,
+    "vram_at_claim": 117
+   },
+   {
+    "val_bpb": 1.003512,
+    "mfu": 34.96,
+    "steps": 838.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.003797,
+    "mfu": 35.19,
+    "steps": 844.0,
+    "vram_at_claim": 2
+   },
+   {
     "val_bpb": 1.002385,
     "mfu": 35.54,
     "steps": 852.0,
@@ -1016,6 +1142,108 @@
     "mfu": 34.97,
     "steps": 839.0,
     "vram_at_claim": null
+   },
+   {
+    "val_bpb": 1.003098,
+    "mfu": 35.27,
+    "steps": 846.0,
+    "vram_at_claim": 96387
+   },
+   {
+    "val_bpb": 1.005024,
+    "mfu": 34.68,
+    "steps": 832.0,
+    "vram_at_claim": 51786
+   },
+   {
+    "val_bpb": 1.003374,
+    "mfu": 35.11,
+    "steps": 842.0,
+    "vram_at_claim": 51780
+   },
+   {
+    "val_bpb": 1.003616,
+    "mfu": 34.89,
+    "steps": 837.0,
+    "vram_at_claim": 51773
+   },
+   {
+    "val_bpb": 1.003757,
+    "mfu": 34.85,
+    "steps": 836.0,
+    "vram_at_claim": 51782
+   },
+   {
+    "val_bpb": 1.004394,
+    "mfu": 34.99,
+    "steps": 839.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.003129,
+    "mfu": 35.24,
+    "steps": 845.0,
+    "vram_at_claim": 6
+   },
+   {
+    "val_bpb": 1.003043,
+    "mfu": 35.23,
+    "steps": 845.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.003831,
+    "mfu": 34.84,
+    "steps": 836.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.003548,
+    "mfu": 35.04,
+    "steps": 840.0,
+    "vram_at_claim": 92588
+   },
+   {
+    "val_bpb": 1.003077,
+    "mfu": 35.25,
+    "steps": 845.0,
+    "vram_at_claim": 92586
+   },
+   {
+    "val_bpb": 1.002067,
+    "mfu": 35.75,
+    "steps": 857.0,
+    "vram_at_claim": 92608
+   },
+   {
+    "val_bpb": 1.003175,
+    "mfu": 35.2,
+    "steps": 844.0,
+    "vram_at_claim": 92589
+   },
+   {
+    "val_bpb": 1.006309,
+    "mfu": 34.11,
+    "steps": 818.0,
+    "vram_at_claim": 6
+   },
+   {
+    "val_bpb": 1.007328,
+    "mfu": 34.5,
+    "steps": 828.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.004012,
+    "mfu": 34.69,
+    "steps": 832.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.004761,
+    "mfu": 34.48,
+    "steps": 827.0,
+    "vram_at_claim": 5
    }
   ],
   "1048576": [
@@ -1064,6 +1292,24 @@
    {
     "val_bpb": 1.045685,
     "mfu": 35.17,
+    "steps": 427.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.050801,
+    "mfu": 34.65,
+    "steps": 421.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.050238,
+    "mfu": 35.17,
+    "steps": 427.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.048264,
+    "mfu": 35.19,
     "steps": 427.0,
     "vram_at_claim": 5
    },
@@ -1138,6 +1384,30 @@
     "mfu": 35.27,
     "steps": 428.0,
     "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 1.048773,
+    "mfu": 35.26,
+    "steps": 428.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.048796,
+    "mfu": 34.84,
+    "steps": 423.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.046338,
+    "mfu": 35.51,
+    "steps": 431.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.048431,
+    "mfu": 35.28,
+    "steps": 428.0,
+    "vram_at_claim": 5
    },
    {
     "val_bpb": 1.051352,
@@ -1284,6 +1554,42 @@
     "vram_at_claim": 5
    },
    {
+    "val_bpb": 1.045323,
+    "mfu": 35.28,
+    "steps": 428.0,
+    "vram_at_claim": 116
+   },
+   {
+    "val_bpb": 1.047447,
+    "mfu": 34.7,
+    "steps": 421.0,
+    "vram_at_claim": 32
+   },
+   {
+    "val_bpb": 1.048398,
+    "mfu": 34.19,
+    "steps": 415.0,
+    "vram_at_claim": 172
+   },
+   {
+    "val_bpb": 1.046209,
+    "mfu": 35.26,
+    "steps": 428.0,
+    "vram_at_claim": 105
+   },
+   {
+    "val_bpb": 1.050536,
+    "mfu": 35.11,
+    "steps": 426.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.049512,
+    "mfu": 35.07,
+    "steps": 426.0,
+    "vram_at_claim": 5
+   },
+   {
     "val_bpb": 1.04969,
     "mfu": 35.28,
     "steps": 428.0,
@@ -1305,30 +1611,6 @@
     "val_bpb": 1.046785,
     "mfu": 35.7,
     "steps": 433.0,
-    "vram_at_claim": 5
-   },
-   {
-    "val_bpb": 1.114602,
-    "mfu": 20.18,
-    "steps": 249.0,
-    "vram_at_claim": 5
-   },
-   {
-    "val_bpb": 1.090448,
-    "mfu": 24.45,
-    "steps": 300.0,
-    "vram_at_claim": 5
-   },
-   {
-    "val_bpb": 1.069601,
-    "mfu": 28.59,
-    "steps": 349.0,
-    "vram_at_claim": 5
-   },
-   {
-    "val_bpb": 1.068719,
-    "mfu": 28.65,
-    "steps": 350.0,
     "vram_at_claim": 5
    },
    {
@@ -1396,6 +1678,48 @@
     "mfu": 34.85,
     "steps": 423.0,
     "vram_at_claim": null
+   },
+   {
+    "val_bpb": 1.044914,
+    "mfu": 35.27,
+    "steps": 428.0,
+    "vram_at_claim": 96385
+   },
+   {
+    "val_bpb": 1.045258,
+    "mfu": 35.28,
+    "steps": 428.0,
+    "vram_at_claim": 96395
+   },
+   {
+    "val_bpb": 1.046037,
+    "mfu": 34.59,
+    "steps": 420.0,
+    "vram_at_claim": 96385
+   },
+   {
+    "val_bpb": 1.046449,
+    "mfu": 35.29,
+    "steps": 428.0,
+    "vram_at_claim": 96385
+   },
+   {
+    "val_bpb": 1.045601,
+    "mfu": 35.29,
+    "steps": 428.0,
+    "vram_at_claim": 96373
+   },
+   {
+    "val_bpb": 1.051185,
+    "mfu": 35.34,
+    "steps": 429.0,
+    "vram_at_claim": 96384
+   },
+   {
+    "val_bpb": 1.048852,
+    "mfu": 34.59,
+    "steps": 420.0,
+    "vram_at_claim": 96384
    }
   ],
   "2097152": [
@@ -1446,6 +1770,24 @@
     "mfu": 35.38,
     "steps": 220.0,
     "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 1.097924,
+    "mfu": 35.22,
+    "steps": 219.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.095019,
+    "mfu": 34.68,
+    "steps": 216.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.095772,
+    "mfu": 35.16,
+    "steps": 219.0,
+    "vram_at_claim": 5
    },
    {
     "val_bpb": 1.09022,
@@ -1516,6 +1858,30 @@
    {
     "val_bpb": 1.103133,
     "mfu": 35.38,
+    "steps": 220.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.092642,
+    "mfu": 35.38,
+    "steps": 220.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.090813,
+    "mfu": 35.63,
+    "steps": 221.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.096313,
+    "mfu": 34.97,
+    "steps": 218.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.092125,
+    "mfu": 35.35,
     "steps": 220.0,
     "vram_at_claim": 5
    },
@@ -1664,6 +2030,42 @@
     "vram_at_claim": 91408
    },
    {
+    "val_bpb": 1.091315,
+    "mfu": 34.79,
+    "steps": 216.0,
+    "vram_at_claim": 32
+   },
+   {
+    "val_bpb": 1.092405,
+    "mfu": 34.32,
+    "steps": 214.0,
+    "vram_at_claim": 113
+   },
+   {
+    "val_bpb": 1.091055,
+    "mfu": 35.37,
+    "steps": 220.0,
+    "vram_at_claim": 105
+   },
+   {
+    "val_bpb": 1.088213,
+    "mfu": 35.38,
+    "steps": 220.0,
+    "vram_at_claim": 105
+   },
+   {
+    "val_bpb": 1.096823,
+    "mfu": 35.06,
+    "steps": 218.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.094768,
+    "mfu": 35.2,
+    "steps": 219.0,
+    "vram_at_claim": 5
+   },
+   {
     "val_bpb": 1.091157,
     "mfu": 35.81,
     "steps": 222.0,
@@ -1761,6 +2163,165 @@
    }
   ]
  },
+ "batch_scan_contended": {
+  "262144": [
+   {
+    "val_bpb": 1.070961,
+    "mfu": 16.73,
+    "steps": 964.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.070483,
+    "mfu": 16.85,
+    "steps": 964.0,
+    "vram_at_claim": 2
+   },
+   {
+    "val_bpb": 1.070398,
+    "mfu": 16.77,
+    "steps": 964.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.068605,
+    "mfu": 16.9,
+    "steps": 964.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.069926,
+    "mfu": 18.85,
+    "steps": 964.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.070889,
+    "mfu": 18.85,
+    "steps": 964.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.070646,
+    "mfu": 18.92,
+    "steps": 964.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 1.06943,
+    "mfu": 18.97,
+    "steps": 964.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.020453,
+    "mfu": 22.01,
+    "steps": 1350.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.020895,
+    "mfu": 21.91,
+    "steps": 1350.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 1.020534,
+    "mfu": 22.08,
+    "steps": 1350.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.019708,
+    "mfu": 21.85,
+    "steps": 1350.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.021455,
+    "mfu": 23.58,
+    "steps": 1350.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.019864,
+    "mfu": 22.53,
+    "steps": 1350.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.000888,
+    "mfu": 25.96,
+    "steps": 1542.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.000608,
+    "mfu": 25.89,
+    "steps": 1542.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.044174,
+    "mfu": 21.36,
+    "steps": 1158.0,
+    "vram_at_claim": 3
+   },
+   {
+    "val_bpb": 1.048412,
+    "mfu": 21.32,
+    "steps": 1158.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.019402,
+    "mfu": 25.0,
+    "steps": 1350.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.044979,
+    "mfu": 20.59,
+    "steps": 1158.0,
+    "vram_at_claim": 4
+   },
+   {
+    "val_bpb": 1.044538,
+    "mfu": 20.56,
+    "steps": 1158.0,
+    "vram_at_claim": 4
+   }
+  ],
+  "524288": [],
+  "1048576": [
+   {
+    "val_bpb": 1.114602,
+    "mfu": 20.18,
+    "steps": 249.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.090448,
+    "mfu": 24.45,
+    "steps": 300.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.069601,
+    "mfu": 28.59,
+    "steps": 349.0,
+    "vram_at_claim": 5
+   },
+   {
+    "val_bpb": 1.068719,
+    "mfu": 28.65,
+    "steps": 350.0,
+    "vram_at_claim": 5
+   }
+  ],
+  "2097152": []
+ },
+ "quiet_mfu_cut": 33.0,
  "oom_cells": [
   {
    "tb": 262144,
@@ -2469,6 +3030,802 @@
   {
    "tb": 2097152,
    "vram_at_claim": 91117
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96392
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96394
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96393
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96393
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96393
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96393
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96393
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96394
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96394
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96391
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96394
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96393
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96394
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96395
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96393
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96393
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96389
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96394
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96395
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96390
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96395
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96391
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96396
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96391
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96396
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96396
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96393
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96394
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96394
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96393
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96394
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 2
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 5
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 4
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 2
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 51783
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 51779
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 51771
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 51779
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 51784
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 51780
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 51771
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 51779
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 51785
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 51780
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 51780
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 51771
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 51782
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 51781
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 51772
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 51787
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 51788
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 51779
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 51771
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 51780
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 51786
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 51779
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 51772
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 51781
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 51786
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 51782
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 51773
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 51779
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 51784
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 51787
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 51774
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 51781
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 1340
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 1339
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 1339
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 1340
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96607
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96586
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96607
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96607
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96608
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96607
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96607
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96586
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96586
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96607
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96586
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96608
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96607
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96608
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96609
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96610
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96611
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96611
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96591
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96611
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96591
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96591
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96612
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96592
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96612
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96592
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96612
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96592
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96588
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96612
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 131072,
+   "vram_at_claim": 96589
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96612
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96591
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96590
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 96611
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96607
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 96585
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96608
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 96587
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 91281
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 91273
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 91294
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 91306
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 92584
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 92585
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 92586
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 92607
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 92586
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 92586
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 92586
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 92608
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 92587
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 92586
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 92609
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 92587
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 92611
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 92588
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 92588
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 92586
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 92586
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 92611
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 92587
+  },
+  {
+   "tb": 524288,
+   "vram_at_claim": 92586
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 92588
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 92587
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 92586
+  },
+  {
+   "tb": 1048576,
+   "vram_at_claim": 92610
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 92589
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 92609
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 92587
+  },
+  {
+   "tb": 2097152,
+   "vram_at_claim": 92587
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 92587
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 92588
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 92590
+  },
+  {
+   "tb": 262144,
+   "vram_at_claim": 92609
   }
  ],
  "reference": {

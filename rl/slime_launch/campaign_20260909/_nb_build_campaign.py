@@ -33,8 +33,14 @@ NOISE = 0.0013      # documented same-config repeat sd
 GAIN  = 0.0044      # documented total gain of an upstream 99-run search
 scan = {int(k): v for k, v in D['batch_scan'].items()}
 levels = sorted(scan)
-print('controlled cells:', {k: len(v) for k, v in scan.items()},
+busy = {int(k): v for k, v in D.get('batch_scan_contended', {}).items()}
+print('controlled cells (quiet nodes only):', {k: len(v) for k, v in scan.items()},
       ' total', sum(len(v) for v in scan.values()))
+print('excluded, node was contended (MFU < %.0f%%):' % D.get('quiet_mfu_cut', 33),
+      {k: len(v) for k, v in busy.items() if v})
+print('  why MFU and not free-VRAM-at-claim: the claim reading covers only OUR card,')
+print('  it misses a neighbour on the OTHER cards of that node -- the wrong scope.')
+print('  MFU measures the effect directly (r = -0.93 against val_bpb).')
 print('reference %.6f  sd %.6f  n=%d' % (REF, REF_SD, REF_N))""")
 
 md("""## Figure 1 — the whole result
@@ -55,7 +61,8 @@ ax.axhline(REF, color='#55A868', ls='--', lw=1.2, zorder=1,
 ax.set_xticks(xs); ax.set_xticklabels([f'{k:,}' for k in levels], rotation=20)
 ax.set_xlabel('TOTAL_BATCH_SIZE  (default = 524,288)')
 ax.set_ylabel('val_bpb   (lower is better)')
-ax.set_title('One knob, four levels, %d real trainings' % sum(len(v) for v in scan.values()))
+ax.set_title('One knob, four levels, %d real trainings on uncontended nodes'
+             % sum(len(v) for v in scan.values()))
 ax.legend(frameon=False, fontsize=7, loc='upper left')
 plt.show()""")
 md("""*Halving the default batch is the only direction that improves on it, and every further
