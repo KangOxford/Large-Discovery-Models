@@ -1,5 +1,5 @@
 {
-  "collected_utc": "2026-09-09T05:48:30Z",
+  "collected_utc": "2026-09-09T20:17:37Z",
   "a1": {
     "status": "PASS",
     "packages_resolved": 322,
@@ -196,15 +196,34 @@
     ]
   },
   "a3": {
-    "status": "not run",
-    "reason": "no GPU capacity reachable before the deadline"
+    "status": "FAIL",
+    "reason": "ModuleNotFoundError: mamba_ssm \u2014 the megatron path needs it and it compiles from source; not attempted yet"
   },
   "a4": {
-    "status": "not run",
-    "reason": "same; A4 is exercised by the A5 run"
+    "status": "PARTIAL",
+    "criterion": "after one sync the engine's output changes with the policy weights",
+    "observed": "sync_weights ran once per step and was timed: 2.0728, 1.2616 s",
+    "not_observed": "that the engine's output changed as a result. The written criterion has two halves and only the first was measured; reporting this as PASS would be an inference standing in for an observation."
   },
   "a5": {
-    "status": "not run",
-    "reason": "implemented and staged; blocked on capacity"
+    "status": "PASS",
+    "criterion": "two training steps complete and a checkpoint is written, with no LDM code on the path",
+    "when_utc": "2026-09-09T20:15Z",
+    "job": "6438532.42",
+    "node": "nid010964",
+    "gpus": 1,
+    "path": "SkyRL examples/train/gsm8k, strategy=fsdp, colocated, local Qwen2.5-1.5B-Instruct",
+    "batch": "256 rows / train_batch_size 128 / epochs 1 = 2 steps; policy_mini_batch 32 x n_samples 4 / 1 gpu = 128 per gpu, micro 4",
+    "checkpoints": [
+      "global_step_1",
+      "global_step_2"
+    ],
+    "checkpoint_contents": "data.pt, trainer_state.pt, policy/{model,optim,fsdp_config,huggingface}",
+    "metrics": {
+      "reward/avg_raw_reward": 0.45703125,
+      "reward/avg_pass_at_4": 0.90625,
+      "policy_loss": 0.1755
+    },
+    "attempts_before_passing": 6
   }
 }

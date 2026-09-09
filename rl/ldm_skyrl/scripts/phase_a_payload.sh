@@ -40,8 +40,50 @@ export UV_CACHE_DIR=/local/user/$(id -u)/uv-cache-phasea
 export UV_NO_PROGRESS=1
 mkdir -p "$UV_CACHE_DIR"
 
-stamp "node and cards (NG=$NG)"
+stamp "node and cards (NG=$NG requested)"
 hostname; nvidia-smi --query-gpu=index,name,memory.used,driver_version --format=csv
+
+# Re-derive the free cards HERE rather than trusting what the hunt loop saw.
+# A VRAM census is stale before it can be acted on: a node measured elsewhere
+# tonight read [1,1,1,1] MiB and 92,211 MiB sixty seconds later. Landing anyway
+# would not merely be slow: a shared card costs 2.29x wall-clock, so under any
+# time-budgeted comparison the run completes far fewer optimizer steps and its
+# loss reads worse for that reason alone. (An accompanying "0.106 bpb" figure was
+# circulated and then retracted at the source -- it was that accounting effect,
+# not a bias. The 2.29x stands.) Either way the gate would return a number shaped
+# like a result. Better to give the node back and let the loop find another.
+mapfile -t _MEM < <(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits)
+_FREE=(); for i in "${!_MEM[@]}"; do [ "${_MEM[$i]}" -lt 2048 ] && _FREE+=("$i"); done
+echo "cards under 2048 MiB right now: ${_FREE[*]:-none}  (hunt loop expected $NG)"
+if [ "${#_FREE[@]}" -lt 1 ]; then
+  verdict S0 "ABORT - every card was taken between the probe and this step; not measuring on a shared card"
+  exit 20
+fi
+if [ "${#_FREE[@]}" -lt "$NG" ]; then
+  echo "fewer cards than expected; running on ${#_FREE[@]} instead of $NG"
+  NG=${#_FREE[@]}
+fi
+# Clamp to a power of two. SkyRL asserts that
+#   policy_mini_batch_size * n_samples_per_prompt / num_gpus
+# is divisible by micro_train_batch_size_per_gpu, and the dataset is 256 rows at
+# train_batch_size 128, which is exactly two steps. Every divisor of 128 is a
+# power of two, so an odd NG has no solution: NG=3 gives 32*4/3 = 42, and the run
+# dies four minutes in on an assertion rather than on anything about the port.
+# Making the card count a free variable is what introduced this; constraining it
+# back is cheaper than making the batch arithmetic depend on it.
+_NG2=1; while [ $((_NG2 * 2)) -le "$NG" ]; do _NG2=$((_NG2 * 2)); done
+if [ "$_NG2" -ne "$NG" ]; then
+  echo "clamping NG $NG -> $_NG2 (batch arithmetic needs a power of two); leaving $((NG - _NG2)) card(s) unused"
+  _FREE=("${_FREE[@]:0:$_NG2}"); NG=$_NG2
+fi
+export CUDA_VISIBLE_DEVICES=$(IFS=,; echo "${_FREE[*]}")
+
+# Print the derived batch sizes. "What batch did this actually run at" has to be
+# greppable in the log rather than reconstructible from three scripts.
+TRAIN_BSZ=128; MINI_BSZ=32; NSAMP=4; MICRO=4
+echo "[bsz] NG=$NG  CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+echo "[bsz] train_batch_size=$TRAIN_BSZ over 256 rows = $((256 / TRAIN_BSZ)) steps at epochs=1"
+echo "[bsz] policy_mini_batch_size=$MINI_BSZ x n_samples=$NSAMP / NG=$NG = $((MINI_BSZ * NSAMP / NG)) per gpu, micro=$MICRO, remainder $(( (MINI_BSZ * NSAMP / NG) % MICRO ))"
 
 # ---------------------------------------------------------------- S0: clone
 stamp "S0 clone the prebuilt aarch64 env (BASE is left untouched)"
@@ -103,13 +145,28 @@ else
   verdict S1b "causal-conv1d not built -- continuing, A5 does not need it"
 fi
 echo "--- skyrl-train support deps ---"
+# Read from SkyRL's own [project.dependencies] + [skyrl-train] + [fsdp] extras
+# rather than hand-listed. Hand-listing cost two landings: first jaxtyping, then
+# peft, each surfacing fifteen minutes in as a ModuleNotFoundError from deep
+# inside the trainer. A curated list is a second, silently-drifting copy of a
+# dependency table that already exists.
+#
+# transformers is deliberately left out. SkyRL pins <=5.8.0 and the staged env
+# carries 5.12.1, which vllm 0.23.0 was installed against; downgrading a core
+# package inside a working env to satisfy a declared bound is the more expensive
+# mistake to make first. If A5 fails on a transformers API, that is the next
+# thing to change and it will say so.
+PURE_DEPS=("datasets>=4.0.0" "pillow>=11.3.0" "rich>=14.1.0" "safetensors>=0.6.2" \
+  "tokenizers>=0.21.2" "typer>=0.17.4" "peft==0.18.1" "hf_transfer" "cloudpathlib>=0.23.0" \
+  "loguru" "tqdm" "ninja" "tensorboard" "func_timeout" "hydra-core==1.3.2" "accelerate" \
+  "torchdata" "omegaconf" "ray==2.56.0" "debugpy==1.8.0" "wandb" "tensordict" "jaxtyping" \
+  "polars" "s3fs" "fastapi" "uvicorn" "pybind11" "setuptools")
+"${PIP[@]}" "${PURE_DEPS[@]}" 2>&1 | tail -5
 # No --no-build here. func-timeout ships an sdist and no wheel, so forbidding
 # builds for the whole line makes the WHOLE line unsatisfiable and installs
 # none of it -- which surfaces much later as ModuleNotFoundError: jaxtyping,
 # from inside skyrl.train.trainer. These are pure-python packages; "building"
 # one runs no compiler. --no-build stays where it belongs: on the CUDA wheels.
-"${PIP[@]}" loguru tqdm ninja tensorboard func_timeout "hydra-core==1.3.2" \
-    accelerate torchdata jaxtyping omegaconf pylatexenc "ray[default]==2.56.0" 2>&1 | tail -4
 echo "--- skyrl itself, --no-deps so its pins do not fight the staged env ---"
 "${PIP[@]}" --no-deps "$SKYRL" "$SKYRL/skyrl-gym" 2>&1 | tail -4
 
@@ -119,8 +176,83 @@ for p in ["torch","vllm","skyrl","skyrl-gym","flash_attn","causal_conv1d","ray",
     try: print(f"  {p:<22}{m.version(p)}")
     except Exception as e: print(f"  {p:<22}MISSING")
 PY
-"$VENV/bin/python" -c "import skyrl.train, torch, vllm; print('imports OK; cuda', torch.cuda.is_available())" \
-  && verdict S1 "fsdp-path install OK" || { verdict S1 "FAIL"; }
+# Pins that must hold regardless of what is already installed. The module sweep
+# below detects ABSENCE and says nothing about CORRECTNESS: vllm_router 0.1.15
+# imports perfectly and then fails at run time, because it renamed
+# RouterArgs.pd_disaggregation to vllm_pd_disaggregation while SkyRL 0.3.0 still
+# calls the old name. The sweep therefore found nothing to do and the same
+# AttributeError came back a second time. uv resolved 0.1.14.post1 in A1; that
+# resolution is the authority on version, and it is applied unconditionally here
+# rather than left to a code path that only runs when something is missing.
+echo "--- version pins from the A1 lock (applied whether or not anything is missing) ---"
+"${PIP[@]}" --reinstall-package vllm-router \
+  "https://github.com/SumanthRH/router/releases/download/0.1.14.post1/vllm_router-0.1.14.post1-cp38-abi3-manylinux_2_28_aarch64.whl" 2>&1 | tail -3
+"$VENV/bin/python" -c "
+import importlib.metadata as m
+v = m.version('vllm-router'); print('  vllm-router', v)
+assert v.startswith('0.1.14'), f'wrong vllm-router: {v}'
+from vllm_router.parsers.parser import RouterArgs
+assert hasattr(RouterArgs, 'pd_disaggregation') or 'pd_disaggregation' in str(RouterArgs.__init__.__code__.co_varnames), 'RouterArgs still lacks pd_disaggregation'
+print('  RouterArgs has pd_disaggregation')
+" || echo "  WARN: vllm-router pin check failed, see above"
+
+# Stop guessing which modules the run reaches. Three landings were lost to three
+# different missing packages -- jaxtyping, peft, vllm_router -- each found one at
+# a time, fifteen minutes in, because the check imported a module that happened
+# to be fine. Both my curated dependency list AND my "heavy, skip it" exclusion
+# list were negative assertions with undeclared coverage; vllm-router was on the
+# exclusion list even though A1 had already recorded that it ships an aarch64
+# wheel.
+#
+# So: import every module in the package, collect every missing top-level name at
+# once, install them, and repeat until the set is empty. The sweep is the
+# positive statement that replaces both lists.
+for attempt in 1 2 3; do
+  MISSING=$("$VENV/bin/python" - <<'PYSWEEP'
+import importlib, pkgutil, sys
+missing = set()
+import skyrl
+for mod in pkgutil.walk_packages(skyrl.__path__, "skyrl."):
+    try:
+        importlib.import_module(mod.name)
+    except ModuleNotFoundError as e:
+        if e.name: missing.add(e.name.split(".")[0])
+    except Exception:
+        pass          # anything that is not a missing module is not this check's business
+print(" ".join(sorted(missing)))
+PYSWEEP
+)
+  MISSING=$(echo "$MISSING" | tr -s ' ')
+  [ -z "$(echo "$MISSING" | tr -d ' ')" ] && { echo "module sweep clean on attempt $attempt"; break; }
+  echo "sweep found missing top-level modules: $MISSING"
+  # Map the few import names that differ from their distribution name.
+  PKGS=""; for m in $MISSING; do
+    case "$m" in
+      # By URL, not by name. The sweep is a positive statement about WHICH module
+      # is missing and says nothing about which version satisfies it. uv resolved
+      # vllm-router 0.1.14.post1 from this wheel in A1; installing the bare name
+      # gets 0.1.15 from PyPI, which renamed RouterArgs.pd_disaggregation to
+      # vllm_pd_disaggregation, and SkyRL 0.3.0 calls the old name. The lock
+      # already held the answer and installing by name walked around it.
+      vllm_router) PKGS="$PKGS https://github.com/SumanthRH/router/releases/download/0.1.14.post1/vllm_router-0.1.14.post1-cp38-abi3-manylinux_2_28_aarch64.whl";;
+      fla)         PKGS="$PKGS flash-linear-attention";;
+      cv2)         PKGS="$PKGS opencv-python-headless";;
+      causal_conv1d|mamba_ssm|transformer_engine*|megatron*|flashinfer*) : ;;   # compile or already staged
+      *)           PKGS="$PKGS $m";;
+    esac
+  done
+  [ -z "$PKGS" ] && { echo "nothing installable left; the rest need a compile"; break; }
+  echo "installing:$PKGS"
+  "${PIP[@]}" $PKGS 2>&1 | tail -4
+done
+
+"$VENV/bin/python" -c "
+import torch, vllm, skyrl.train
+from skyrl.train.entrypoints import main_base
+from skyrl.backends.skyrl_train.workers.fsdp import fsdp_worker
+from skyrl.backends.skyrl_train.inference_servers import setup as _s
+print('fsdp + inference-server path imports OK; cuda', torch.cuda.is_available())
+" && verdict S1 "fsdp-path install OK" || { verdict S1 "FAIL - see the traceback above"; }
 
 # ---------------------------------------------------------- S2: A5 and A4, fsdp
 stamp "S2 gate A5 (and A4): two GRPO steps and a checkpoint, SkyRL's own example path"
@@ -144,13 +276,13 @@ export VLLM_USE_FLASHINFER_SAMPLER=0
   generator.inference_engine.weight_sync_backend=nccl \
   generator.inference_engine.gpu_memory_utilization=0.6 \
   generator.batched=true \
-  generator.n_samples_per_prompt=4 \
+  generator.n_samples_per_prompt=$NSAMP \
   environment.env_class=gsm8k \
   trainer.epochs=1 \
-  trainer.train_batch_size=128 \
-  trainer.policy_mini_batch_size=32 \
+  trainer.train_batch_size=$TRAIN_BSZ \
+  trainer.policy_mini_batch_size=$MINI_BSZ \
   trainer.micro_forward_batch_size_per_gpu=4 \
-  trainer.micro_train_batch_size_per_gpu=4 \
+  trainer.micro_train_batch_size_per_gpu=$MICRO \
   trainer.max_prompt_length=256 \
   generator.sampling_params.max_generate_length=128 \
   trainer.eval_before_train=false \
@@ -195,11 +327,11 @@ stamp "S4 gate A3: does the megatron strategy reach the first forward"
   generator.inference_engine.backend=vllm \
   generator.inference_engine.gpu_memory_utilization=0.5 \
   generator.batched=true \
-  generator.n_samples_per_prompt=4 \
+  generator.n_samples_per_prompt=$NSAMP \
   environment.env_class=gsm8k \
   trainer.epochs=1 \
-  trainer.train_batch_size=128 \
-  trainer.policy_mini_batch_size=32 \
+  trainer.train_batch_size=$TRAIN_BSZ \
+  trainer.policy_mini_batch_size=$MINI_BSZ \
   trainer.micro_forward_batch_size_per_gpu=2 \
   trainer.micro_train_batch_size_per_gpu=2 \
   trainer.max_prompt_length=256 \

@@ -1,0 +1,148 @@
+[20:09:55Z +0m] === S2 gate A5 (and A4): two GRPO steps and a checkpoint, SkyRL's own example path ===
+(skyrl_entrypoint pid=221291)  'timing/save_checkpoints': '15.1890',
+(skyrl_entrypoint pid=221291)  'timing/step': '81.5379',
+(skyrl_entrypoint pid=221291)  'timing/sync_weights': '2.0728',
+(skyrl_entrypoint pid=221291)  'timing/train_critic_and_policy': '40.2252',
+(skyrl_entrypoint pid=221291)  'trainer/epoch': 0,
+(skyrl_entrypoint pid=221291)  'trainer/global_step': 1,
+(skyrl_entrypoint pid=221291)  'trainer/tokens_per_second_per_gpu': '2105.0460'}
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:51.271 | INFO     | skyrl.train.trainer:train:340 - Started: 'step'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:51.278 | INFO     | skyrl.train.trainer:train:359 - Started: 'generate'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.497 | INFO     | skyrl.train.trainer:train:359 - Finished: 'generate', time cost: 3.22s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.680 | INFO     | skyrl.train.trainer:train:389 - Started: 'postprocess_generator_output'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.681 | INFO     | skyrl.train.trainer:postprocess_generator_output:1102 - reward/avg_pass_at_4: 0.90625, reward/avg_raw_reward: 0.45703125, reward/mean_positive_reward: 0.45703125
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.681 | INFO     | skyrl.train.trainer:train:389 - Finished: 'postprocess_generator_output', time cost: 0.00s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.681 | INFO     | skyrl.train.utils.trajectory_logging:pretty_print_example:88 - Example:
+(skyrl_entrypoint pid=221291)   Input: [{'role': 'user', 'content': 'A box holds 5 red marbles and 30 blue marbles. How many marbles are in the box? Let\'s think step by step and output the final answer after "####".'}]
+(skyrl_entrypoint pid=221291)   Output (Total Reward: 1.0000):
+(skyrl_entrypoint pid=221291) #### 35 <|im_end|>
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.682 | INFO     | skyrl.train.trainer:train:405 - Started: 'log_train_results'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.682 | INFO     | skyrl.train.trainer:train:405 - Finished: 'log_train_results', time cost: 0.00s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.682 | INFO     | skyrl.train.trainer:train:418 - Started: 'convert_to_training_input'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.731 | INFO     | skyrl.train.trainer:convert_to_training_input:949 - batch_num_seq: 512, batch_padded_seq_len: 198
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.731 | INFO     | skyrl.train.trainer:convert_to_training_input:961 - Number of sequences before padding: 512
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.731 | INFO     | skyrl.train.trainer:convert_to_training_input:965 - Number of sequences after padding: 512
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.732 | INFO     | skyrl.train.trainer:train:418 - Finished: 'convert_to_training_input', time cost: 0.05s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:13:54.732 | INFO     | skyrl.train.trainer:train:422 - Started: 'fwd_logprobs_values_reward'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:12.242 | INFO     | skyrl.train.trainer:train:422 - Finished: 'fwd_logprobs_values_reward', time cost: 17.51s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:12.242 | INFO     | skyrl.train.trainer:train:431 - Started: 'compute_advantages_and_returns'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:12.256 | INFO     | skyrl.train.trainer:compute_advantages_and_returns:1212 - avg_final_rewards: 0.45703125, avg_response_length: 81.96484375
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:12.256 | INFO     | skyrl.train.trainer:train:431 - Finished: 'compute_advantages_and_returns', time cost: 0.01s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:12.256 | INFO     | skyrl.train.trainer:train:448 - Started: 'train_critic_and_policy'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:12.256 | INFO     | skyrl.train.trainer:train_critic_and_policy:1541 - Started: 'policy_train'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:51.646 | INFO     | skyrl.train.trainer:train_critic_and_policy:1541 - Finished: 'policy_train', time cost: 39.39s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:51.697 | INFO     | skyrl.train.trainer:train:448 - Finished: 'train_critic_and_policy', time cost: 39.44s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:51.697 | INFO     | skyrl.train.trainer:train:473 - Started: 'save_checkpoints'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:59.993 | INFO     | skyrl.train.trainer:save_checkpoints:1654 - Saved dataloader state to /local/user/1483804540/skyrl_phase_a/ckpt/global_step_2/data.pt
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:59.995 | INFO     | skyrl.train.trainer:save_checkpoints:1666 - Saved trainer state to /local/user/1483804540/skyrl_phase_a/ckpt/global_step_2/trainer_state.pt
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:59.996 | INFO     | skyrl.train.trainer:save_checkpoints:1673 - Successfully saved checkpoint for global_step_2 to: /local/user/1483804540/skyrl_phase_a/ckpt/global_step_2
+(skyrl_entrypoint pid=221291) 2026-09-09 20:14:59.996 | INFO     | skyrl.train.trainer:save_checkpoints:1676 - Started: 'cleanup_old_checkpoints'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:15:00.005 | INFO     | skyrl.train.trainer:save_checkpoints:1676 - Finished: 'cleanup_old_checkpoints', time cost: 0.01s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:15:00.005 | INFO     | skyrl.train.trainer:train:473 - Finished: 'save_checkpoints', time cost: 8.31s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:15:00.005 | INFO     | skyrl.train.trainer:train:491 - Started: 'sync_weights'
+(skyrl_entrypoint pid=221291) 2026-09-09 20:15:01.266 | INFO     | skyrl.train.trainer:train:491 - Finished: 'sync_weights', time cost: 1.26s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:15:01.267 | INFO     | skyrl.train.trainer:train:340 - Finished: 'step', time cost: 70.00s
+(skyrl_entrypoint pid=221291) 2026-09-09 20:15:01.267 | INFO     | skyrl.train.trainer:train:495 - {'policy_entropy': 0.23967016488313675, 'response_length': 128.0, 'policy_lr': 9.999999974752427e-07, 'loss_metrics/clip_ratio': 0.011178236920386553, 'policy_kl': 0.03364140447229147, 'minibatch_rollout_logprobs_abs_diff_mean': 0.017447971971705556, 'minibatch_rollout_logprobs_abs_diff_min': 0.0, 'minibatch_rollout_logprobs_abs_diff_max': 2.454145908355713, 'final_loss': 0.17552608624100685, 'policy_loss': 0.17549244314432144, 'grad_norm': 1.860778570175171, 'minibatch_rollout_logprobs_abs_diff_std': 0.07840301873726671}
+(skyrl_entrypoint pid=221291) Training Batches Processed: 100%|██████████| 2/2 [03:01<00:00, 86.98s/it] 2026-09-09 20:15:01.268 | INFO     | skyrl.train.utils.tracking:log:189 - Step 2: 
+(skyrl_entrypoint pid=221291) {'generate/avg_assistant_tokens': '81.9648',
+(skyrl_entrypoint pid=221291)  'generate/avg_num_tokens': '81.9648',
+(skyrl_entrypoint pid=221291)  'generate/avg_tokens_non_zero_rewards': '58.1368',
+(skyrl_entrypoint pid=221291)  'generate/avg_tokens_zero_rewards': '102.0216',
+(skyrl_entrypoint pid=221291)  'generate/batch_num_seq': 512,
+(skyrl_entrypoint pid=221291)  'generate/batch_padded_seq_len': 198,
+(skyrl_entrypoint pid=221291)  'generate/max_assistant_tokens': 128,
+(skyrl_entrypoint pid=221291)  'generate/max_num_tokens': 128,
+(skyrl_entrypoint pid=221291)  'generate/min_assistant_tokens': 4,
+(skyrl_entrypoint pid=221291)  'generate/min_num_tokens': 4,
+(skyrl_entrypoint pid=221291)  'generate/std_assistant_tokens': '42.0960',
+(skyrl_entrypoint pid=221291)  'generate/std_num_tokens': '42.0960',
+(skyrl_entrypoint pid=221291)  'generate/tokens_per_turn_max': 128,
+(skyrl_entrypoint pid=221291)  'generate/tokens_per_turn_mean': '81.9648',
+(skyrl_entrypoint pid=221291)  'generate/tokens_per_turn_std': '42.0960',
+(skyrl_entrypoint pid=221291)  'loss/avg_final_rewards': '0.4570',
+(skyrl_entrypoint pid=221291)  'loss/avg_raw_advantages': '-0.1755',
+(skyrl_entrypoint pid=221291)  'loss/avg_raw_advantages_abs': '0.6791',
+(skyrl_entrypoint pid=221291)  'policy/final_loss': '0.1755',
+(skyrl_entrypoint pid=221291)  'policy/grad_norm': '1.8608',
+(skyrl_entrypoint pid=221291)  'policy/loss_metrics/clip_ratio': '0.0112',
+(skyrl_entrypoint pid=221291)  'policy/minibatch_rollout_logprobs_abs_diff_max': '2.4541',
+(skyrl_entrypoint pid=221291)  'policy/minibatch_rollout_logprobs_abs_diff_mean': '0.0174',
+(skyrl_entrypoint pid=221291)  'policy/minibatch_rollout_logprobs_abs_diff_min': '0.0000',
+(skyrl_entrypoint pid=221291)  'policy/minibatch_rollout_logprobs_abs_diff_std': '0.0784',
+(skyrl_entrypoint pid=221291)  'policy/policy_entropy': '0.2397',
+(skyrl_entrypoint pid=221291)  'policy/policy_kl': '0.0336',
+(skyrl_entrypoint pid=221291)  'policy/policy_loss': '0.1755',
+(skyrl_entrypoint pid=221291)  'policy/policy_lr': '0.0000',
+(skyrl_entrypoint pid=221291)  'policy/response_length': '128.0000',
+(skyrl_entrypoint pid=221291)  'policy/rollout_train_logprobs_abs_diff_max': '0.6785',
+(skyrl_entrypoint pid=221291)  'policy/rollout_train_logprobs_abs_diff_mean': '0.0083',
+(skyrl_entrypoint pid=221291)  'policy/rollout_train_logprobs_abs_diff_min': '0.0000',
+(skyrl_entrypoint pid=221291)  'policy/rollout_train_logprobs_abs_diff_std': '0.0260',
+(skyrl_entrypoint pid=221291)  'ray/cpu_ram_used_gb.avg': '461.5084',
+(skyrl_entrypoint pid=221291)  'ray/gpu.mem_used_gb.avg': '51.2682',
+(skyrl_entrypoint pid=221291)  'ray/gpu.util.avg': '56.9792',
+(skyrl_entrypoint pid=221291)  'ray/node.0.cpu_ram_used_gb': '461.5084',
+(skyrl_entrypoint pid=221291)  'ray/node.0.gpu.0.mem_used_gb': '29.7533',
+(skyrl_entrypoint pid=221291)  'ray/node.0.gpu.0.util': '20.5833',
+(skyrl_entrypoint pid=221291)  'ray/node.0.gpu.1.mem_used_gb': '77.2939',
+(skyrl_entrypoint pid=221291)  'ray/node.0.gpu.1.util': '8.3333',
+(skyrl_entrypoint pid=221291)  'ray/node.0.gpu.2.mem_used_gb': '49.0127',
+(skyrl_entrypoint pid=221291)  'ray/node.0.gpu.2.util': '99.5833',
+(skyrl_entrypoint pid=221291)  'ray/node.0.gpu.3.mem_used_gb': '49.0127',
+(skyrl_entrypoint pid=221291)  'ray/node.0.gpu.3.util': '99.4167',
+(skyrl_entrypoint pid=221291)  'reward/avg_pass_at_4': '0.9062',
+(skyrl_entrypoint pid=221291)  'reward/avg_raw_reward': '0.4570',
+(skyrl_entrypoint pid=221291)  'reward/mean_positive_reward': '0.4570',
+(skyrl_entrypoint pid=221291)  'timing/cleanup_old_checkpoints': '0.0089',
+(skyrl_entrypoint pid=221291)  'timing/compute_advantages_and_returns': '0.0137',
+(skyrl_entrypoint pid=221291)  'timing/convert_to_training_input': '0.0498',
+(skyrl_entrypoint pid=221291)  'timing/fwd_logprobs_values_reward': '17.5108',
+(skyrl_entrypoint pid=221291)  'timing/generate': '3.2200',
+(skyrl_entrypoint pid=221291)  'timing/policy_train': '39.3899',
+(skyrl_entrypoint pid=221291)  'timing/postprocess_generator_output': '0.0013',
+(skyrl_entrypoint pid=221291)  'timing/save_checkpoints': '8.3074',
+(skyrl_entrypoint pid=221291)  'timing/step': '69.9954',
+(skyrl_entrypoint pid=221291)  'timing/sync_weights': '1.2616',
+(skyrl_entrypoint pid=221291)  'timing/train_critic_and_policy': '39.4412',
+(skyrl_entrypoint pid=221291)  'trainer/epoch': 0,
+(skyrl_entrypoint pid=221291)  'trainer/global_step': 2,
+(skyrl_entrypoint pid=221291)  'trainer/tokens_per_second_per_gpu': '1966.8255',
+(skyrl_entrypoint pid=221291)  'vllm/train/generation_throughput_tok_s': '0.0000',
+(skyrl_entrypoint pid=221291)  'vllm/train/prompt_throughput_tok_s': '0.0000'}
+(skyrl_entrypoint pid=221291) Training Batches Processed: 100%|██████████| 2/2 [03:02<00:00, 91.05s/it]
+(skyrl_entrypoint pid=221291) 2026-09-09 20:15:03.298 | INFO     | skyrl.train.utils.ray_gpu_monitor:stop:95 - RayGpuMonitor stopped.
+(skyrl_entrypoint pid=221291) 2026-09-09 20:15:03.299 | INFO     | skyrl.train.trainer:train:592 - Training done!
+(skyrl_entrypoint pid=221291) 2026-09-09 20:15:03.336 | ERROR    | aiohttp.client:__del__:512 - Unclosed client session
+(skyrl_entrypoint pid=221291) client_session: <aiohttp.client.ClientSession object at 0x402cc56c7d40>
+(skyrl_entrypoint pid=221291) 2026-09-09 20:15:03.336 | ERROR    | aiohttp.connector:__del__:373 - Unclosed connector
+(skyrl_entrypoint pid=221291) connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x402cc2811f60>, 2609100.971566084)])']
+(skyrl_entrypoint pid=221291) connector: <aiohttp.connector.TCPConnector object at 0x402cc56c7c20>
+(skyrl_entrypoint pid=221291) WARNING 09-09 20:10:43 [serial_utils.py:79] Allowing insecure serialization using pickle due to VLLM_ALLOW_INSECURE_SERIALIZATION=1
+(pid=232595) WARNING 09-09 20:10:53 [serial_utils.py:79] Allowing insecure serialization using pickle due to VLLM_ALLOW_INSECURE_SERIALIZATION=1
+--- checkpoint directory ---
+/local/user/1483804540/skyrl_phase_a/ckpt:
+global_step_1
+global_step_2
+latest_ckpt_global_step.txt
+
+/local/user/1483804540/skyrl_phase_a/ckpt/global_step_1:
+data.pt
+policy
+trainer_state.pt
+
+/local/user/1483804540/skyrl_phase_a/ckpt/global_step_1/policy:
+extra_state_world_size_1_rank_0.pt
+fsdp_config.json
+huggingface
+model_world_size_1_rank_0.pt
+optim_world_size_1_rank_0.pt
+
+/local/user/1483804540/skyrl_phase_a/ckpt/global_step_1/policy/huggingface:
+chat_template.jinja
+config.json
+
+GATE A5: PASS - the loop closed and 2 checkpoint dir(s) were written
+
+GATE A4: PASS - colocated training performed NCCL weight syncs each step (see the log above)
+
+[20:15:07Z +6m] === S3 add the megatron extras (mamba-ssm and megatron-bridge compile) ===
