@@ -297,3 +297,104 @@ rl/slime_launch/
 改 `rl_encoder.py` 的特征布局或归一化时**必须同时 bump `FEATURE_VERSION`**：
 在一个版本的向量上拟合的 GP 绝不能喂另一个版本的向量（`LDMEnv` 在 task spec 和
 encoder 声明不一致时会直接拒绝构建）。
+
+---
+
+# 10. 2026-09-09 在 Isambard-AI（GH200 / aarch64）上实跑出来的修正
+
+本节是照着这份 runbook 从零跑到底之后，**必须改的地方**。每一条都有实测。
+结果见 `NANOGPT_RUNS.md` §5 与 `campaign_20260909/`。
+
+## 10.1 FA3：能用，但和 sglang 自带的那个不是一回事
+
+**nanoGPT 训练器要的 FA3 在 aarch64 上有原生构建**，`prepare_nanogpt.sh` 第 `[2/4]` 步照常能拉：
+
+```
+varunneal/flash-attention-3
+  -> .../build/torch29-cxx11-cu128-aarch64-linux/flash_attention_3/
+```
+
+forward 实测通过、输出有限。`scripts/train.py:23` 因为 `cap == (9,0)` 走的正是这一支。
+
+**但 sglang 自带的 `sgl_kernel` 没有 aarch64 的 FA3**，唯一 flash 相关的导出是 `dsv4_fused_k_norm_rope_flashmla`。两者混为一谈会让人以为"FA3 在这台机器上不能用"，那是错的。
+
+## 10.2 服务 Qwen3.5-9B 的完整配方（三个故障层层遮蔽）
+
+```bash
+export CUDA_HOME=/opt/nvidia/hpc_sdk/Linux_aarch64/24.11/cuda
+export PATH=$CUDA_HOME/bin:$PATH
+export CPATH=/opt/nvidia/hpc_sdk/Linux_aarch64/24.11/math_libs/include:$CUDA_HOME/include:${CPATH:-}
+sglang.launch_server ... --attention-backend triton --mm-attention-backend sdpa
+```
+
+三个故障，每一个都藏着下一个：
+
+1. **`assert cuda_home is not None`** —— 它在选择 attention 后端**之前**就触发，所以换 `--attention-backend` 的值试三次会得到**完全相同**的失败。**三个不同取值给出同一个失败，本身就是"取值没被读到"的证据。**
+2. **`ImportError: cannot import name 'flash_ops' from 'sgl_kernel'`** —— 见 §10.1，用 `--attention-backend triton` 绕开。
+3. **vision tower 需要它自己的后端**，`--attention-backend` 管不到它。必须 `--mm-attention-backend sdpa`；**`--language-only` 绕不过去**。
+
+**另外两个只在扇出时才暴露的坑：**
+
+- **flashinfer 的 JIT 找不到 `cublasLt.h`** —— HPC SDK 的 `cuda/include` 里没有 cuBLAS，它在隔壁 `math_libs/include`。不设 `CPATH` 就 `ninja: build stopped` 然后 SIGQUIT。
+- **flashinfer 的 JIT 缓存是共享的** —— 相隔 2 秒启动的两个服务器会在同一个 `cached_ops/norm` 上**一起死**。扇出前先串行预热一次，或把启动错峰。
+
+**一个会让人白等几小时的陷阱**：sglang **打印**它自动检测到的 tool-call parser，却**不设置**它，端点返回 `tool_calls: null`。日志主动断言了一件与事实相反的事，信它的人会把重试烧在一个永远无法满足的端点上，并且会去查自己的请求格式（因为日志已经"排除"了服务端）。启动时探测一次，不要信那行。
+
+## 10.3 一张卡一个评测——这是正确性要求，不是礼貌
+
+| 布局 | 代价 |
+|---|---|
+| 两个进程共享**一张卡** | MFU 15.4% vs 35.2%，379 步 vs 851 步，`val_bpb` **+0.106**（80 倍噪声底），**完全静默** |
+| 四个进程分占**四张卡** | **−0.000008**，实质为零 |
+
+因为奖励是**墙钟预算**的：卡被挤占不会让它跑得更久，而是让它在同样 300 秒里**训练得更少**，然后报一个更差的 `val_bpb`——**每一个指标字段都正常，峰值显存一字不差**。
+
+**推论：`evaluation.eval_gpus` 与训练器的卡必须真正不相交，而且要验证。**
+`rl_eval.py:349` 让 **episode 里的 `eval_gpus` 字段覆盖环境变量**，所以启动器打印 `GPU split OK: trainer [0,1] | evaluation [2,3]` 并正常退出的同时，评测器照样把四张卡全占了——**那道守卫是空的**。生成 episode 时不要写 `eval_gpus`，让环境变量说了算。
+
+**显存读数在你动手时已经过期。** 一个节点读到 `[1,1,1,1]` MiB，**60 秒后**是 92,211 MiB。检查必须**焊进 step 的第一行**：
+
+```bash
+srun ... bash -lc 'u=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits|sort -rn|head -1)
+                   [ "$u" -gt 100 ] && { echo "ABORT busiest ${u} MiB"; exit 3; }
+                   <真正的命令>'
+```
+
+实测：16 次启动里 9 次在几秒内 abort，而不是两分钟后 OOM。
+
+## 10.4 `ulimit -c 0` 是必需的
+
+`/proc/sys/kernel/core_pattern` 是裸的相对名 `core`，所以 core 写进**进程 cwd**，也就是 run 目录。第一个失败的评测就往 **Lustre** 上落了 **944 MB**。按整个矩阵的规模算是 22 TB，会让**全项目所有人的写入一起失败**，不只是自己的。
+
+## 10.5 GH200 的实测开销比文档里的 H100 数大 1.3–2.4 倍
+
+| 量 | 文档 | GH200 实测 |
+|---|---|---|
+| 每次评测墙钟 | ~340 s | **381–384 s**（中位数 381.2，p90 420.1，n=48） |
+| 启动 + 编译 + 末次验证 | 28–51 s | **66–69 s** |
+| MFU | — | 35.6%（DEPTH=8 参考配置） |
+| 峰值显存 | — | 45,059 MB / 95.6 GB |
+
+**失败很便宜，这一点文档说得对**：`rejected_by_trainer` 是 **0 秒**（整除断言在任何 CUDA 工作之前触发），`oom` 中位数 48–54 秒。所以 39% 的尝试失败只损失 **4.7% 的 GPU 时间**。
+
+**但 `oom` 这个标签本身被污染了**：469 个格子里，OOM 的中位卡占用是 91,120 MiB 而成功的是 3 MiB，**148 次 OOM 里 144 次（97%）发生在已被占用的卡上**。所以**每一行都要记下认领时刻该卡的可用显存**，否则事后永远分不开"这个配置太大"和"当时旁边有人"。
+
+## 10.6 `uv run` 在规模下会踩坏共享 venv
+
+`uv run --group train --project <repo>/tasks/nanogpt` **每次调用都会把 venv 同步到 lock**（实测在两个不同节点上各观察到一次 `Uninstalled 1 package / Installed 1 package`）。单进程没事；256 个并发进程对着一个装在网络文件系统上的 venv，就是锁争用加互相踩坏。
+
+绕开办法是一行——`rl_real.build_runner` 把 `run_command` 从 episode 的 `real_kwargs` 直通到评测器（`rl_real.py:172`）：
+
+```json
+"run_command": ["/path/to/env/bin/python", "-u", "train.py"]
+```
+
+## 10.7 参考点要重复测，而且比任何候选都更严
+
+奖励是 `max(0, 参考 − 最好)`，而 `ResultCache` 对 `ok=True` 的行**永远直接返回**。所以参考点一旦测在有邻居的卡上，**每一个 episode 的奖励都被平移同一个量**，而那一行格式完全正确、挑不出毛病。
+
+实测：被挤占的 1.107706 对 8 次单租户的 1.003512（sd 0.000821），差 **0.104**，是文档所述 99 次搜索全部增益的 **24 倍**。
+
+修法不需要删除——`ResultCache._load` 按文件顺序 `rows[key] = row`，**后写的行覆盖先写的**，被推翻的那次留作历史（它记录了"这台机器在有邻居时会慢成什么样"，将来还有用）。
+
+**一般规则：任何被缓存、被所有下游共用的参照量，必须比任何单个候选测得更严。** 候选测错会被平均掉，参照测错不会。
