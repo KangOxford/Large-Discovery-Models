@@ -35,6 +35,12 @@ RUN_LOGS = {
                  RUNS / "9b-sft-gbs2_20260909T094256Z" / "train.log"),
     "9b-base": (RUNS / "9b_base_split_20260909T073652Z.log",
                 RUNS / "9b-base_20260909T073721Z" / "train.log"),
+    # The K=8 cell. Same SFT arm, same 50 rollouts, same 100 groups as 9b-sft-a,
+    # so the group counts compare without any adjustment for length. It also
+    # carries UPDATES_PER_ROLLOUT=2 against the others' 1 -- see the note in
+    # facts["k8_confound"] for why that does not touch this particular metric.
+    "k8sft": (RUNS / "k8sft_20260909T200313Z" / "train.log",
+              RUNS / "k8sft_20260909T200313Z" / "train.log"),
 }
 
 
@@ -179,6 +185,15 @@ facts = {
     # From PR #5's frozen facts (rl/ldm_skyrl/facts.json, figure F3) on this same
     # line. Carried here with its unequal step counts attached, because the two
     # 0.00 readings rest on 24 and 15 steps rather than on equal power.
+    "k8_confound": (
+        "The K=8 cell differs from the K=2 runs in two ways, not one: "
+        "n_samples_per_prompt 2 -> 8 and UPDATES_PER_ROLLOUT 1 -> 2. For the "
+        "zero-variance counts specifically the comparison is still one-factor, "
+        "because _compute_zero_std_metrics runs over the rollout's samples "
+        "before any optimizer update, and UPDATES_PER_ROLLOUT only sets how "
+        "many inner updates a rollout gets. Every other quantity here is "
+        "confounded and should not be read as a K effect."
+    ),
     "zero_variance_vs_n_from_pr5": {
         "fraction_of_groups_with_zero_std": {"2": 0.87, "4": 0.28, "8": 0.00, "16": 0.00},
         "step_counts": {"2": 52, "4": 32, "8": 24, "16": 15},
