@@ -1,0 +1,222 @@
+
+[23:23:48Z +0m] === node and cards (NG=1 requested) ===
+nid010950
+index, name, memory.used [MiB], driver_version
+0, NVIDIA GH200 120GB, 49631 MiB, 565.57.01
+1, NVIDIA GH200 120GB, 1 MiB, 565.57.01
+2, NVIDIA GH200 120GB, 49599 MiB, 565.57.01
+3, NVIDIA GH200 120GB, 49599 MiB, 565.57.01
+cards under 2048 MiB right now: 1  (hunt loop expected 1)
+job cgroup memory: 71 GB used of 449 GB, 377 GB headroom
+[bsz] NG=1  CUDA_VISIBLE_DEVICES=1
+[bsz] train_batch_size=128 over 256 rows = 2 steps at epochs=1
+[bsz] policy_mini_batch_size=32 x n_samples=4 / NG=1 = 128 per gpu, micro=4, remainder 0
+
+[23:23:48Z +0m] === S0 clone the prebuilt aarch64 env (BASE is left untouched) ===
+env already present at /local/user/1483804540/ldm-skyrl-cp, reusing it
+Python 3.12.14
+nvcc in front: /local/user/1483804540/ldm-skyrl-cp/bin/nvcc -> Build cuda_12.9.r12.9/compiler.36037853_0
+
+GATE S0: clone ready at /local/user/1483804540/ldm-skyrl-cp
+
+[23:23:48Z +0m] === S1 add what the fsdp path needs that the clone lacks ===
+--- vllm (prebuilt aarch64 wheel) ---
+Prepared 1 package in 4.08s
+Uninstalled 2 packages in 67ms
+Installed 2 packages in 108ms
+ ~ nvidia-cusparselt-cu12==0.7.1
+ - tilelang==0.1.8
+ + tilelang==0.1.9
+--- causal-conv1d (compiles; sdist only on every platform) ---
+host compiler for the CUDA extensions: g++ (SUSE Linux) 12.3.0
+Installed 1 package in 16ms
+Prepared 1 package without build isolation in 0.29ms
+Uninstalled 1 package in 0.34ms
+Installed 1 package in 0.35ms
+ ~ causal-conv1d==1.7.0
+ ~ nvidia-cusparselt-cu12==0.7.1
+
+GATE S1b: causal-conv1d built AND causal_conv1d_cuda imports
+--- skyrl-train support deps ---
+Using Python 3.12.14 environment at: /local/user/1483804540/ldm-skyrl-cp
+Resolved 127 packages in 3.90s
+Uninstalled 1 package in 0.33ms
+Installed 1 package in 16ms
+ ~ nvidia-cusparselt-cu12==0.7.1
+--- skyrl itself, --no-deps so its pins do not fight the staged env ---
+Uninstalled 2 packages in 5ms
+Installed 2 packages in 6ms
+ ~ skyrl==0.3.0 (from file:///lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/oss/SkyRL-v0.3.0)
+ ~ skyrl-gym==0.4.0 (from file:///lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/oss/SkyRL-v0.3.0/skyrl-gym)
+  torch                 2.11.0+cu129
+  vllm                  0.23.0+cu129
+  skyrl                 0.3.0
+  skyrl-gym             0.4.0
+  flash_attn            2.8.3
+  causal_conv1d         1.7.0
+  ray                   2.56.0
+  transformer_engine    2.16.0
+  megatron-core         0.16.0rc0
+--- version pins from the A1 lock (applied whether or not anything is missing) ---
+Uninstalled 1 package in 0.40ms
+Installed 1 package in 17ms
+ ~ vllm-router==0.1.14.post1 (from https://github.com/SumanthRH/router/releases/download/0.1.14.post1/vllm_router-0.1.14.post1-cp38-abi3-manylinux_2_28_aarch64.whl)
+  vllm-router 0.1.14.post1
+  vllm_router.launch_router.RouterArgs has pd_disaggregation
+WARNING:absl:Tensorflow library not found, tensorflow.io.gfile operations will use native shim calls. GCS paths (i.e. 'gs://...') cannot be accessed.
+module sweep clean on attempt 1
+fsdp + inference-server path imports OK; cuda True
+
+GATE S1: fsdp-path install OK
+SKIP_A5=1 -- A5 already passed on this stack at 20:15Z; going straight to the megatron path
+
+GATE A5: SKIPPED by request (SKIP_A5=1); the passing evidence is 6438532.42 on nid010964
+
+[23:24:49Z +1m] === S3 add the megatron extras (mamba-ssm and megatron-bridge compile) ===
+Installed 2 packages in 89ms
+Prepared 1 package without build isolation in 0.37ms
+Uninstalled 1 package in 1ms
+Installed 1 package in 0.99ms
+ ~ mamba-ssm==2.3.2.post1
+ ~ nvidia-cusparselt-cu12==0.7.1
+ - tilelang==0.1.9
+ + tilelang==0.1.8
+      And because only megatron-bridge==0.6.0+91a15142 is available and you
+      require megatron-bridge, we can conclude that your requirements are
+      unsatisfiable.
+
+      hint: Wheels are available for `nvidia-resiliency-ext` (v0.6.0) on the
+      following platforms: `manylinux_2_39_aarch64`, `manylinux_2_39_x86_64`
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+ModuleNotFoundError: No module named 'megatron.bridge'
+
+GATE S3: FAIL - megatron.bridge does not import; A3 cannot be run on this env
+both CUDA extensions load, and transformers qwen3_next imports
+
+[23:25:11Z +1m] === S4 gate A3: does the megatron strategy reach the first forward ===
+(skyrl_entrypoint pid=138398)   recompute_old_logprobs_per_minibatch: true
+(skyrl_entrypoint pid=138398)   ref:
+(skyrl_entrypoint pid=138398)     fsdp_config:
+(skyrl_entrypoint pid=138398)       cpu_offload: false
+(skyrl_entrypoint pid=138398)       fsdp_size: -1
+(skyrl_entrypoint pid=138398)       mixed_precision: null
+(skyrl_entrypoint pid=138398)       reshard_after_forward: true
+(skyrl_entrypoint pid=138398)       wrap_policy: {}
+(skyrl_entrypoint pid=138398)     language_model_only: false
+(skyrl_entrypoint pid=138398)     megatron_config:
+(skyrl_entrypoint pid=138398)       context_parallel_size: 1
+(skyrl_entrypoint pid=138398)       ddp_config:
+(skyrl_entrypoint pid=138398)         average_in_collective: true
+(skyrl_entrypoint pid=138398)         grad_reduce_in_fp32: true
+(skyrl_entrypoint pid=138398)         overlap_grad_reduce: false
+(skyrl_entrypoint pid=138398)         overlap_param_gather: false
+(skyrl_entrypoint pid=138398)       dist_ckpt_optim_fully_reshardable: false
+(skyrl_entrypoint pid=138398)       empty_cuda_cache: true
+(skyrl_entrypoint pid=138398)       expert_model_parallel_size: 1
+(skyrl_entrypoint pid=138398)       expert_tensor_parallel_size: null
+(skyrl_entrypoint pid=138398)       freeze_moe_router: false
+(skyrl_entrypoint pid=138398)       hf_export_config:
+(skyrl_entrypoint pid=138398)         distributed_save: false
+(skyrl_entrypoint pid=138398)         save_every_n_ranks: 1
+(skyrl_entrypoint pid=138398)       lora_config:
+(skyrl_entrypoint pid=138398)         lora_type: lora
+(skyrl_entrypoint pid=138398)         merge_lora: true
+(skyrl_entrypoint pid=138398)       model_config_kwargs: {}
+(skyrl_entrypoint pid=138398)       moe_aux_loss_coeff: 0.0
+(skyrl_entrypoint pid=138398)       moe_enable_routing_replay: false
+(skyrl_entrypoint pid=138398)       moe_grouped_gemm: true
+(skyrl_entrypoint pid=138398)       moe_per_layer_logging: false
+(skyrl_entrypoint pid=138398)       moe_router_dtype: fp32
+(skyrl_entrypoint pid=138398)       moe_router_enable_expert_bias: null
+(skyrl_entrypoint pid=138398)       moe_router_load_balancing_type: none
+(skyrl_entrypoint pid=138398)       moe_router_score_function: null
+(skyrl_entrypoint pid=138398)       moe_token_dispatcher_type: alltoall
+(skyrl_entrypoint pid=138398)       mtp_loss_chunk_size: 1024
+(skyrl_entrypoint pid=138398)       mtp_loss_topk: null
+(skyrl_entrypoint pid=138398)       mtp_loss_weight: 0.1
+(skyrl_entrypoint pid=138398)       mtp_num_layers: null
+(skyrl_entrypoint pid=138398)       optimizer_config_kwargs:
+(skyrl_entrypoint pid=138398)         optimizer_cpu_offload: false
+(skyrl_entrypoint pid=138398)         optimizer_offload_fraction: 0.0
+(skyrl_entrypoint pid=138398)         overlap_cpu_optimizer_d2h_h2d: false
+(skyrl_entrypoint pid=138398)         use_precision_aware_optimizer: false
+(skyrl_entrypoint pid=138398)       pipeline_model_parallel_size: 1
+(skyrl_entrypoint pid=138398)       tensor_model_parallel_size: 1
+(skyrl_entrypoint pid=138398)       transformer_config_kwargs:
+(skyrl_entrypoint pid=138398)         gradient_accumulation_fusion: false
+(skyrl_entrypoint pid=138398)         recompute_granularity: full
+(skyrl_entrypoint pid=138398)         recompute_method: uniform
+(skyrl_entrypoint pid=138398)         recompute_modules:
+(skyrl_entrypoint pid=138398)         - core_attn
+(skyrl_entrypoint pid=138398)         recompute_num_layers: 1
+(skyrl_entrypoint pid=138398)     model:
+(skyrl_entrypoint pid=138398)       fake_int4_qat:
+(skyrl_entrypoint pid=138398)         bf16_base_path: null
+(skyrl_entrypoint pid=138398)         enabled: false
+(skyrl_entrypoint pid=138398)         group_size: 32
+(skyrl_entrypoint pid=138398)         q_min: -8.0
+(skyrl_entrypoint pid=138398)         scale_divisor: 7.5
+(skyrl_entrypoint pid=138398)         symmetric: true
+(skyrl_entrypoint pid=138398)       lora:
+(skyrl_entrypoint pid=138398)         alpha: 16
+(skyrl_entrypoint pid=138398)         dropout: 0.0
+(skyrl_entrypoint pid=138398)         exclude_modules: null
+(skyrl_entrypoint pid=138398)         init_method: kaiming
+(skyrl_entrypoint pid=138398)         lora_sync_path: /tmp/skyrl_lora_sync
+(skyrl_entrypoint pid=138398)         max_cpu_loras: null
+(skyrl_entrypoint pid=138398)         max_loras: 1
+(skyrl_entrypoint pid=138398)         rank: 0
+(skyrl_entrypoint pid=138398)         target_modules: all-linear
+(skyrl_entrypoint pid=138398)       path: /lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/models/Qwen2.5-1.5B-Instruct
+(skyrl_entrypoint pid=138398)     model_config_kwargs: {}
+(skyrl_entrypoint pid=138398)     sequence_parallel_size: 1
+(skyrl_entrypoint pid=138398)   remove_microbatch_padding: true
+(skyrl_entrypoint pid=138398)   resume_mode: null
+(skyrl_entrypoint pid=138398)   resume_path: null
+(skyrl_entrypoint pid=138398)   run_name: phase_a3
+(skyrl_entrypoint pid=138398)   seed: 42
+(skyrl_entrypoint pid=138398)   sequence_parallel_backend: ulysses
+(skyrl_entrypoint pid=138398)   strategy: megatron
+(skyrl_entrypoint pid=138398)   tags: null
+(skyrl_entrypoint pid=138398)   train_batch_size: 128
+(skyrl_entrypoint pid=138398)   update_epochs_per_batch: 1
+(skyrl_entrypoint pid=138398)   update_ref_every_epoch: false
+(skyrl_entrypoint pid=138398)   use_expandable_segments: true
+(skyrl_entrypoint pid=138398) 
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/local/user/1483804540/ldm-skyrl-cp/lib/python3.12/site-packages/skyrl/train/entrypoints/main_base.py", line 370, in <module>
+    main()
+  File "/local/user/1483804540/ldm-skyrl-cp/lib/python3.12/site-packages/skyrl/train/entrypoints/main_base.py", line 366, in main
+    ray.get(skyrl_entrypoint.remote(cfg))
+  File "/local/user/1483804540/ldm-skyrl-cp/lib/python3.12/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/local/user/1483804540/ldm-skyrl-cp/lib/python3.12/site-packages/ray/_private/client_mode_hook.py", line 110, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/local/user/1483804540/ldm-skyrl-cp/lib/python3.12/site-packages/ray/_private/worker.py", line 2968, in get
+    values, debugger_breakpoint = worker.get_objects(
+                                  ^^^^^^^^^^^^^^^^^^^
+  File "/local/user/1483804540/ldm-skyrl-cp/lib/python3.12/site-packages/ray/_private/worker.py", line 1050, in get_objects
+    raise value.as_instanceof_cause()
+ray.exceptions.RayTaskError(ModuleNotFoundError): ray::skyrl_entrypoint() (pid=138398, ip=10.242.10.70)
+  File "/local/user/1483804540/ldm-skyrl-cp/lib/python3.12/site-packages/skyrl/train/entrypoints/main_base.py", line 342, in skyrl_entrypoint
+    exp.run()
+  File "/local/user/1483804540/ldm-skyrl-cp/lib/python3.12/site-packages/skyrl/train/entrypoints/main_base.py", line 319, in run
+    trainer = self._setup_trainer()
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/local/user/1483804540/ldm-skyrl-cp/lib/python3.12/site-packages/skyrl/train/entrypoints/main_base.py", line 269, in _setup_trainer
+    from skyrl.backends.skyrl_train.workers.megatron.megatron_worker import (
+  File "/local/user/1483804540/ldm-skyrl-cp/lib/python3.12/site-packages/skyrl/backends/skyrl_train/workers/megatron/megatron_worker.py", line 14, in <module>
+    from megatron.bridge import AutoBridge
+ModuleNotFoundError: No module named 'megatron.bridge'
+(skyrl_entrypoint pid=138398) 2026-09-09 23:26:03.916 | ERROR    | __main__:run:334 - Setup failed before tracker was initialized:
+(skyrl_entrypoint pid=138398) No module named 'megatron.bridge'
+
+GATE A3: FAIL - rc=1
+
+[23:26:07Z +2m] === done ===
+elapsed 2 minutes

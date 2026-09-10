@@ -1,0 +1,19 @@
+# uv lock --no-build  (source builds forbidden: a failure NAMES what aarch64 has no wheel for)
+# host=login41 arch=aarch64 uv=uv 0.11.7 (aarch64-unknown-linux-gnu) utc=2026-09-09T05:15:07Z
+Downloading cpython-3.12.13-linux-aarch64-gnu (download) (28.2MiB)
+ Downloaded cpython-3.12.13-linux-aarch64-gnu (download)
+Using CPython 3.12.13
+Downloading vllm-router (12.7MiB)
+Downloading vllm-router (13.0MiB)
+Downloading causal-conv1d (239.3MiB)
+   Updating https://github.com/NVIDIA-NeMo/Megatron-Bridge (91a15142a4b4442a8d46ab539d1b923bd08570d0)
+   Updating https://github.com/NVIDIA/Megatron-LM (71e418ea7d7b3a6c9a53238c543c3e0b43e11026)
+Downloading flash-attn (241.9MiB)
+Downloading mamba-ssm (446.7MiB)
+ Downloaded vllm-router
+ Downloaded vllm-router
+    Updated https://github.com/NVIDIA/Megatron-LM (71e418ea7d7b3a6c9a53238c543c3e0b43e11026)
+  × Failed to download and build `megatron-core @
+  │ git+https://github.com/NVIDIA/Megatron-LM@71e418ea7d7b3a6c9a53238c543c3e0b43e11026`
+  ╰─▶ Building source distributions for `megatron-core` is disabled
+EXIT=1

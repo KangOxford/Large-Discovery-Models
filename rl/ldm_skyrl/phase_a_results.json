@@ -1,0 +1,250 @@
+{
+  "collected_utc": "2026-09-09T23:28:54Z",
+  "a1": {
+    "status": "PASS",
+    "packages_resolved": 322,
+    "torch_version": "2.11.0+cu128",
+    "torch_delivery": "prebuilt aarch64 wheel",
+    "cu130_occurrences": 0,
+    "cu13_packages": 0,
+    "criterion": "uv lock succeeds and the resolved torch is a +cu128 or +cu129 build"
+  },
+  "delivery": [
+    {
+      "package": "torch",
+      "version": "2.11.0+cu128",
+      "delivery": "prebuilt aarch64 wheel"
+    },
+    {
+      "package": "vllm",
+      "version": "0.23.0+cu129",
+      "delivery": "prebuilt aarch64 wheel"
+    },
+    {
+      "package": "flash-attn",
+      "version": "2.8.3",
+      "delivery": "sdist only, compiled at install"
+    },
+    {
+      "package": "mamba-ssm",
+      "version": "2.3.1",
+      "delivery": "sdist only, compiled at install"
+    },
+    {
+      "package": "causal-conv1d",
+      "version": "1.6.1",
+      "delivery": "sdist only, compiled at install"
+    },
+    {
+      "package": "transformer-engine",
+      "version": "2.11.0",
+      "delivery": "pure-python wheel"
+    },
+    {
+      "package": "transformer-engine-torch",
+      "version": "2.11.0",
+      "delivery": "sdist only, compiled at install"
+    },
+    {
+      "package": "megatron-core",
+      "version": "0.19.0+71e418ea7",
+      "delivery": "git checkout, compiled at install"
+    },
+    {
+      "package": "megatron-bridge",
+      "version": "0.6.0+91a15142",
+      "delivery": "git checkout, compiled at install"
+    },
+    {
+      "package": "flashinfer-python",
+      "version": "0.6.12",
+      "delivery": "sdist only, compiled at install"
+    },
+    {
+      "package": "ray",
+      "version": "2.56.0",
+      "delivery": "prebuilt aarch64 wheel"
+    },
+    {
+      "package": "torchvision",
+      "version": "0.26.0+cu128",
+      "delivery": "prebuilt aarch64 wheel"
+    },
+    {
+      "package": "vllm-router",
+      "version": "0.1.14.post1",
+      "delivery": "prebuilt aarch64 wheel"
+    }
+  ],
+  "already_built_here": {
+    "env": "/home/u6gb/kangli.u6gb/envs/ldm-rl-train",
+    "versions": {
+      "torch": "2.11.0+cu129",
+      "transformer_engine": "2.16.0",
+      "transformer_engine_torch": "2.16.0",
+      "flash_attn": "2.8.3",
+      "mamba_ssm": null,
+      "causal_conv1d": null,
+      "vllm": null,
+      "megatron-core": "0.16.0rc0",
+      "ray": "2.58.0",
+      "flashinfer_python": "0.6.12"
+    }
+  },
+  "a2": {
+    "status": "PASS",
+    "log": "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_skyrl_nb/A2_vllm_6426448.log",
+    "node": "nid010771",
+    "driver": "565.57.01",
+    "torch": "2.11.0+cu128",
+    "vllm": "0.23.0+cu129",
+    "cuda_available": "True",
+    "device": "NVIDIA GH200 120GB",
+    "token_text": "' Paris'",
+    "flashinfer": "present",
+    "failed_steps": "none -- A2 PASSES",
+    "attention_backend": "FLASH_ATTN",
+    "backend_candidates": "'FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'",
+    "model_load": "2.98 GiB memory and 2.092806 seconds",
+    "job_id": "6426448",
+    "attempts": [
+      {
+        "job": 6426395,
+        "stopped_at": "install torch",
+        "cause": "uv index strategy is first-match: it found the torch NAME on PyPI and never looked at the pytorch index named one line above"
+      },
+      {
+        "job": 6426397,
+        "stopped_at": "create venv",
+        "cause": "the previous attempt left a valid empty venv behind; fixed with --allow-existing rather than by deleting it"
+      },
+      {
+        "job": 6426399,
+        "stopped_at": "generate one token",
+        "cause": "probe had no if __name__ == '__main__' guard, and vLLM v1 spawns its engine core, which re-imports the main module"
+      },
+      {
+        "job": 6426443,
+        "stopped_at": "generate one token",
+        "cause": "flashinfer JIT-compiles its sampling kernel at first use and found no CUDA toolkit; the only nvcc in the venv is a CUDA 13 one"
+      },
+      {
+        "job": 6426448,
+        "stopped_at": "passed",
+        "cause": ""
+      }
+    ]
+  },
+  "blocked": {
+    "collected_utc": "2026-09-09T18:46:12Z",
+    "deadline_utc": "2026-09-10T05:00:00Z",
+    "note": "A3, A4 and A5 are implemented, staged and unit-checked, and have not run. What stops them is cluster capacity, and the two measurements below are why no amount of resizing or waiting fixes it inside the window.",
+    "scheduling": {
+      "measured_at_utc": "2026-09-09T18:24:32Z",
+      "rows": [
+        {
+          "request": "1 GPU, 1 h, shared node",
+          "predicted_start": "2026-09-11T12:48"
+        },
+        {
+          "request": "1 GPU, 2 h, shared node",
+          "predicted_start": "2026-09-11T12:48"
+        },
+        {
+          "request": "4 GPU, 2 h, exclusive",
+          "predicted_start": "2026-09-11T12:48"
+        },
+        {
+          "request": "4 GPU, 8 h, exclusive",
+          "predicted_start": "2026-09-11T12:03"
+        }
+      ],
+      "submitted_job_priority": 1,
+      "account_running_jobs": 174,
+      "account_pending_jobs": 168,
+      "account_nodes_held": 355
+    },
+    "capacity": {
+      "account_nodes_allocated": 238,
+      "nodes_with_no_slurm_step": 101,
+      "nodes_probed_with_nvidia_smi": 61,
+      "nodes_found_with_a_free_card": 1,
+      "median_used_mib_on_stepless_nodes": 91527,
+      "reason": "A node with no step can still be full. Session teardown kills the srun client while the compute processes keep running, so the step disappears from squeue and the memory stays allocated."
+    },
+    "staging": [
+      {
+        "finding": "/home is at its hard quota (101G of 101G)",
+        "consequence": "conda create --clone fails even when the destination is node-local, because it unpacks into $CONDA_ROOT/pkgs on /home",
+        "misleading_symptom": "reported as InvalidArchiveError, 'you probably need to delete and re-download', which points at a corrupt package rather than at a full filesystem"
+      },
+      {
+        "finding": "a plain cp -a of a conda env works",
+        "consequence": "19 GB in 13.5 min; the copy imports torch 2.11.0+cu129, transformer_engine 2.16.0, flash_attn 2.8.3, megatron-core 0.16.0rc0, ray 2.58.0 with sys.prefix resolved to the new location",
+        "misleading_symptom": ""
+      },
+      {
+        "finding": "--no-build applied to a whole requirement line is all-or-nothing",
+        "consequence": "func-timeout ships an sdist and no wheel, so the line became unsatisfiable and installed none of its packages",
+        "misleading_symptom": "surfaces much later as ModuleNotFoundError: jaxtyping from inside skyrl.train.trainer"
+      },
+      {
+        "finding": "causal-conv1d is not on the FSDP gate's path",
+        "consequence": "skyrl.train, RayPPOTrainer and FullyAsyncRayPPOTrainer all import without it; it is for Mamba-family models and A5 runs a plain transformer",
+        "misleading_symptom": "SkyRL's [fsdp] extra lists it, which suggests the only compile in phase A is unavoidable"
+      }
+    ]
+  },
+  "a3": {
+    "status": "FAIL",
+    "criterion": "trainer.strategy=megatron reaches the first forward",
+    "root_cause": "a platform incompatibility one glibc minor version wide. megatron-bridge 0.6.0 at the pinned commit requires nvidia-resiliency-ext 0.6.0, which publishes only manylinux_2_39 wheels and no source distribution at all. The compute nodes run glibc 2.38 and accept manylinux_2_38_aarch64 at best.",
+    "layers": [
+      "1. the python packages install and import; only the CUDA extensions are absent, and transformers' lazy importer rewrites that into \"Could not import module 'Qwen3NextForCausalLM'. Are this object's requirements defined correctly?\" -- which reads as a version conflict and is not one",
+      "2. uv's build cache is keyed on (package, version) and not on the toolchain, so every rebuild reissued a kernel-less wheel in 4 s while printing Building and Built. --refresh-package moved the same build to 361 s: it had never been running",
+      "3. the default compiler is GCC 7.5.0 and torch 2.11's headers reject it outright. module load gcc-native/12.3 does not fix it -- after loading, command -v gcc still returns /usr/bin/gcc, and the load prints nothing, so its silence reads as success",
+      "4. the megatron-bridge install lacked --no-build-isolation. Two other install sites had been fixed and this one was left beside them",
+      "5. nvidia-resiliency-ext 0.6.0: wheels for manylinux_2_39 only, node glibc 2.38, no sdist"
+    ],
+    "cleared_and_verified_in_run": [
+      "host compiler for the CUDA extensions: g++ (SUSE Linux) 12.3.0",
+      "GATE S1b: causal-conv1d built AND causal_conv1d_cuda imports",
+      "Built mamba-ssm==2.3.2.post1 in 2m46s",
+      "both CUDA extensions load, and transformers qwen3_next imports (the disguised error is gone, because a kernel got built and not because a version changed)"
+    ],
+    "recipe_that_builds_the_kernels": "CC/CXX set by absolute path to /opt/cray/pe/gcc-native/12/bin, NVCC_PREPEND_FLAGS=-ccbin on the same g++, --refresh-package to defeat the build cache, --no-build-isolation, and every extension check importing torch first (a bare import of causal_conv1d_cuda raises ImportError: libc10.so even when it is correct)",
+    "routes_not_taken": [
+      "an older megatron-bridge whose dependencies have manylinux_2_38 wheels",
+      "building nvidia-resiliency-ext from its git repository rather than PyPI",
+      "a container image with glibc >= 2.39"
+    ],
+    "not_claimed": "that the megatron path is broken. Nothing here tests it; the run never reaches it."
+  },
+  "a4": {
+    "status": "PARTIAL",
+    "criterion": "after one sync the engine's output changes with the policy weights",
+    "observed": "sync_weights ran once per step and was timed: 2.0728, 1.2616 s",
+    "not_observed": "that the engine's output changed as a result. The written criterion has two halves and only the first was measured; reporting this as PASS would be an inference standing in for an observation."
+  },
+  "a5": {
+    "status": "PASS",
+    "criterion": "two training steps complete and a checkpoint is written, with no LDM code on the path",
+    "when_utc": "2026-09-09T20:15Z",
+    "job": "6438532.42",
+    "node": "nid010964",
+    "gpus": 1,
+    "path": "SkyRL examples/train/gsm8k, strategy=fsdp, colocated, local Qwen2.5-1.5B-Instruct",
+    "batch": "256 rows / train_batch_size 128 / epochs 1 = 2 steps; policy_mini_batch 32 x n_samples 4 / 1 gpu = 128 per gpu, micro 4",
+    "checkpoints": [
+      "global_step_1",
+      "global_step_2"
+    ],
+    "checkpoint_contents": "data.pt, trainer_state.pt, policy/{model,optim,fsdp_config,huggingface}",
+    "metrics": {
+      "reward/avg_raw_reward": 0.45703125,
+      "reward/avg_pass_at_4": 0.90625,
+      "policy_loss": 0.1755
+    },
+    "attempts_before_passing": 6
+  }
+}

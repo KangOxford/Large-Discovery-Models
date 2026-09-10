@@ -1,0 +1,335 @@
+{
+  "collected_utc": "2026-09-08T22:59:21Z",
+  "ldm_head": "b5dab16a57e6b9fd75f8a72a3d8b39b9e0faaff8",
+  "ldm_rl_ref": "18fa414c538f84d8ca6fcf7f2b8cf0be357063b3",
+  "port_surface": [
+    {
+      "file": "__init__.py",
+      "lines": 27,
+      "coupled_lines": 4
+    },
+    {
+      "file": "bridge.py",
+      "lines": 302,
+      "coupled_lines": 16
+    },
+    {
+      "file": "components.py",
+      "lines": 30,
+      "coupled_lines": 1
+    },
+    {
+      "file": "env.py",
+      "lines": 803,
+      "coupled_lines": 1
+    },
+    {
+      "file": "episodes.py",
+      "lines": 239,
+      "coupled_lines": 4
+    },
+    {
+      "file": "factories.py",
+      "lines": 104,
+      "coupled_lines": 0
+    },
+    {
+      "file": "parsing.py",
+      "lines": 105,
+      "coupled_lines": 0
+    },
+    {
+      "file": "prompts.py",
+      "lines": 228,
+      "coupled_lines": 0
+    },
+    {
+      "file": "real_env_worker.py",
+      "lines": 79,
+      "coupled_lines": 0
+    },
+    {
+      "file": "remote_env.py",
+      "lines": 90,
+      "coupled_lines": 4
+    }
+  ],
+  "vllm_aarch64": {
+    "recipe_index": "https://wheels.vllm.ai/0.23.0/cu129/vllm/",
+    "wheels": [
+      "vllm-0.23.0+cu129-cp38-abi3-manylinux_2_28_aarch64.whl",
+      "vllm-0.23.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl"
+    ],
+    "aarch64_present": true,
+    "pypi_recent": [
+      {
+        "version": "0.28.0",
+        "aarch64": true,
+        "x86_64": true
+      },
+      {
+        "version": "0.27.1",
+        "aarch64": true,
+        "x86_64": true
+      },
+      {
+        "version": "0.27.0",
+        "aarch64": true,
+        "x86_64": true
+      },
+      {
+        "version": "0.26.0",
+        "aarch64": true,
+        "x86_64": true
+      },
+      {
+        "version": "0.25.1",
+        "aarch64": true,
+        "x86_64": true
+      },
+      {
+        "version": "0.25.0",
+        "aarch64": true,
+        "x86_64": true
+      },
+      {
+        "version": "0.24.0",
+        "aarch64": true,
+        "x86_64": true
+      },
+      {
+        "version": "0.23.0",
+        "aarch64": true,
+        "x86_64": true
+      }
+    ]
+  },
+  "cuda_constraint": {
+    "isambard_driver": 565,
+    "isambard_cuda": "12.7",
+    "isambard_source": "rl/slime_launch/HANDOFF.md sec.1 (the CUDA red line)",
+    "rows": [
+      {
+        "target": "SkyRL main",
+        "needs_cuda": "13.0",
+        "needs_driver": "r580",
+        "feasible": false,
+        "source": "docs/content/docs/getting-started/installation.mdx"
+      },
+      {
+        "target": "SkyRL 0.3.0 (b8a5caaa)",
+        "needs_cuda": "12.8 / 12.9",
+        "needs_driver": "r525+ (minor-version compat)",
+        "feasible": true,
+        "source": "ApexAgents-SkyRL-Recipe pyproject.toml [tool.uv.index]"
+      },
+      {
+        "target": "LDM slime stack (today)",
+        "needs_cuda": "12.8 / 12.9",
+        "needs_driver": "565",
+        "feasible": true,
+        "source": "rl/slime_launch/HANDOFF.md sec.1"
+      }
+    ]
+  },
+  "zero_variance": {
+    "source": "https://github.com/KangOxford/Large-Discovery-Models/pull/2",
+    "rows": [
+      {
+        "n_samples": 2,
+        "runs": 3,
+        "steps": 52,
+        "zero_var_groups_per_step": 0.87
+      },
+      {
+        "n_samples": 4,
+        "runs": 2,
+        "steps": 32,
+        "zero_var_groups_per_step": 0.28
+      },
+      {
+        "n_samples": 8,
+        "runs": 8,
+        "steps": 24,
+        "zero_var_groups_per_step": 0.0
+      },
+      {
+        "n_samples": 16,
+        "runs": 6,
+        "steps": 15,
+        "zero_var_groups_per_step": 0.0
+      }
+    ]
+  },
+  "gp_cost": {
+    "source": "ldm_rl/results/FINDINGS.md (2026-09-02 section)",
+    "seconds_per_gp_call_sk": 67.0,
+    "gp_calls_per_step_all_success": 80,
+    "kernel_fp_seconds_at_n2600": 0.679,
+    "step_seconds_observed": {
+      "0_evals": 19,
+      "1_eval": 85,
+      "2_evals": 156
+    }
+  },
+  "ablation": {
+    "source": "Mercor-Intelligence/ApexAgents-SkyRL-Recipe assets/full_ablation_table.md",
+    "rows": [
+      {
+        "run": "prompt_mean",
+        "mean_reward": 32.54,
+        "sd": 1.19,
+        "adopt": true
+      },
+      {
+        "run": "DPPO + prompt_mean + nudge",
+        "mean_reward": 31.81,
+        "sd": 0.81,
+        "adopt": true
+      },
+      {
+        "run": "Nudge",
+        "mean_reward": 31.64,
+        "sd": 0.68,
+        "adopt": false
+      },
+      {
+        "run": "DPPO + prompt_mean + nudge + ALP 0.25/0.1",
+        "mean_reward": 31.6,
+        "sd": 1.54,
+        "adopt": false
+      },
+      {
+        "run": "DPPO + prompt_mean + nudge + ALP 0.1/0.1",
+        "mean_reward": 30.93,
+        "sd": 0.22,
+        "adopt": false
+      },
+      {
+        "run": "prompt_mean + ALP",
+        "mean_reward": 30.85,
+        "sd": 0.99,
+        "adopt": false
+      },
+      {
+        "run": "ResetKV",
+        "mean_reward": 30.57,
+        "sd": 1.75,
+        "adopt": false
+      },
+      {
+        "run": "DPPO + prompt_mean + nudge + OLF",
+        "mean_reward": 30.3,
+        "sd": 0.5,
+        "adopt": false
+      },
+      {
+        "run": "DPPO + ALP + OLF",
+        "mean_reward": 30.0,
+        "sd": 1.2,
+        "adopt": false
+      },
+      {
+        "run": "DPPO (ep1)",
+        "mean_reward": 29.03,
+        "sd": 0.45,
+        "adopt": true
+      },
+      {
+        "run": "Baseline (token_mean, rollout_is)",
+        "mean_reward": 28.69,
+        "sd": 0.8,
+        "adopt": false
+      },
+      {
+        "run": "DPPO + ALP",
+        "mean_reward": 28.12,
+        "sd": 0.75,
+        "adopt": false
+      },
+      {
+        "run": "DPPO + ALP + Prompt nudge",
+        "mean_reward": 27.24,
+        "sd": 0.59,
+        "adopt": false
+      },
+      {
+        "run": "Untrained model",
+        "mean_reward": 22.74,
+        "sd": 1.04,
+        "adopt": false
+      }
+    ]
+  },
+  "knobs": {
+    "source": "NovaSky-AI/SkyRL @ b8a5caaa, skyrl/train/config/config.py",
+    "rows": [
+      {
+        "knob": "grpo_norm_by_std",
+        "default": "True",
+        "line": 623
+      },
+      {
+        "knob": "zero_variance_filter",
+        "default": "False",
+        "line": 624
+      },
+      {
+        "knob": "zero_variance_filter_tol",
+        "default": "1e-6",
+        "line": 626
+      },
+      {
+        "knob": "policy_loss_type",
+        "default": "\"regular\"",
+        "line": 619
+      },
+      {
+        "knob": "loss_reduction",
+        "default": "\"token_mean\"",
+        "line": 621
+      },
+      {
+        "knob": "inference_engine.backend",
+        "default": "\"vllm\"",
+        "line": 743
+      }
+    ]
+  },
+  "nine_b": {
+    "source": "rl/slime_launch/LDM_RL_PLAN.md sec.0.3",
+    "grad_norm_median_1p5b": 6.21,
+    "grad_norm_median_9b": 51000000.0,
+    "optimizer_steps_applied_1p5b": [
+      4536,
+      4536
+    ],
+    "optimizer_steps_applied_9b": [
+      37,
+      269
+    ],
+    "hypotheses_excluded": 7
+  },
+  "phases": [
+    {
+      "phase": "A",
+      "title": "Stack feasibility on GH200 / aarch64 / driver 565",
+      "items": 6
+    },
+    {
+      "phase": "B",
+      "title": "Domain wiring onto the SkyRL seams",
+      "items": 6
+    },
+    {
+      "phase": "C",
+      "title": "Algorithm settings the recipe already ranked",
+      "items": 5
+    },
+    {
+      "phase": "D",
+      "title": "The main objective: budget-80 Pareto hypervolume",
+      "items": 2
+    }
+  ]
+}

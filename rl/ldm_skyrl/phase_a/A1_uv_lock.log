@@ -1,0 +1,31 @@
+# uv lock, source builds forbidden ONLY for the four CUDA-kernel packages.
+# A failure there means aarch64 has no wheel and the package must compile.
+# host=login41 arch=aarch64 utc=2026-09-09T05:16:06Z
+Using CPython 3.12.13
+Downloading causal-conv1d (239.3MiB)
+Downloading flash-attn (241.9MiB)
+Downloading mamba-ssm (446.7MiB)
+ Downloaded causal-conv1d
+ Downloaded flash-attn
+ Downloaded mamba-ssm
+  × No solution found when resolving dependencies for split (markers:
+  │ platform_machine == 'aarch64' and sys_platform == 'linux'):
+  ╰─▶ Because flash-attn{platform_machine != 'x86_64' and sys_platform
+      == 'linux'}==2.8.3 has no usable wheels and skyrl[megatron]==0.3.0
+      depends on flash-attn{platform_machine != 'x86_64' and sys_platform
+      == 'linux'}==2.8.3, we can conclude that skyrl[megatron]==0.3.0 cannot
+      be used.
+      And because only skyrl[megatron]==0.3.0 is available and your project
+      depends on skyrl[megatron], we can conclude that your project's
+      requirements are unsatisfiable.
+
+      hint: Wheels are required for `flash-attn` because building from
+      source is disabled for `flash-attn` (i.e., with `--no-build-package
+      flash-attn`)
+EXIT=1
+
+=== full resolve, builds allowed, CUDA metadata builds escaped ===
+# utc=2026-09-09T05:19:15Z
+Using CPython 3.12.13
+Resolved 322 packages in 1.83s
+EXIT=0

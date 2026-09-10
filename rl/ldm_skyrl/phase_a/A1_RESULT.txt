@@ -1,0 +1,27 @@
+PHASE ITEM A1 -- RESULT: PASS
+criterion: uv lock succeeds AND the resolved torch is a +cu128/+cu129 build (never +cu130)
+resolved 322 packages; lock is 479 KB
+
+torch on the linux/aarch64 split:
+  2.11.0+cu128   from {'registry': 'https://download.pytorch.org/whl/cu128'}   (aarch64 wheel)
+  cuda deps: ['nvidia-cudnn-cu12', 'nvidia-cusparselt-cu12', 'nvidia-nccl-cu12', 'nvidia-nvshmem-cu12']
+  'cu130' anywhere in the lock: 0   'cu13-' packages: 0
+
+how each heavy package arrives on aarch64:
+  vllm                      0.23.0+cu129          aarch64 wheel
+  flash-attn                2.8.3                 sdist -> compiled at install
+  mamba-ssm                 2.3.1                 sdist -> compiled at install
+  causal-conv1d             1.6.1                 sdist -> compiled at install
+  transformer-engine        2.11.0                pure-python wheel
+  transformer-engine-torch  2.11.0                sdist -> compiled at install
+  megatron-core             0.19.0+71e418ea7      git checkout -> compiled at install
+  megatron-bridge           0.6.0+91a15142        git checkout -> compiled at install
+  flashinfer-python         0.6.12                sdist -> compiled at install
+  ray                       2.56.0                aarch64 wheel
+  vllm-router               0.1.14.post1          aarch64 wheel
+  torchvision               0.26.0+cu128          aarch64 wheel
+
+vllm 0.23.0's own torch requirement:
+  requires flashinfer-python platform_machine == 'x86_64' and sys_platform == 'linux'
+  requires torch sys_platform == 'linux'
+  requires torchvision sys_platform == 'linux'
