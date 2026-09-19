@@ -1,3 +1,6 @@
 [submodule "finetune/LLaMA-Factory"]
 	path = finetune/LLaMA-Factory
 	url = https://github.com/hiyouga/LLaMA-Factory.git
+[submodule "rl/slime"]
+	path = rl/slime
+	url = https://github.com/THUDM/slime.git
