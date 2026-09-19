@@ -1,0 +1,607 @@
+{
+  "run": "k8sft_20260909T200313Z",
+  "source": "/lus/lfs1aip2/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/runs/k8sft_20260909T200313Z/train.log",
+  "sha256": "5417547cc01d339f9c70427a8ff9a7b5b84dce165d4b511e36a1e3414867b34d",
+  "rows": [
+    {
+      "step": 0,
+      "loss": 0.03624538332223892,
+      "grad_finite": false,
+      "line": 2170
+    },
+    {
+      "step": 1,
+      "loss": 0.05808240920305252,
+      "grad_finite": false,
+      "line": 2183
+    },
+    {
+      "step": 2,
+      "loss": 0.04114871472120285,
+      "grad_finite": false,
+      "line": 2448
+    },
+    {
+      "step": 3,
+      "loss": 0.03411101549863815,
+      "grad_finite": false,
+      "line": 2463
+    },
+    {
+      "step": 4,
+      "loss": 0.0450405478477478,
+      "grad_finite": false,
+      "line": 2725
+    },
+    {
+      "step": 5,
+      "loss": 0.04033359885215759,
+      "grad_finite": false,
+      "line": 2742
+    },
+    {
+      "step": 6,
+      "loss": 0.04668629169464111,
+      "grad_finite": false,
+      "line": 2999
+    },
+    {
+      "step": 7,
+      "loss": 0.06348970532417297,
+      "grad_finite": false,
+      "line": 3012
+    },
+    {
+      "step": 8,
+      "loss": 0.03554017096757889,
+      "grad_finite": false,
+      "line": 3253
+    },
+    {
+      "step": 9,
+      "loss": 0.05410744249820709,
+      "grad_finite": false,
+      "line": 3264
+    },
+    {
+      "step": 10,
+      "loss": 0.04491390287876129,
+      "grad_finite": false,
+      "line": 3523
+    },
+    {
+      "step": 11,
+      "loss": 0.04974598065018654,
+      "grad_finite": false,
+      "line": 3540
+    },
+    {
+      "step": 12,
+      "loss": 0.04012612998485565,
+      "grad_finite": false,
+      "line": 3799
+    },
+    {
+      "step": 13,
+      "loss": 0.04272274672985077,
+      "grad_finite": false,
+      "line": 3810
+    },
+    {
+      "step": 14,
+      "loss": 0.033006489276885986,
+      "grad_finite": false,
+      "line": 4061
+    },
+    {
+      "step": 15,
+      "loss": 0.05405709147453308,
+      "grad_finite": false,
+      "line": 4074
+    },
+    {
+      "step": 16,
+      "loss": 0.051008544862270355,
+      "grad_finite": false,
+      "line": 4341
+    },
+    {
+      "step": 17,
+      "loss": 0.040930427610874176,
+      "grad_finite": false,
+      "line": 4352
+    },
+    {
+      "step": 18,
+      "loss": 0.03495844826102257,
+      "grad_finite": false,
+      "line": 4637
+    },
+    {
+      "step": 19,
+      "loss": 0.045214418321847916,
+      "grad_finite": false,
+      "line": 4650
+    },
+    {
+      "step": 20,
+      "loss": 0.03509415313601494,
+      "grad_finite": false,
+      "line": 4929
+    },
+    {
+      "step": 21,
+      "loss": 0.02921493723988533,
+      "grad_finite": false,
+      "line": 4942
+    },
+    {
+      "step": 22,
+      "loss": 0.04811429977416992,
+      "grad_finite": false,
+      "line": 5215
+    },
+    {
+      "step": 23,
+      "loss": 0.04912705719470978,
+      "grad_finite": false,
+      "line": 5230
+    },
+    {
+      "step": 24,
+      "loss": 0.042994424700737,
+      "grad_finite": false,
+      "line": 5512
+    },
+    {
+      "step": 25,
+      "loss": 0.063443124294281,
+      "grad_finite": false,
+      "line": 5525
+    },
+    {
+      "step": 26,
+      "loss": 0.10623857378959656,
+      "grad_finite": false,
+      "line": 5782
+    },
+    {
+      "step": 27,
+      "loss": 0.029878873378038406,
+      "grad_finite": false,
+      "line": 5791
+    },
+    {
+      "step": 28,
+      "loss": 0.000271303957561031,
+      "grad_finite": false,
+      "line": 6053
+    },
+    {
+      "step": 29,
+      "loss": 0.04169851541519165,
+      "grad_finite": false,
+      "line": 6066
+    },
+    {
+      "step": 30,
+      "loss": 0.05402097478508949,
+      "grad_finite": false,
+      "line": 6339
+    },
+    {
+      "step": 31,
+      "loss": 0.03334902226924896,
+      "grad_finite": false,
+      "line": 6350
+    },
+    {
+      "step": 32,
+      "loss": 0.041729625314474106,
+      "grad_finite": false,
+      "line": 6633
+    },
+    {
+      "step": 33,
+      "loss": 0.04279091954231262,
+      "grad_finite": false,
+      "line": 6646
+    },
+    {
+      "step": 34,
+      "loss": 0.16510683298110962,
+      "grad_finite": false,
+      "line": 6976
+    },
+    {
+      "step": 35,
+      "loss": 0.05349484831094742,
+      "grad_finite": false,
+      "line": 6991
+    },
+    {
+      "step": 36,
+      "loss": 0.05671694502234459,
+      "grad_finite": false,
+      "line": 7269
+    },
+    {
+      "step": 37,
+      "loss": 0.03473356366157532,
+      "grad_finite": false,
+      "line": 7284
+    },
+    {
+      "step": 38,
+      "loss": 0.04881785809993744,
+      "grad_finite": false,
+      "line": 7593
+    },
+    {
+      "step": 39,
+      "loss": 0.05685634911060333,
+      "grad_finite": false,
+      "line": 7606
+    },
+    {
+      "step": 40,
+      "loss": 0.04223455861210823,
+      "grad_finite": false,
+      "line": 7891
+    },
+    {
+      "step": 41,
+      "loss": 0.0002744937955867499,
+      "grad_finite": false,
+      "line": 7902
+    },
+    {
+      "step": 42,
+      "loss": 0.0439138188958168,
+      "grad_finite": false,
+      "line": 8192
+    },
+    {
+      "step": 43,
+      "loss": 0.04906938970088959,
+      "grad_finite": false,
+      "line": 8207
+    },
+    {
+      "step": 44,
+      "loss": 0.0002314995799679309,
+      "grad_finite": false,
+      "line": 8523
+    },
+    {
+      "step": 45,
+      "loss": 0.054266393184661865,
+      "grad_finite": false,
+      "line": 8540
+    },
+    {
+      "step": 46,
+      "loss": 0.04174468293786049,
+      "grad_finite": false,
+      "line": 8851
+    },
+    {
+      "step": 47,
+      "loss": 0.04172230139374733,
+      "grad_finite": false,
+      "line": 8862
+    },
+    {
+      "step": 48,
+      "loss": 0.06358901411294937,
+      "grad_finite": false,
+      "line": 9156
+    },
+    {
+      "step": 49,
+      "loss": 0.03489556908607483,
+      "grad_finite": false,
+      "line": 9169
+    },
+    {
+      "step": 50,
+      "loss": 0.0697835385799408,
+      "grad_finite": false,
+      "line": 9489
+    },
+    {
+      "step": 51,
+      "loss": 0.03629158437252045,
+      "grad_finite": false,
+      "line": 9500
+    },
+    {
+      "step": 52,
+      "loss": 0.04870600998401642,
+      "grad_finite": false,
+      "line": 9857
+    },
+    {
+      "step": 53,
+      "loss": 0.05290958285331726,
+      "grad_finite": false,
+      "line": 9870
+    },
+    {
+      "step": 54,
+      "loss": 0.041693467646837234,
+      "grad_finite": false,
+      "line": 10207
+    },
+    {
+      "step": 55,
+      "loss": 0.03395546227693558,
+      "grad_finite": false,
+      "line": 10222
+    },
+    {
+      "step": 56,
+      "loss": 0.043219465762376785,
+      "grad_finite": false,
+      "line": 10643
+    },
+    {
+      "step": 57,
+      "loss": 0.04434875026345253,
+      "grad_finite": false,
+      "line": 10658
+    },
+    {
+      "step": 58,
+      "loss": 0.0402725487947464,
+      "grad_finite": false,
+      "line": 10975
+    },
+    {
+      "step": 59,
+      "loss": 0.031047925353050232,
+      "grad_finite": false,
+      "line": 10990
+    },
+    {
+      "step": 60,
+      "loss": 0.037031278014183044,
+      "grad_finite": false,
+      "line": 11319
+    },
+    {
+      "step": 61,
+      "loss": 0.04473911598324776,
+      "grad_finite": false,
+      "line": 11332
+    },
+    {
+      "step": 62,
+      "loss": 0.05114871263504028,
+      "grad_finite": false,
+      "line": 11691
+    },
+    {
+      "step": 63,
+      "loss": 0.05310213565826416,
+      "grad_finite": false,
+      "line": 11704
+    },
+    {
+      "step": 64,
+      "loss": 0.03094238042831421,
+      "grad_finite": false,
+      "line": 12063
+    },
+    {
+      "step": 65,
+      "loss": 0.00023338761820923537,
+      "grad_finite": false,
+      "line": 12074
+    },
+    {
+      "step": 66,
+      "loss": 0.04581761360168457,
+      "grad_finite": false,
+      "line": 12441
+    },
+    {
+      "step": 67,
+      "loss": 0.047386884689331055,
+      "grad_finite": false,
+      "line": 12452
+    },
+    {
+      "step": 68,
+      "loss": 0.04304448887705803,
+      "grad_finite": false,
+      "line": 12783
+    },
+    {
+      "step": 69,
+      "loss": 0.04809638485312462,
+      "grad_finite": false,
+      "line": 12794
+    },
+    {
+      "step": 70,
+      "loss": 0.04864177852869034,
+      "grad_finite": false,
+      "line": 13199
+    },
+    {
+      "step": 71,
+      "loss": 0.0733073502779007,
+      "grad_finite": false,
+      "line": 13212
+    },
+    {
+      "step": 72,
+      "loss": 0.03663434088230133,
+      "grad_finite": false,
+      "line": 13611
+    },
+    {
+      "step": 73,
+      "loss": 0.00024059359566308558,
+      "grad_finite": false,
+      "line": 13624
+    },
+    {
+      "step": 74,
+      "loss": 0.03830473870038986,
+      "grad_finite": false,
+      "line": 14447
+    },
+    {
+      "step": 75,
+      "loss": 0.04039030522108078,
+      "grad_finite": false,
+      "line": 14462
+    },
+    {
+      "step": 76,
+      "loss": 0.058821022510528564,
+      "grad_finite": false,
+      "line": 14825
+    },
+    {
+      "step": 77,
+      "loss": 0.03546826168894768,
+      "grad_finite": false,
+      "line": 14838
+    },
+    {
+      "step": 78,
+      "loss": 0.00019772976520471275,
+      "grad_finite": false,
+      "line": 15178
+    },
+    {
+      "step": 79,
+      "loss": 0.00021750768064521253,
+      "grad_finite": false,
+      "line": 15191
+    },
+    {
+      "step": 80,
+      "loss": 0.05319909751415253,
+      "grad_finite": false,
+      "line": 15566
+    },
+    {
+      "step": 81,
+      "loss": 0.04188070073723793,
+      "grad_finite": false,
+      "line": 15579
+    },
+    {
+      "step": 82,
+      "loss": 0.04519426450133324,
+      "grad_finite": false,
+      "line": 16032
+    },
+    {
+      "step": 83,
+      "loss": 0.07914318889379501,
+      "grad_finite": false,
+      "line": 16043
+    },
+    {
+      "step": 84,
+      "loss": 0.03408240154385567,
+      "grad_finite": false,
+      "line": 16660
+    },
+    {
+      "step": 85,
+      "loss": 0.03536904230713844,
+      "grad_finite": false,
+      "line": 16673
+    },
+    {
+      "step": 86,
+      "loss": 0.046034932136535645,
+      "grad_finite": false,
+      "line": 17070
+    },
+    {
+      "step": 87,
+      "loss": 0.0002456257352605462,
+      "grad_finite": false,
+      "line": 17083
+    },
+    {
+      "step": 88,
+      "loss": 0.04154832661151886,
+      "grad_finite": false,
+      "line": 17775
+    },
+    {
+      "step": 89,
+      "loss": 0.04238572716712952,
+      "grad_finite": false,
+      "line": 17786
+    },
+    {
+      "step": 90,
+      "loss": 0.03958204388618469,
+      "grad_finite": false,
+      "line": 18175
+    },
+    {
+      "step": 91,
+      "loss": 0.04040614143013954,
+      "grad_finite": false,
+      "line": 18186
+    },
+    {
+      "step": 92,
+      "loss": 0.0457770861685276,
+      "grad_finite": false,
+      "line": 18805
+    },
+    {
+      "step": 93,
+      "loss": 0.04238278791308403,
+      "grad_finite": false,
+      "line": 18816
+    },
+    {
+      "step": 94,
+      "loss": 0.00025032449048012495,
+      "grad_finite": false,
+      "line": 19180
+    },
+    {
+      "step": 95,
+      "loss": 0.04271133244037628,
+      "grad_finite": false,
+      "line": 19193
+    },
+    {
+      "step": 96,
+      "loss": 0.04281143844127655,
+      "grad_finite": false,
+      "line": 20162
+    },
+    {
+      "step": 97,
+      "loss": 0.043383240699768066,
+      "grad_finite": false,
+      "line": 20175
+    },
+    {
+      "step": 98,
+      "loss": 0.04750549793243408,
+      "grad_finite": false,
+      "line": 20700
+    },
+    {
+      "step": 99,
+      "loss": 0.04759848490357399,
+      "grad_finite": false,
+      "line": 20713
+    }
+  ]
+}
