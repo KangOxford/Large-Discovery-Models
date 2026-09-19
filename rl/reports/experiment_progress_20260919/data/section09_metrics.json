@@ -1,0 +1,59 @@
+{
+  "source": "data/pr06_followup_metrics.json",
+  "source_sha256": "eead5c688f852527824a2e81a64cb099934f10bcf4dab23ab0dd28e0a1586694",
+  "statistics": {
+    "A": {
+      "n": 50,
+      "gap_min": 0.15429309010505676,
+      "gap_q25": 0.21779346466064453,
+      "gap_median": 0.24970398098230362,
+      "gap_q75": 0.26930536329746246,
+      "gap_max": 0.31344565749168396,
+      "gap_p95": 0.2859587222337723,
+      "flagged_groups": 49,
+      "groups": 100,
+      "finite_grad_norm": 50,
+      "gradient_records": 50
+    },
+    "B": {
+      "n": 58,
+      "gap_min": 0.002629948081448674,
+      "gap_q25": 0.006250590551644564,
+      "gap_median": 0.00786481867544353,
+      "gap_q75": 0.00877607287839055,
+      "gap_max": 0.01167202927172184,
+      "gap_p95": 0.010608237329870462,
+      "flagged_groups": 37,
+      "groups": 58,
+      "finite_grad_norm": 58,
+      "gradient_records": 58
+    },
+    "C": {
+      "n": 27,
+      "gap_min": 0.37269240617752075,
+      "gap_q25": 0.4384617954492569,
+      "gap_median": 0.4581470191478729,
+      "gap_q75": 0.48890912532806396,
+      "gap_max": 0.5091623663902283,
+      "gap_p95": 0.5069031536579132,
+      "flagged_groups": 18,
+      "groups": 56,
+      "finite_grad_norm": 27,
+      "gradient_records": 27
+    },
+    "D": {
+      "n": 100,
+      "gap_min": 0.004529991652816534,
+      "gap_q25": 0.007261865888722241,
+      "gap_median": 0.007822105661034584,
+      "gap_q75": 0.0083768789190799,
+      "gap_max": 0.011620045639574528,
+      "gap_p95": 0.009518223302438854,
+      "flagged_groups": 9,
+      "groups": 100,
+      "finite_grad_norm": 0,
+      "gradient_records": 100
+    }
+  },
+  "status": "Observed statistics; controlled replays and parameter-delta tests remain proposed."
+}
