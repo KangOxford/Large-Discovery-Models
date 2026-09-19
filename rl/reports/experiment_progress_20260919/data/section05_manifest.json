@@ -1,39 +1,38 @@
 {
-  "status": "Proposed diagnostic handoff; no new experiment executed.",
+  "status": "Existing quantitative results; diagnostic follow-ups proposed, not executed.",
+  "evidence": "data/section05_evidence.json",
   "sources": [
     {
-      "file": "data/evidence.json",
-      "sha256": "cd55f5433ffeb54c6fcd7b5bb7a1f5d9a81977151c2dfeccc157d6a63abbdfa4"
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/results/grad_updates.json",
+      "sha256": "5854c4aa940597aeedcb9f1d1e36702dc41018d0255c7bdb6677415917a19323"
     },
     {
-      "file": "data/section03_loss_grad.json",
-      "sha256": "72a522e9e0f78fb91f7ebcdddce4be2db53007f71714a1e9c30a5fc76ad80777"
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/results/yardstick/lifetime_trend.json",
+      "sha256": "eaad082b4a4841cba545fefca5a713539c39c3057b320c060f0db4db1b5e85a7"
     },
     {
-      "file": "data/section04_evidence.json",
-      "sha256": "5a1af1f6a6cf09cd4d02ff9e1020738b22a7632e115a8adb327379942399bf98"
-    }
-  ],
-  "sections": [
-    {
-      "id": "5.1",
-      "title": "先找异常首次出现的位置，再讨论原因",
-      "status": "proposed"
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/results/exploration.json",
+      "sha256": "2ad4f32d1623357ac6ca38e2efb75886552f541d4f24b2f3a93c18c554586b4c"
     },
     {
-      "id": "5.2",
-      "title": "改动有效，必须在同一故障上做对照",
-      "status": "proposed"
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/results/g12c_qsar_20260901T010923Z/best_model_metadata.json",
+      "sha256": "d33dc3cba61dbd3ba19692fdc147ca6de12b4c21c9659ba26ddee77dd810b964"
     },
     {
-      "id": "5.3",
-      "title": "奖励没有区分度，要追到候选级数据",
-      "status": "proposed"
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/results/g12d_qsar_matched_20260901T011826Z/best_model_metadata.json",
+      "sha256": "c4cdae4b96dcf1f4789da1b7b6e2e9336fed03518ea646c2b99f7391348cd544"
     },
     {
-      "id": "5.4",
-      "title": "交接的终点，是别人能复核的定位结论",
-      "status": "proposed"
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/code/collect_grad_updates.py",
+      "sha256": "5699ddba6167c44c8f30b2c536a2949c5bf847d20cfbfcdd84037a9cf859b592"
+    },
+    {
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/code/eval_frozen_yardstick.py",
+      "sha256": "ad4de447cab58dc4116bb46861d41db03d3d0909afb19f98f35809d46c6eacda"
+    },
+    {
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/code/collect_exploration.py",
+      "sha256": "268716eb03723ab7e2ee5d6c8b761f16f7ceb240d7910777d0160d51be0b2dc1"
     }
   ]
 }
