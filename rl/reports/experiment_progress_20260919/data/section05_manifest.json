@@ -1,0 +1,39 @@
+{
+  "status": "Proposed diagnostic handoff; no new experiment executed.",
+  "sources": [
+    {
+      "file": "data/evidence.json",
+      "sha256": "cd55f5433ffeb54c6fcd7b5bb7a1f5d9a81977151c2dfeccc157d6a63abbdfa4"
+    },
+    {
+      "file": "data/section03_loss_grad.json",
+      "sha256": "72a522e9e0f78fb91f7ebcdddce4be2db53007f71714a1e9c30a5fc76ad80777"
+    },
+    {
+      "file": "data/section04_evidence.json",
+      "sha256": "5a1af1f6a6cf09cd4d02ff9e1020738b22a7632e115a8adb327379942399bf98"
+    }
+  ],
+  "sections": [
+    {
+      "id": "5.1",
+      "title": "先找异常首次出现的位置，再讨论原因",
+      "status": "proposed"
+    },
+    {
+      "id": "5.2",
+      "title": "改动有效，必须在同一故障上做对照",
+      "status": "proposed"
+    },
+    {
+      "id": "5.3",
+      "title": "奖励没有区分度，要追到候选级数据",
+      "status": "proposed"
+    },
+    {
+      "id": "5.4",
+      "title": "交接的终点，是别人能复核的定位结论",
+      "status": "proposed"
+    }
+  ]
+}

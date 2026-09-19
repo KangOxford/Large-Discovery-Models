@@ -1,0 +1,441 @@
+{
+  "stationarity": {
+    "spec": {
+      "pool": "/lus/lfs1aip2/projects/public/u6gb/tasks/large-discovery-model/ldm_rl/results/gp/real_pool.jsonl",
+      "shuffle_seed": 0,
+      "n_snapshot": 63,
+      "kernel": "fingerprint+tanimoto",
+      "gp_seed": 0,
+      "ehvi_seed": 12345,
+      "ehvi_n_samples": 128,
+      "fit_itersteps": 20,
+      "fingerprint": "2bd9c87067f78656"
+    },
+    "n_candidates": 8,
+    "candidate_slice": [
+      350,
+      358
+    ],
+    "candidates_are_fixed_across_history_sizes": true,
+    "snapshot_fit_seconds": 7.734095573425293,
+    "points": [
+      {
+        "n_history": 41,
+        "drifting_median": 0.00838310784175178,
+        "drifting_mean": 0.010606289186541652,
+        "drifting_max": 0.022875043103499,
+        "drifting_n_zero": 1,
+        "drifting_sigma_obj0": [
+          1.50478994846344,
+          1.6759151220321655
+        ],
+        "drifting_sigma_obj1": [
+          0.538163423538208,
+          0.6089227199554443
+        ],
+        "frozen_median": 0.0037296272571502587,
+        "frozen_mean": 0.005241116545848513,
+        "frozen_max": 0.01645089747234524,
+        "frozen_n_zero": 2
+      },
+      {
+        "n_history": 63,
+        "drifting_median": 0.0037296272571502587,
+        "drifting_mean": 0.005241116545848513,
+        "drifting_max": 0.01645089747234524,
+        "drifting_n_zero": 2,
+        "drifting_sigma_obj0": [
+          1.2967356443405151,
+          1.467779278755188
+        ],
+        "drifting_sigma_obj1": [
+          0.4965062439441681,
+          0.561694324016571
+        ],
+        "frozen_median": 0.0037296272571502587,
+        "frozen_mean": 0.005241116545848513,
+        "frozen_max": 0.01645089747234524,
+        "frozen_n_zero": 2
+      },
+      {
+        "n_history": 120,
+        "drifting_median": 0.0008770920709937347,
+        "drifting_mean": 0.0024226598295489753,
+        "drifting_max": 0.008233981674930807,
+        "drifting_n_zero": 4,
+        "drifting_sigma_obj0": [
+          1.2235859632492065,
+          1.4053046703338623
+        ],
+        "drifting_sigma_obj1": [
+          0.4239712357521057,
+          0.4828455150127411
+        ],
+        "frozen_median": 0.0037296272571502587,
+        "frozen_mean": 0.005241116545848513,
+        "frozen_max": 0.01645089747234524,
+        "frozen_n_zero": 2
+      },
+      {
+        "n_history": 300,
+        "drifting_median": 0.0,
+        "drifting_mean": 0.002086235401912672,
+        "drifting_max": 0.01477550718358217,
+        "drifting_n_zero": 5,
+        "drifting_sigma_obj0": [
+          0.8451426029205322,
+          1.3435697555541992
+        ],
+        "drifting_sigma_obj1": [
+          0.28280848264694214,
+          0.4039222300052643
+        ],
+        "frozen_median": 0.0037296272571502587,
+        "frozen_mean": 0.005241116545848513,
+        "frozen_max": 0.01645089747234524,
+        "frozen_n_zero": 2
+      }
+    ],
+    "discrimination": {
+      "strong_mean": 0.017212020375408,
+      "weak_mean": 0.008993408897696578,
+      "strong_median": 0.014686431574506983,
+      "weak_median": 0.007848300418805132,
+      "strong_frac_nonzero": 1.0,
+      "weak_frac_nonzero": 1.0
+    }
+  },
+  "history": [
+    {
+      "rollout": 0,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 2245
+    },
+    {
+      "rollout": 1,
+      "raw_reward": 0.006639535388266511,
+      "mean_advantage": 4.470348358154297e-08,
+      "line": 2688
+    },
+    {
+      "rollout": 2,
+      "raw_reward": 0.00968470486932696,
+      "mean_advantage": 2.9802322387695312e-08,
+      "line": 3133
+    },
+    {
+      "rollout": 3,
+      "raw_reward": 0.005143464093339718,
+      "mean_advantage": 0.0,
+      "line": 3547
+    },
+    {
+      "rollout": 4,
+      "raw_reward": 0.0001584559171360217,
+      "mean_advantage": 0.0,
+      "line": 3881
+    },
+    {
+      "rollout": 5,
+      "raw_reward": 0.008823982342927118,
+      "mean_advantage": 0.0,
+      "line": 4379
+    },
+    {
+      "rollout": 6,
+      "raw_reward": 0.0027259727245624032,
+      "mean_advantage": -1.4901161193847656e-08,
+      "line": 4812
+    },
+    {
+      "rollout": 7,
+      "raw_reward": 0.033867361031979897,
+      "mean_advantage": -2.9802322387695312e-08,
+      "line": 5255
+    },
+    {
+      "rollout": 8,
+      "raw_reward": 0.0001718608659023041,
+      "mean_advantage": 0.0,
+      "line": 5652
+    },
+    {
+      "rollout": 9,
+      "raw_reward": 0.00010313650896993931,
+      "mean_advantage": -4.470348358154297e-08,
+      "line": 6039
+    },
+    {
+      "rollout": 10,
+      "raw_reward": 0.0005931919599777083,
+      "mean_advantage": 2.9802322387695312e-08,
+      "line": 6514
+    },
+    {
+      "rollout": 11,
+      "raw_reward": 0.016535921065348527,
+      "mean_advantage": 4.470348358154297e-08,
+      "line": 6869
+    },
+    {
+      "rollout": 12,
+      "raw_reward": 4.649978024206386e-05,
+      "mean_advantage": -1.4901161193847656e-08,
+      "line": 7162
+    },
+    {
+      "rollout": 13,
+      "raw_reward": 0.0006474827948742962,
+      "mean_advantage": 0.0,
+      "line": 7610
+    },
+    {
+      "rollout": 14,
+      "raw_reward": 0.016227987457474585,
+      "mean_advantage": 1.9371509552001953e-07,
+      "line": 8175
+    },
+    {
+      "rollout": 15,
+      "raw_reward": 0.13911882640988318,
+      "mean_advantage": 0.0,
+      "line": 8701
+    },
+    {
+      "rollout": 16,
+      "raw_reward": 0.00026942573754352994,
+      "mean_advantage": -2.9802322387695312e-08,
+      "line": 9170
+    },
+    {
+      "rollout": 17,
+      "raw_reward": 0.001736351421112177,
+      "mean_advantage": 1.4901161193847656e-08,
+      "line": 9657
+    },
+    {
+      "rollout": 18,
+      "raw_reward": 0.00025215156274278894,
+      "mean_advantage": -1.4901161193847656e-08,
+      "line": 10117
+    },
+    {
+      "rollout": 19,
+      "raw_reward": 1.0510433840066336e-06,
+      "mean_advantage": -1.4901161193847656e-08,
+      "line": 10704
+    },
+    {
+      "rollout": 20,
+      "raw_reward": 0.003726611382857542,
+      "mean_advantage": 4.470348358154297e-08,
+      "line": 11215
+    },
+    {
+      "rollout": 21,
+      "raw_reward": 0.017609131571302734,
+      "mean_advantage": 4.470348358154297e-08,
+      "line": 11717
+    },
+    {
+      "rollout": 22,
+      "raw_reward": 4.0623973821721227e-05,
+      "mean_advantage": -1.4901161193847656e-08,
+      "line": 12153
+    },
+    {
+      "rollout": 23,
+      "raw_reward": 0.01782696636502621,
+      "mean_advantage": -2.9802322387695312e-08,
+      "line": 12714
+    },
+    {
+      "rollout": 24,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 13086
+    },
+    {
+      "rollout": 25,
+      "raw_reward": 2.405602438443344e-06,
+      "mean_advantage": 1.4901161193847656e-08,
+      "line": 13431
+    },
+    {
+      "rollout": 26,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 13794
+    },
+    {
+      "rollout": 27,
+      "raw_reward": 0.008459352139472472,
+      "mean_advantage": 1.4901161193847656e-08,
+      "line": 14292
+    },
+    {
+      "rollout": 28,
+      "raw_reward": 0.0009783715388013425,
+      "mean_advantage": 0.0,
+      "line": 14757
+    },
+    {
+      "rollout": 29,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 15144
+    },
+    {
+      "rollout": 30,
+      "raw_reward": 0.005732254013696432,
+      "mean_advantage": 1.1920928955078125e-07,
+      "line": 15696
+    },
+    {
+      "rollout": 31,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 16162
+    },
+    {
+      "rollout": 32,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 16682
+    },
+    {
+      "rollout": 33,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 17141
+    },
+    {
+      "rollout": 34,
+      "raw_reward": 0.001090952316880514,
+      "mean_advantage": 1.4901161193847656e-08,
+      "line": 17675
+    },
+    {
+      "rollout": 35,
+      "raw_reward": 1.5486020518248877e-05,
+      "mean_advantage": 0.0,
+      "line": 18145
+    },
+    {
+      "rollout": 36,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 18558
+    },
+    {
+      "rollout": 37,
+      "raw_reward": 8.582995460316989e-05,
+      "mean_advantage": 1.4901161193847656e-08,
+      "line": 18964
+    },
+    {
+      "rollout": 38,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 19433
+    },
+    {
+      "rollout": 39,
+      "raw_reward": 0.0001845924239481378,
+      "mean_advantage": 0.0,
+      "line": 19883
+    },
+    {
+      "rollout": 40,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 20236
+    },
+    {
+      "rollout": 41,
+      "raw_reward": 6.184524698147481e-05,
+      "mean_advantage": -1.4901161193847656e-08,
+      "line": 20810
+    },
+    {
+      "rollout": 42,
+      "raw_reward": 0.0030665558381941724,
+      "mean_advantage": 0.0,
+      "line": 21284
+    },
+    {
+      "rollout": 43,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 21729
+    },
+    {
+      "rollout": 44,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 22214
+    },
+    {
+      "rollout": 45,
+      "raw_reward": 0.00017020673179073131,
+      "mean_advantage": -1.4901161193847656e-08,
+      "line": 22707
+    },
+    {
+      "rollout": 46,
+      "raw_reward": 0.0011831216273641074,
+      "mean_advantage": -1.4901161193847656e-08,
+      "line": 23182
+    },
+    {
+      "rollout": 47,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 23650
+    },
+    {
+      "rollout": 48,
+      "raw_reward": 9.547496354136986e-07,
+      "mean_advantage": -1.4901161193847656e-08,
+      "line": 24147
+    },
+    {
+      "rollout": 49,
+      "raw_reward": 0.0,
+      "mean_advantage": 0.0,
+      "line": 24496
+    }
+  ],
+  "snapshot_counts": {
+    "total": 2904,
+    "both_main": 1930,
+    "all_three": 658,
+    "missing_bucket": 1272,
+    "different": 94
+  },
+  "counter_code_current": "def _compute_zero_std_metrics(args, all_samples: list[Sample]):\n    # only compute in GRPO-like algorithms where one prompt has multiple responses\n    if args.advantage_estimator == \"ppo\":\n        return {}\n\n    def _group_rewards(samples: list[Sample]):\n        return [sample.get_reward_value(args) for sample in samples]\n\n    mode = getattr(args, \"grpo_advantage_std_mode\", DEFAULT_ADVANTAGE_STD_MODE)\n\n    def _is_zero_std(samples: list[Sample]):\n        rewards = _group_rewards(samples)\n        return len(rewards) == 0 or all(rewards[0] == r for r in rewards)\n\n    def _is_below_eps_std(samples: list[Sample]):\n        # `_is_zero_std` only catches exact float ties, but `_post_process_rewards` divides\n        # by `std + _ADVANTAGE_STD_EPS`. A group whose rewards differ only by float residue\n        # (e.g. a `max(0.0, ...)` reward landing on 5e-13) keeps a nonzero std, so the exact\n        # check never sees it, yet its advantages come out at ~eps of full scale: no usable\n        # gradient. Mirror the training-side computation (same float32 cast, same unbiased\n        # std) so the two cannot drift apart.\n        rewards = _group_rewards(samples)\n        if len(rewards) < 2:\n            return True\n        std = torch.tensor(rewards, dtype=torch.float).std().item()\n        return not np.isfinite(std) or std < _ADVANTAGE_STD_EPS\n\n    def _is_degenerate_std(samples: list[Sample]):\n        # The set `normalize_by_group_std` sends to exactly 0.0 in \"scale_free\" mode:\n        # fewer than two samples, or a std that is not finite and strictly positive.\n        rewards = _group_rewards(samples)\n        if len(rewards) < 2:\n            return True\n        std = torch.tensor(rewards, dtype=group_stat_dtype(mode)).std().item()\n        return not np.isfinite(std) or std <= 0.0\n\n    all_sample_groups = group_by(all_samples, lambda s: s.group_index)\n    interesting_sample_groups = [g for g in all_sample_groups.values() if _is_zero_std(g)]\n\n    interesting_rewards = [str(round(g[0].get_reward_value(args), 1)) for g in interesting_sample_groups]\n\n    metrics = {f\"zero_std/count_{reward}\": len(items) for reward, items in group_by(interesting_rewards).items()}\n    # emitted on every rollout, zero included: a missing key cannot be told apart from\n    # \"this was never measured\", which is exactly how the exact-equality count read.\n    metrics[\"zero_std/count_lt_eps\"] = sum(1 for g in all_sample_groups.values() if _is_below_eps_std(g))\n    # `count_lt_eps` is only the gradient-killing set under `legacy_eps`. Under\n    # `scale_free` a sub-eps std is normalized like any other, so the set that really\n    # carries no gradient is the exactly-degenerate one. Report the count that matches\n    # the running mode, and label it with that mode so the two cannot be confused when\n    # comparing runs recorded on either side of the flag.\n    degenerate = _is_below_eps_std if mode == \"legacy_eps\" else _is_degenerate_std\n    metrics[\"zero_std/count_no_gradient\"] = sum(1 for g in all_sample_groups.values() if degenerate(g))\n    metrics[\"zero_std/mode_is_scale_free\"] = float(mode == \"scale_free\")\n    return metrics",
+  "historical_binding": "Current inspected source; historical per-run implementation identity is not established by this source alone.",
+  "sources": [
+    {
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/results/yardstick/stationarity.json",
+      "sha256": "20f4e632091aaef12f39cf5539cf216ca556400e68554fa02965dbe736e8c8c9"
+    },
+    {
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/evidence/rollouts_20260910.psv",
+      "sha256": "5d2372b6884f201beaa1fd5f01897090ba37c1e82ce08b24f53c93117563721b"
+    },
+    {
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/ldm_rl/runs/9b-sft_20260909T071143Z/train.log",
+      "sha256": "6a40730352a91dbefbf338aaaccfea6c1eaa480c5dfadb5320b1c7ff31cfc9ba"
+    },
+    {
+      "path": "/projects/public/u6gb/kangli/large-discovery-model/LDM-rl/rl/slime/slime/ray/rollout.py",
+      "sha256": "2ec13f7aac566c8ed7d2f0f038f8836444b0c5c0b55f6ebc50182112e95ac29c"
+    },
+    {
+      "path": "/lus/lfs1aip2/projects/public/u6gb/kangli/large-discovery-model/_wt_experiment_figures_20260919/rl/ldm_rl/env.py",
+      "sha256": "844ef17496003f6bf94a23e6f4e2207c581ce0c8700d2694436f2438d9a00a55"
+    }
+  ]
+}
