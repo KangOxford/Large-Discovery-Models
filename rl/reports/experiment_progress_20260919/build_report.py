@@ -149,7 +149,7 @@ def canvas(number,title,subtitle,caption):
     fig.text(.045,.907,subtitle,fontsize=14,color=MUTED,va='top')
     fig.add_artist(plt.Line2D([.045,.955],[.25,.25],transform=fig.transFigure,color=LINE))
     fig.text(.045,.226,wrap(caption),fontsize=11.5,linespacing=1.65,va='top')
-    fig.text(.955,.025,'LDM RL · 实验记录截至 2026-09-10 · 2026-09-19 核验',ha='right',fontsize=10,color=MUTED)
+    fig.text(.955,.025,'LDM RL · 证据截至 2026-09-10 · 2026-09-19 核验',ha='right',fontsize=10,color=MUTED)
     return fig
 
 def style(ax):
@@ -282,6 +282,7 @@ FIGURES=[fig1,fig2,fig3,fig4]
 HEADINGS=['2.1 小模型：端到端链路验证','2.2 9B：训练执行与数值表现','2.3 奖励与采样：两条配置的观测对比','2.4 阶段性结果：距离效果结论还有多远']
 
 def build(data):
+    from argument_figures import FIGURES, SECTIONS, TITLE, THESIS
     setup_font();(HERE/'figures').mkdir(exist_ok=True)
     figures=[]
     with PdfPages(HERE/'experiment_progress.pdf') as pdf:
@@ -290,21 +291,24 @@ def build(data):
             f.savefig(HERE/f'figures/figure_{i}.svg');pdf.savefig(f);plt.close(f)
             figures.append(HERE/f'figures/figure_{i}.png')
     blocks=[]
-    for title,p in zip(HEADINGS,figures):
+    for (title,argument),p in zip(SECTIONS,figures):
         encoded=base64.b64encode(p.read_bytes()).decode()
-        blocks.append(f'<section><h2>{html.escape(title)}</h2><a href="data:image/png;base64,{encoded}" target="_blank"><img alt="{html.escape(title)}；完整说明见图内图注" src="data:image/png;base64,{encoded}"></a></section>')
-    (HERE/'experiment_progress.html').write_text('<!doctype html><html lang="zh"><meta charset="utf-8"><title>LDM RL · 训练实验与阶段性结果</title><style>body{margin:0;background:#edf1f6;color:#172b43;font-family:system-ui,sans-serif}main{max-width:1500px;margin:30px auto}h1,h2,p{padding:0 24px}h2{font-size:18px;margin:35px 0 12px}img{width:100%;height:auto;display:block}section{background:#f7f9fc;padding-top:1px;margin-bottom:30px}p{color:#506277}</style><main><h1>训练实验与阶段性结果</h1><p>四张图独立包含结论、定义、样本量、限制与来源。实验记录截至 2026-09-10；2026-09-19 核验。</p>'+''.join(blocks)+'</main></html>')
+        blocks.append(f'<section><h2>{html.escape(title)}</h2><p>{html.escape(argument)}</p><a href="data:image/png;base64,{encoded}" target="_blank"><img alt="{html.escape(title)}；证据、边界与建议验证均在图内" src="data:image/png;base64,{encoded}"></a></section>')
+    (HERE/'experiment_progress.html').write_text('<!doctype html><html lang="zh"><meta charset="utf-8"><title>'+TITLE+'</title><style>body{margin:0;background:#edf1f6;color:#172b43;font-family:system-ui,sans-serif}main{max-width:1500px;margin:30px auto}h1,h2,p{padding:0 24px}h2{font-size:20px;margin:35px 0 12px}img{width:100%;height:auto;display:block}section{background:#f7f9fc;padding-top:1px;margin-bottom:30px}p{color:#506277;line-height:1.8;max-width:1050px}</style><main><h1>'+TITLE+'</h1><p>'+THESIS+'</p>'+''.join(blocks)+'</main></html>')
     import nbformat as nbf
     nb=nbf.v4.new_notebook();nb.metadata.kernelspec={'display_name':'Python 3','language':'python','name':'python3'}
-    nb.cells=[nbf.v4.new_markdown_cell('# 训练实验与阶段性结果\n\n四张独立图，正文仅保留小节标题。数据为已冻结的原始日志摘录；不启动训练。'),
-      nbf.v4.new_code_cell('from pathlib import Path\nimport json\nfrom IPython.display import display\nimport matplotlib.pyplot as plt\nfrom build_report import setup_font, FIGURES\nsetup_font()\ndata = json.loads(Path("data/evidence.json").read_text())')]
-    for i,title in enumerate(HEADINGS):
-        nb.cells.extend([nbf.v4.new_markdown_cell('## '+title),nbf.v4.new_code_cell(f'fig = FIGURES[{i}](data)\ndisplay(fig)\nplt.close(fig)')])
+    nb.cells=[nbf.v4.new_markdown_cell('# '+TITLE+'\n\n'+THESIS),
+      nbf.v4.new_code_cell('from pathlib import Path\nimport json\nfrom IPython.display import display\nimport matplotlib.pyplot as plt\nfrom build_report import setup_font\nfrom argument_figures import FIGURES\nsetup_font()\ndata = json.loads(Path("data/evidence.json").read_text())')]
+    for i,(title,argument) in enumerate(SECTIONS):
+        nb.cells.extend([nbf.v4.new_markdown_cell('## '+title+'\n\n'+argument),nbf.v4.new_code_cell(f'fig = FIGURES[{i}](data)\ndisplay(fig)\nplt.close(fig)')])
     # Explicit PNG rendering keeps outputs visible even when the kernel uses Agg.
     for cell in nb.cells:
         if cell.cell_type=='code' and 'display(fig)' in cell.source:
             cell.source=cell.source.replace('display(fig)','from io import BytesIO\nfrom IPython.display import Image\nbuf = BytesIO()\nfig.savefig(buf, format="png", dpi=150)\ndisplay(Image(data=buf.getvalue()))')
     nbf.write(nb,HERE/'experiment_progress.ipynb')
+    (HERE/'argument.md').write_text('# '+TITLE+'\n\n'+THESIS+'\n\n'+'\n\n'.join(
+        '## '+title+'\n\n'+argument+f'\n\n![{title}](figures/figure_{i+1}.png)'
+        for i,(title,argument) in enumerate(SECTIONS))+'\n')
 
 if __name__=='__main__':
     ap=argparse.ArgumentParser();ap.add_argument('--extract',type=Path);args=ap.parse_args()
