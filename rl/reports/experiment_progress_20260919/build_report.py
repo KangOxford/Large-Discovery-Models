@@ -43,11 +43,15 @@ def extract(root):
           'global_batch_size','rollout_batch_size','clip_grad','grpo_advantage_std_mode']},
           'reward':spec['reward'],'mode':spec['mode'],'grad':[],'rollout':[],
           'source_sha256':sha(p),'source_bytes':p.stat().st_size}
+        perf={}
         for lineno,line in enumerate(text.splitlines(),1):
-            m=re.search(r"(?:step|rollout) (\d+): (\{.*\})",line)
+            m=re.search(r"(?:step|rollout|perf) (\d+): (\{.*\})",line)
             if not m: continue
             metrics={k:float(v) for k,v in re.findall(
                 r"'([^']+)':\s*(-?(?:\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|nan|inf))",m.group(2))}
+            if 'rollout/zero_std/count_no_gradient' in metrics:
+                assert int(m[1]) not in perf
+                perf[int(m[1])]={'line':lineno,'metrics':metrics}
             if 'train/grad_norm' in metrics:
                 v=metrics['train/grad_norm']; item={'index':int(m[1]),'line':lineno,
                   'value':v if math.isfinite(v) else None,'nonfinite':not math.isfinite(v)}
@@ -60,7 +64,14 @@ def extract(root):
                   'exact_zero_groups_emitted':metrics.get('rollout/zero_std/count_0.0')}
                 r['rollout'].append(item)
                 rows.append([key,name,'raw_reward',item['index'],item['raw_reward'],False,lineno])
-                rows.append([key,name,'no_gradient_groups',item['index'],item['no_gradient_groups'],'',lineno])
+        for item in r['rollout']:
+            record=perf.get(item['index'])
+            if record:
+                metrics=record['metrics'];item['counter_line']=record['line']
+                item['no_gradient_groups']=metrics['rollout/zero_std/count_no_gradient']
+                item['lt_eps_groups']=metrics.get('rollout/zero_std/count_lt_eps')
+                item['exact_zero_groups_emitted']=metrics.get('rollout/zero_std/count_0.0')
+                rows.append([key,name,'no_gradient_groups',item['index'],item['no_gradient_groups'],'',record['line']])
         latest=d/'ckpt/latest_checkpointed_iteration.txt'
         r['checkpoint_last_iteration']=int(latest.read_text()) if latest.exists() else None
         r['checkpoint_dirs']=[f.name for f in sorted((d/'ckpt').glob('iter_*')) if f.is_dir()]
